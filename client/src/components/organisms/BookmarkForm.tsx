@@ -32,28 +32,20 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         tags,
       };
 
-      // Submit the basic update
-      await onSubmit(submitData);
-
-      // Only attempt enrichment after successful update
-      if (initialData?.id) {
-        try {
-          const response = await fetch('/api/bookmarks/enrich', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: [initialData.id] })
-          });
-          
-          if (!response.ok) {
-            console.error('Failed to enrich bookmark');
-          }
-        } catch (enrichError) {
-          console.error('Error enriching bookmark:', enrichError);
-          // Don't throw enrichment errors - they shouldn't block the update
-        }
+      const updatedBookmark = await onSubmit(submitData);
+      
+      if (updatedBookmark && initialData?.id) {
+        await fetch('/api/bookmarks/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: [initialData.id] })
+        });
       }
+
+      onCancel(); // Close the form after successful update
     } catch (error) {
       console.error('Error updating bookmark:', error);
+      throw error;
     }
   };
 
