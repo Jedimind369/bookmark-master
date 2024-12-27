@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { BookmarkModel } from "./models/bookmark";
+import { AIService } from "./services/aiService";
 import { insertBookmarkSchema } from "@db/schema";
 import { z } from "zod";
 
@@ -14,6 +15,24 @@ const importBookmarkSchema = z.object({
 }).array();
 
 export function registerRoutes(app: Express): Server {
+  // AI Analysis endpoint
+  app.post("/api/analyze-url", async (req, res) => {
+    try {
+      const { url } = await z.object({ url: z.string().url() }).parseAsync(req.body);
+      const analysis = await AIService.analyzeUrl(url);
+      res.json(analysis);
+    } catch (error) {
+      console.error("Failed to analyze URL:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid URL format",
+          errors: error.errors
+        });
+      }
+      res.status(500).json({ message: "Failed to analyze URL" });
+    }
+  });
+
   // Bookmark routes
   app.get("/api/bookmarks", async (req, res) => {
     try {
