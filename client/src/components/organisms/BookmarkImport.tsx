@@ -51,6 +51,16 @@ export const BookmarkImport = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Check file size before processing
+    if (file.size > 50 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "File size too large. Maximum size is 50MB.",
+      });
+      return;
+    }
+
     setImporting(true);
     setProgress(0);
 
@@ -69,6 +79,9 @@ export const BookmarkImport = () => {
         });
 
         if (!response.ok) {
+          if (response.status === 413) {
+            throw new Error('File size too large. Maximum size is 50MB.');
+          }
           throw new Error('Failed to parse HTML bookmarks');
         }
 

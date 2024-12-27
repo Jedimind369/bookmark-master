@@ -5,17 +5,23 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 
 // Configure express with increased limits for large files
-app.use(express.json({
-  limit: '50mb',
-  verify: (req, res, buf) => {
-    if (buf.length > 50 * 1024 * 1024) { // 50MB limit
-      throw new Error('File size too large. Maximum size is 50MB.');
-    }
+app.use((req, res, next) => {
+  if (req.headers['content-type']?.includes('text/html')) {
+    express.text({
+      type: 'text/html',
+      limit: '50mb',
+      verify: (req, res, buf) => {
+        if (buf.length > 50 * 1024 * 1024) { // 50MB limit
+          throw new Error('File size too large. Maximum size is 50MB.');
+        }
+      }
+    })(req, res, next);
+  } else {
+    next();
   }
-}));
+});
 
-app.use(express.text({
-  type: 'text/html',
+app.use(express.json({
   limit: '50mb',
   verify: (req, res, buf) => {
     if (buf.length > 50 * 1024 * 1024) { // 50MB limit
@@ -26,6 +32,18 @@ app.use(express.text({
 
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
+// Error handling middleware for payload size
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof Error && err.message.includes('File size too large')) {
+    return res.status(413).json({ message: err.message });
+  }
+  if (err instanceof SyntaxError && err.message.includes('entity too large')) {
+    return res.status(413).json({ message: 'File size too large. Maximum size is 50MB.' });
+  }
+  next(err);
+});
+
+// Logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -59,6 +77,7 @@ app.use((req, res, next) => {
 (async () => {
   const server = registerRoutes(app);
 
+  // Error handling middleware
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
