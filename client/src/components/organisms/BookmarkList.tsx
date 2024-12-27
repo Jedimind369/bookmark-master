@@ -46,9 +46,16 @@ export const BookmarkList = ({ onEdit, onDelete, onRefresh }: BookmarkListProps)
     );
   }
 
+  // Sort bookmarks by dateModified in descending order
+  const sortedBookmarks = [...bookmarks].sort((a, b) => {
+    const dateA = new Date(a.dateModified || a.dateAdded || 0).getTime();
+    const dateB = new Date(b.dateModified || b.dateAdded || 0).getTime();
+    return dateB - dateA;
+  });
+
   return (
     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      {bookmarks.map((bookmark) => (
+      {sortedBookmarks.map((bookmark) => (
         <BookmarkCard
           key={bookmark.id}
           bookmark={bookmark}

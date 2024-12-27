@@ -33,20 +33,42 @@ export const Home = () => {
       if (!response.ok) throw new Error("Failed to refresh bookmark analysis");
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+    onMutate: (bookmark) => {
+      // Optimistically update the UI
+      const previousBookmarks = queryClient.getQueryData(["/api/bookmarks"]);
+      queryClient.setQueryData(["/api/bookmarks"], (old: Bookmark[] | undefined) => {
+        if (!old) return old;
+        return old.map(b => b.id === bookmark.id ? {
+          ...b,
+          analysis: { ...b.analysis, status: 'processing' }
+        } : b);
+      });
+      return { previousBookmarks };
+    },
+    onSuccess: (updatedBookmark) => {
+      queryClient.setQueryData(["/api/bookmarks"], (old: Bookmark[] | undefined) => {
+        if (!old) return [updatedBookmark];
+        return old.map(b => b.id === updatedBookmark.id ? updatedBookmark : b);
+      });
       toast({
         title: "Success",
         description: "Bookmark analysis refreshed",
       });
     },
-    onError: () => {
+    onError: (error, _, context) => {
+      // Revert to the previous state on failure
+      if (context?.previousBookmarks) {
+        queryClient.setQueryData(["/api/bookmarks"], context.previousBookmarks);
+      }
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to refresh bookmark analysis",
+        description: error instanceof Error ? error.message : "Failed to refresh bookmark analysis",
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+    }
   });
 
   const purgeMutation = useMutation({
