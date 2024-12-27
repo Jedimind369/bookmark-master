@@ -30,24 +30,26 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         url: formData.url,
         description: formData.description,
         tags,
-        analysis: initialData?.analysis
+        analysis: null // Force re-analysis
       };
 
-      await onSubmit(submitData);
+      const updatedBookmark = await onSubmit(submitData);
       
-      if (initialData?.id) {
-        const enrichResponse = await fetch('/api/bookmarks/enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: [initialData.id] })
-        });
-
-        if (!enrichResponse.ok) {
-          console.error('Failed to trigger enrichment');
+      if (updatedBookmark?.id) {
+        // Trigger re-analysis immediately after update
+        try {
+          await fetch('/api/bookmarks/enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [updatedBookmark.id] })
+          });
+        } catch (error) {
+          console.error('Failed to trigger enrichment:', error);
         }
       }
 
-      onCancel();
+      // Force refresh of bookmark list
+      window.location.reload();
     } catch (error) {
       console.error('Error updating bookmark:', error);
       throw error;

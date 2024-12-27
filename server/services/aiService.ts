@@ -267,11 +267,23 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: "You are a website analyzer specializing in identifying landing pages and general websites. Provide detailed analysis of content focus and target audience."
+            content: `You are an expert website analyzer with the following capabilities:
+1. Identify if a page is a landing page or part of a larger website
+2. Determine the main purpose and target audience
+3. Generate meaningful descriptions even for partially accessible content
+4. Make educated guesses about website purpose based on URL structure and available context
+5. Extract key themes and topics for better bookmark categorization`
           },
           {
             role: "user",
-            content: `Analyze these pages from ${startUrl} and determine if it's a landing page or general website:
+            content: `Analyze these pages from ${startUrl} and provide a comprehensive analysis:
+
+1. If the URL is unreachable but the domain exists, make an educated guess about its purpose.
+2. For landing pages, focus on the specific product/service/purpose.
+3. For general websites, provide an overview of the main topics and target audience.
+
+Available content from crawling:
+</old_str>
 
 ${pages.map(page => `
 URL: ${page.url}
