@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -22,18 +23,15 @@ export const BookmarkEnrichment = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Query to get the count of bookmarks that can be enriched
   const { data: enrichmentCount } = useQuery({
     queryKey: ["/api/bookmarks/enrich/count"],
-    // Refresh every minute
     refetchInterval: 60000,
   });
 
-  // Poll enrichment status when processing
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
 
-    if (enrichmentStatus.status === "processing" || enrichmentStatus.status === "completed") {
+    if (enrichmentStatus.status === "processing") {
       pollInterval = setInterval(async () => {
         try {
           const response = await fetch("/api/bookmarks/enrich/status");
@@ -42,21 +40,20 @@ export const BookmarkEnrichment = () => {
           const status = await response.json();
           setEnrichmentStatus(status);
 
-          if (status.status === "completed" || status.status === "error") {
+          if (status.status === "completed") {
             clearInterval(pollInterval);
-            if (status.status === "completed") {
-              queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/bookmarks/enrich/count"] });
-              toast({
-                title: "Success",
-                description: "All bookmarks have been enriched with AI analysis",
-              });
-            }
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks/enrich/count"] });
+            toast({
+              title: "Success",
+              description: "All bookmarks have been enriched with AI analysis",
+            });
           }
         } catch (error) {
           console.error("Error polling enrichment status:", error);
+          clearInterval(pollInterval);
         }
-      }, 2000); // Poll every 2 seconds
+      }, 2000);
     }
 
     return () => {
@@ -98,17 +95,15 @@ export const BookmarkEnrichment = () => {
   const getProgressStatus = () => {
     if (enrichmentStatus.status === "processing" || enrichmentStatus.status === "completed") {
       const progress = Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100);
-      const isProcessing = enrichmentStatus.status === "processing" && enrichmentStatus.processedCount < enrichmentStatus.totalCount;
-      
       return (
         <Alert>
           <AlertDescription className="flex items-center gap-4">
             <Progress value={progress} className="w-[200px]" />
             <span className="text-sm text-muted-foreground">
               {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} enriched
-              {!isProcessing ? " (Completed)" : ""}
+              {enrichmentStatus.status === "completed" && " (Completed)"}
             </span>
-            {isProcessing && <Loader2 className="h-4 w-4 animate-spin" />}
+            {enrichmentStatus.status === "processing" && <Loader2 className="h-4 w-4 animate-spin" />}
           </AlertDescription>
         </Alert>
       );
