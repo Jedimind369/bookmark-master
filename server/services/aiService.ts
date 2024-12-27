@@ -1,23 +1,21 @@
-import OpenAI from "openai";
+import Anthropic from '@anthropic-ai/sdk';
 import * as cheerio from "cheerio";
 import fetch from "node-fetch";
 import type { Response } from "node-fetch";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY is not set");
+if (!process.env.ANTHROPIC_API_KEY) {
+  throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Using Claude 3 Haiku for cost-effective but powerful analysis
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 export interface AIAnalysis {
   title: string;
   description: string;
   tags: string[];
-  isLandingPage?: boolean;
-  mainTopic?: string;
   contentQuality: {
     relevance: number;
     informativeness: number;
@@ -34,7 +32,6 @@ export interface AIAnalysis {
     author?: string;
     publishDate?: string;
     lastModified?: string;
-    contentType?: string;
     mainImage?: string;
     wordCount?: number;
   };
@@ -45,7 +42,6 @@ interface PageContent {
   title: string;
   description: string;
   content: string;
-  links: string[];
   type?: 'webpage' | 'video' | 'article' | 'product';
   metadata?: {
     author?: string;
@@ -58,23 +54,25 @@ interface PageContent {
 
 export class AIService {
   private static readonly MAX_RETRIES = 3;
-  private static readonly RETRY_DELAY = 2000;
+  private static readonly INITIAL_RETRY_DELAY = 1000; // 1 second
 
   private static async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  private static async exponentialBackoff(attempt: number): Promise<void> {
+    const delay = this.INITIAL_RETRY_DELAY * Math.pow(2, attempt);
+    await this.delay(delay);
+  }
+
   private static normalizeUrl(url: string): string {
     try {
-      // Handle case where URL starts with www.
       if (url.startsWith('www.')) {
         url = 'https://' + url;
       }
-      // Handle case where URL starts with http:// by upgrading to https://
       if (url.startsWith('http://')) {
         url = 'https://' + url.slice(7);
       }
-      // Add https:// if no protocol is present
       if (!url.startsWith('http')) {
         url = 'https://' + url;
       }
@@ -105,33 +103,23 @@ export class AIService {
       const $ = cheerio.load(html);
 
       // Remove non-content elements
-      $('script, style, nav, footer, iframe, noscript, header').remove();
-      $('.cookie-banner, .advertisement, .social-media').remove();
-      $('[class*="cookie"], [class*="banner"], [class*="popup"], [class*="modal"]').remove();
-      $('[role="complementary"], [role="banner"]').remove();
+      $('script, style, nav, footer, iframe, noscript').remove();
+      $('.cookie-banner, .advertisement').remove();
+      $('[class*="cookie"], [class*="banner"]').remove();
 
-      // Extract key content with better fallbacks
       const title = $('meta[property="og:title"]').attr('content')?.trim() ||
                    $('title').text().trim() ||
                    $('h1').first().text().trim() ||
                    'Untitled Page';
 
       const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
-                             $('meta[name="description"]').attr('content')?.trim() ||
-                             '';
+                            $('meta[name="description"]').attr('content')?.trim() ||
+                            '';
 
-      // Identify main content area
-      const contentSelectors = [
-        'article',
-        '[role="main"]',
-        'main',
-        '#content',
-        '.content',
-        '.post-content',
-        '.article-content'
-      ];
-
+      // Get main content
       let mainContent = '';
+      const contentSelectors = ['article', '[role="main"]', 'main', '#content', '.content'];
+
       for (const selector of contentSelectors) {
         const element = $(selector).first();
         if (element.length) {
@@ -140,7 +128,6 @@ export class AIService {
         }
       }
 
-      // Fallback to body if no main content found
       if (!mainContent) {
         mainContent = $('body').clone()
           .children('nav,header,footer,aside')
@@ -153,24 +140,19 @@ export class AIService {
       // Extract metadata
       const metadata = {
         author: $('meta[name="author"]').attr('content') ||
-                $('[rel="author"]').first().text() ||
-                $('.author').first().text(),
+                $('[rel="author"]').first().text(),
         publishDate: $('meta[property="article:published_time"]').attr('content') ||
-                    $('time[pubdate]').attr('datetime') ||
-                    $('[itemprop="datePublished"]').attr('content'),
-        lastModified: $('meta[property="article:modified_time"]').attr('content') ||
-                     $('[itemprop="dateModified"]').attr('content'),
-        mainImage: $('meta[property="og:image"]').attr('content') ||
-                  $('meta[name="twitter:image"]').attr('content') ||
-                  $('article img').first().attr('src'),
+                    $('time[pubdate]').attr('datetime'),
+        lastModified: $('meta[property="article:modified_time"]').attr('content'),
+        mainImage: $('meta[property="og:image"]').attr('content'),
         wordCount: mainContent.split(/\s+/).length
       };
 
       // Determine content type
       let type: 'webpage' | 'video' | 'article' | 'product' = 'webpage';
-      if ($('[itemtype*="Product"]').length || $('.price').length || $('#price').length) {
+      if ($('[itemtype*="Product"]').length || $('.price').length) {
         type = 'product';
-      } else if ($('article').length || $('[itemtype*="Article"]').length || $('.post').length) {
+      } else if ($('article').length || $('[itemtype*="Article"]').length) {
         type = 'article';
       }
 
@@ -183,8 +165,7 @@ export class AIService {
           .join('\n\n')
           .replace(/\s+/g, ' ')
           .trim()
-          .slice(0, 2000),
-        links: [],
+          .slice(0, 1500), // Reduced content length for efficiency
         type,
         metadata
       };
@@ -194,7 +175,7 @@ export class AIService {
 
       if (retries < this.MAX_RETRIES) {
         console.warn(`[Analysis] Retrying ${url} (attempt ${retries + 1})`);
-        await this.delay(this.RETRY_DELAY * Math.pow(2, retries));
+        await this.exponentialBackoff(retries);
         return this.fetchWithRetry(url, retries + 1);
       }
 
@@ -202,7 +183,7 @@ export class AIService {
     }
   }
 
-  static async analyzeUrl(url: string): Promise<AIAnalysis> {
+  static async analyzeUrl(url: string, retries = 0): Promise<AIAnalysis> {
     try {
       const normalizedUrl = this.normalizeUrl(url);
       console.log(`[Analysis] Starting analysis of: ${normalizedUrl}`);
@@ -210,64 +191,41 @@ export class AIService {
       const pageContent = await this.fetchWithRetry(normalizedUrl);
       console.log(`[Analysis] Successfully fetched page content`);
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert content analyst and curator. Your task is to thoroughly analyze web content for quality, relevance, and value. Provide a comprehensive analysis focusing on what makes this content valuable or not valuable for users.
-
-Key Analysis Requirements:
-1. Title: Clear, concise, descriptive (max 60 chars)
-2. Description: Informative summary highlighting value (max 200 chars)
-3. Tags: Relevant and specific (3-5 tags)
-4. Content Quality Assessment:
-   - Relevance (0-1): How well does it serve its intended purpose?
-   - Informativeness (0-1): How much useful information does it provide?
-   - Credibility (0-1): How trustworthy and well-sourced is the content?
-   - Overall Score (0-1): Combined assessment of content value
-5. Main Topics: List key subjects covered
-6. Recommendations: Suggest improvements if needed
-
-Return a complete JSON analysis with all these aspects.`
-          },
-          {
-            role: "user",
-            content: `Analyze this web content:
-
+      const response = await anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 1024,
+        temperature: 0.3,
+        system: `You are a content analyst. Analyze web content and return a JSON response with:
+{
+  "title": "<60 char title",
+  "description": "<160 char summary",
+  "tags": ["3-5 tags"],
+  "contentQuality": {
+    "relevance": 0-1,
+    "informativeness": 0-1,
+    "credibility": 0-1,
+    "overallScore": 0-1
+  },
+  "mainTopics": ["2-3 topics"],
+  "recommendations": {
+    "improvedTitle": "optional",
+    "improvedDescription": "optional",
+    "suggestedTags": ["optional"]
+  }
+}`,
+        messages: [{
+          role: "user",
+          content: `Analyze:
 URL: ${pageContent.url}
 Title: ${pageContent.title}
 Type: ${pageContent.type}
-Content: ${pageContent.content}
-
-Return analysis in JSON format with fields:
-{
-  "title": string,
-  "description": string,
-  "tags": string[],
-  "contentQuality": {
-    "relevance": number,
-    "informativeness": number,
-    "credibility": number,
-    "overallScore": number
-  },
-  "mainTopics": string[],
-  "recommendations": {
-    "improvedTitle": string?,
-    "improvedDescription": string?,
-    "suggestedTags": string[]?
-  }
-}`
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 1000,
+Content: ${pageContent.content}`
+        }]
       });
 
-      const result = response.choices[0]?.message?.content;
+      const result = response.content[0].text;
       if (!result) {
-        throw new Error("No response from OpenAI");
+        throw new Error("No response from Claude");
       }
 
       console.log(`[Analysis] Raw analysis result:`, result);
@@ -276,7 +234,7 @@ Return analysis in JSON format with fields:
       return {
         ...analysis,
         title: analysis.title.slice(0, 60),
-        description: analysis.description.slice(0, 200),
+        description: analysis.description.slice(0, 160),
         tags: analysis.tags.slice(0, 5).map((tag: string) => tag.toLowerCase()),
         contentQuality: {
           relevance: Math.max(0, Math.min(1, analysis.contentQuality.relevance)),
@@ -290,24 +248,33 @@ Return analysis in JSON format with fields:
     } catch (error) {
       console.error('[Analysis] Error in analyzeUrl:', error);
 
+      // Handle rate limits with retries
+      if (error instanceof Error && 
+          error.message.includes('rate') && 
+          retries < this.MAX_RETRIES) {
+        console.log(`[Analysis] Rate limit hit, retrying after backoff (attempt ${retries + 1})`);
+        await this.exponentialBackoff(retries);
+        return this.analyzeUrl(url, retries + 1);
+      }
+
       // Create meaningful fallback analysis
       try {
         const urlParts = new URL(url);
         return {
           title: urlParts.hostname,
-          description: `Website at ${urlParts.hostname}${urlParts.pathname} - ${error instanceof Error ? error.message : 'Access error'}`,
-          tags: ['error', 'unavailable'],
+          description: `Content temporarily unavailable - ${error instanceof Error ? error.message : 'Analysis error'}`,
+          tags: ['pending-analysis'],
           contentQuality: {
             relevance: 0,
             informativeness: 0,
             credibility: 0,
             overallScore: 0
           },
-          mainTopics: ['unknown'],
+          mainTopics: ['analysis-pending'],
           recommendations: {
-            improvedTitle: 'Unable to analyze content',
-            improvedDescription: 'Content analysis failed due to access or processing error',
-            suggestedTags: ['needs-review']
+            improvedTitle: 'Analysis will be retried later',
+            improvedDescription: 'Content analysis temporarily unavailable. Will retry automatically.',
+            suggestedTags: ['needs-reanalysis']
           }
         };
       } catch {
