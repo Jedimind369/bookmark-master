@@ -9,13 +9,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 interface BookmarkListProps {
   onEdit: (bookmark: Bookmark) => void;
   onDelete: (id: number) => void;
+  onRefresh: (bookmark: Bookmark) => void;
 }
 
-export const BookmarkList = ({ onEdit, onDelete }: BookmarkListProps) => {
+export const BookmarkList = ({ onEdit, onDelete, onRefresh }: BookmarkListProps) => {
   const { data: bookmarks, isLoading, error } = useQuery({
     queryKey: ['/api/bookmarks'],
-    queryFn: fetchBookmarks, // Assuming fetchBookmarks function exists elsewhere
-    onSuccess: (data) => console.log('Received bookmarks:', data)
+    queryFn: fetchBookmarks
   });
 
   if (isLoading) {
@@ -53,7 +53,8 @@ export const BookmarkList = ({ onEdit, onDelete }: BookmarkListProps) => {
           key={bookmark.id}
           bookmark={bookmark}
           onEdit={onEdit}
-          onDelete={onDelete}
+          onDelete={() => onDelete(bookmark.id)}
+          onRefresh={onRefresh}
         />
       ))}
     </div>
