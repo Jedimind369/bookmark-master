@@ -94,7 +94,18 @@ export class AIService {
   private static async fetchWithRetry(url: string, retries = 0): Promise<PageContent> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      // Take screenshot using puppeteer
+      const puppeteer = await import('puppeteer');
+      const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+      const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'networkidle0' });
+      const screenshot = await page.screenshot({ encoding: 'base64' });
+      
+      // Get meta tags and main content
+      const html = await page.content();
+      await browser.close();
 
       const contentType = this.getContentType(url);
       if (contentType === 'video') {
@@ -167,6 +178,7 @@ export class AIService {
         url,
         title,
         description: metaDescription,
+        screenshot: screenshot,
         content: [title, metaDescription, mainContent]
           .filter(Boolean)
           .join('\n\n')
