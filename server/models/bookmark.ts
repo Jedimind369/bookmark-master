@@ -253,8 +253,8 @@ export class BookmarkModel {
 
       console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
 
-      // Process in batches of 3 to avoid overloading
-      const batchSize = 3;
+      // Process in larger batches for better throughput
+      const batchSize = 10;
       for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
         const batch = bookmarksToUpdate.slice(i, i + batchSize);
         console.log(`[Enrichment] Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(bookmarksToUpdate.length/batchSize)}`);

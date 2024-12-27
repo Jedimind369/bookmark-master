@@ -162,13 +162,15 @@ export function registerRoutes(app: Express): Server {
   // Get enrichment status
   app.get("/api/bookmarks/enrich/status", async (req, res) => {
     try {
-      const processedCount = await BookmarkModel.getProcessedCount();
-      const totalCount = await BookmarkModel.getEnrichmentCount();
+      const [processedCount, totalCount] = await Promise.all([
+        BookmarkModel.getProcessedCount(),
+        db.select().from(bookmarks).execute().then(res => res.length)
+      ]);
 
       res.json({
         processedCount,
         totalCount,
-        status: "processing",
+        status: processedCount === totalCount ? "completed" : "processing",
       });
     } catch (error) {
       console.error("Failed to get enrichment status:", error);

@@ -25,7 +25,7 @@ export const BookmarkEnrichment = () => {
 
   const { data: enrichmentCount } = useQuery({
     queryKey: ["/api/bookmarks/enrich/count"],
-    refetchInterval: 60000,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
