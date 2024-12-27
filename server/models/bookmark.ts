@@ -92,6 +92,20 @@ export class BookmarkModel {
         throw new Error(`Bookmark with id ${id} not found`);
       }
 
+      // Track changes
+      const changes: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        if (JSON.stringify(existing[key]) !== JSON.stringify(value)) {
+          changes[key] = value;
+        }
+      });
+
+      const updateRecord = {
+        timestamp: new Date().toISOString(),
+        changes,
+        previousState: { ...existing }
+      };
+
       const normalizedData = {
         ...existing,
         title: data.title,
@@ -100,8 +114,15 @@ export class BookmarkModel {
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : [],
         dateModified: new Date().toISOString(),
-        analysis: data.analysis || existing.analysis
+        analysis: data.analysis || existing.analysis,
+        updateHistory: [...(existing.updateHistory || []), updateRecord]
       };
+
+      console.log('[Update History]', {
+        bookmarkId: id,
+        changes,
+        timestamp: updateRecord.timestamp
+      });
 
       const [bookmark] = await db
         .update(bookmarks)

@@ -25,6 +25,11 @@ export const bookmarks = pgTable("bookmarks", {
     retryable?: boolean;
     tags?: string[];
   }>(),
+  updateHistory: jsonb("update_history").$type<{
+    timestamp: string;
+    changes: Record<string, any>;
+    previousState: Record<string, any>;
+  }[]>().default([]),
 });
 
 // User schemas
