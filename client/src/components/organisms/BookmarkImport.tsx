@@ -14,6 +14,7 @@ export const BookmarkImport = () => {
 
   const importMutation = useMutation({
     mutationFn: async (bookmarks: any[]) => {
+      console.log('[Import] Starting import mutation with', bookmarks.length, 'bookmarks');
       const response = await fetch("/api/bookmarks/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -21,8 +22,8 @@ export const BookmarkImport = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message);
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to import bookmarks");
       }
 
       return response.json();
@@ -37,9 +38,10 @@ export const BookmarkImport = () => {
       setProgress(0);
     },
     onError: (error: Error) => {
+      console.error('[Import] Import error:', error);
       toast({
         variant: "destructive",
-        title: "Error",
+        title: "Import Error",
         description: error.message || "Failed to import bookmarks",
       });
       setImporting(false);
@@ -62,16 +64,24 @@ export const BookmarkImport = () => {
     }
 
     setImporting(true);
-    setProgress(0);
+    setProgress(10);
 
     try {
+      console.log('[Import] Reading file:', file.name);
       const text = await file.text();
       let bookmarks;
 
+      setProgress(30);
+
       if (file.name.endsWith('.json')) {
-        bookmarks = JSON.parse(text);
+        console.log('[Import] Parsing JSON file');
+        try {
+          bookmarks = JSON.parse(text);
+        } catch (error) {
+          throw new Error("Invalid JSON format. Please check your file.");
+        }
       } else if (file.name.endsWith('.html')) {
-        // Set the proper content type for HTML
+        console.log('[Import] Processing HTML file');
         const response = await fetch('/api/bookmarks/parse-html', {
           method: 'POST',
           headers: { 'Content-Type': 'text/html' },
@@ -82,39 +92,29 @@ export const BookmarkImport = () => {
           if (response.status === 413) {
             throw new Error('File size too large. Maximum size is 50MB.');
           }
-          throw new Error('Failed to parse HTML bookmarks');
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to parse HTML bookmarks');
         }
 
         bookmarks = await response.json();
-        console.log('Parsed bookmarks:', bookmarks);
+        console.log('[Import] Parsed bookmarks:', bookmarks);
       } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Unsupported file format. Please upload a JSON or HTML file.",
-        });
-        setImporting(false);
-        return;
+        throw new Error("Unsupported file format. Please upload a JSON or HTML file.");
       }
 
       if (!Array.isArray(bookmarks)) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Invalid file format. Expected an array of bookmarks.",
-        });
-        setImporting(false);
-        return;
+        throw new Error("Invalid file format. Expected an array of bookmarks.");
       }
 
       setProgress(50);
+      console.log('[Import] Starting import of', bookmarks.length, 'bookmarks');
       await importMutation.mutateAsync(bookmarks);
     } catch (error) {
-      console.error('Error during import:', error);
+      console.error('[Import] Error during import:', error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to parse the import file",
+        title: "Import Error",
+        description: error instanceof Error ? error.message : "Failed to process the import file",
       });
       setImporting(false);
       setProgress(0);
@@ -136,7 +136,7 @@ export const BookmarkImport = () => {
           <Button asChild disabled={importing}>
             <span>
               <Upload className="h-4 w-4 mr-2" />
-              Import Bookmarks
+              {importing ? "Importing..." : "Import Bookmarks"}
             </span>
           </Button>
         </label>

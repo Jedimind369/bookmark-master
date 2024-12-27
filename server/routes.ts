@@ -7,6 +7,60 @@ import { parseHtmlBookmarks } from "./utils/bookmarkParser";
 import { z } from "zod";
 
 export function registerRoutes(app: Express): Server {
+  // Import bookmarks
+  app.post("/api/bookmarks/import", async (req, res) => {
+    try {
+      console.log('[Import] Starting bookmark import process');
+      const bookmarks = req.body;
+
+      if (!Array.isArray(bookmarks)) {
+        return res.status(400).json({ 
+          message: "Invalid request body. Expected an array of bookmarks." 
+        });
+      }
+
+      console.log(`[Import] Processing ${bookmarks.length} bookmarks`);
+      const result = await BookmarkModel.bulkCreate(bookmarks);
+
+      console.log(`[Import] Successfully imported ${result.length} bookmarks`);
+      res.json({ 
+        success: true, 
+        count: result.length,
+        message: `Successfully imported ${result.length} bookmarks` 
+      });
+    } catch (error) {
+      console.error("[Import] Error importing bookmarks:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to import bookmarks",
+        error: true
+      });
+    }
+  });
+
+  // Parse HTML bookmarks
+  app.post("/api/bookmarks/parse-html", async (req, res) => {
+    try {
+      console.log('[Parse] Starting HTML bookmark parsing');
+      const htmlContent = req.body;
+
+      if (typeof htmlContent !== 'string') {
+        return res.status(400).json({ 
+          message: "Invalid request body. Expected HTML content as string." 
+        });
+      }
+
+      const bookmarks = await parseHtmlBookmarks(htmlContent);
+      console.log(`[Parse] Successfully parsed ${bookmarks.length} bookmarks`);
+      res.json(bookmarks);
+    } catch (error) {
+      console.error("[Parse] Error parsing HTML bookmarks:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to parse HTML bookmarks",
+        error: true
+      });
+    }
+  });
+
   // Purge all bookmarks
   app.delete("/api/bookmarks/purge", async (req, res) => {
     try {
@@ -129,7 +183,9 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error) {
       console.error("Error creating bookmark:", error);
-      res.status(500).json({ message: "Failed to create bookmark" });
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to create bookmark" 
+      });
     }
   });
 
@@ -152,6 +208,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Delete bookmark by ID
+  app.delete("/api/bookmarks/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid bookmark ID" });
+      }
+
+      const result = await BookmarkModel.delete(id);
+      if (!result) {
+        return res.status(404).json({ message: "Bookmark not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting bookmark:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to delete bookmark" 
+      });
+    }
+  });
+
   // Get all bookmarks
   app.get("/api/bookmarks", async (req, res) => {
     try {
@@ -159,7 +236,9 @@ export function registerRoutes(app: Express): Server {
       res.json(bookmarks);
     } catch (error) {
       console.error("Failed to fetch bookmarks:", error);
-      res.status(500).json({ message: "Failed to fetch bookmarks" });
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to fetch bookmarks" 
+      });
     }
   });
 
