@@ -9,8 +9,8 @@ const importBookmarkSchema = z.object({
   url: z.string().url(),
   title: z.string(),
   description: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  collections: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional().default([]),
+  collections: z.array(z.string()).optional().default([]),
 }).array();
 
 export function registerRoutes(app: Express): Server {
@@ -28,7 +28,11 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/bookmarks", async (req, res) => {
     try {
       const validatedData = insertBookmarkSchema.omit({ id: true, dateAdded: true }).parse(req.body);
-      const bookmark = await BookmarkModel.create(validatedData);
+      const bookmark = await BookmarkModel.create({
+        ...validatedData,
+        tags: validatedData.tags || [],
+        collections: validatedData.collections || [],
+      });
       res.status(201).json(bookmark);
     } catch (error) {
       console.error("Failed to create bookmark:", error);
@@ -44,7 +48,11 @@ export function registerRoutes(app: Express): Server {
       }
 
       const validatedData = insertBookmarkSchema.partial().omit({ id: true }).parse(req.body);
-      const bookmark = await BookmarkModel.update(id, validatedData);
+      const bookmark = await BookmarkModel.update(id, {
+        ...validatedData,
+        tags: validatedData.tags || undefined,
+        collections: validatedData.collections || undefined,
+      });
       if (!bookmark) {
         return res.status(404).json({ message: "Bookmark not found" });
       }

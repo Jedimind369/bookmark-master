@@ -25,7 +25,11 @@ export const Home = () => {
       const response = await fetch("/api/bookmarks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          tags: data.tags || [],
+          collections: data.collections || [],
+        }),
       });
       if (!response.ok) throw new Error("Failed to create bookmark");
       return response.json();
@@ -52,7 +56,11 @@ export const Home = () => {
       const response = await fetch(`/api/bookmarks/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          tags: data.tags || [],
+          collections: data.collections || [],
+        }),
       });
       if (!response.ok) throw new Error("Failed to update bookmark");
       return response.json();
@@ -75,7 +83,7 @@ export const Home = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (id: number) => {
       const response = await fetch(`/api/bookmarks/${id}`, {
         method: "DELETE",
       });
