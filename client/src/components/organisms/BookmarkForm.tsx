@@ -21,35 +21,39 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
-    
-    const submitData = {
-      id: initialData?.id,
-      title: formData.title,
-      url: formData.url,
-      description: formData.description,
-      tags,
-    };
-
     try {
-      // First submit the basic update
+      const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+      
+      const submitData = {
+        id: initialData?.id,
+        title: formData.title,
+        url: formData.url,
+        description: formData.description,
+        tags,
+      };
+
+      // Submit the basic update
       await onSubmit(submitData);
 
-      // Then trigger enrichment if this is an update
+      // Only attempt enrichment after successful update
       if (initialData?.id) {
-        const response = await fetch('/api/bookmarks/enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: [initialData.id] })
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to enrich bookmark');
+        try {
+          const response = await fetch('/api/bookmarks/enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [initialData.id] })
+          });
+          
+          if (!response.ok) {
+            console.error('Failed to enrich bookmark');
+          }
+        } catch (enrichError) {
+          console.error('Error enriching bookmark:', enrichError);
+          // Don't throw enrichment errors - they shouldn't block the update
         }
       }
     } catch (error) {
       console.error('Error updating bookmark:', error);
-      throw error; // Re-throw to trigger error handling in parent component
     }
   };
 
