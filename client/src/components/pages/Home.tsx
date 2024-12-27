@@ -101,10 +101,10 @@ export const Home = () => {
     mutationFn: async (data: UpdateBookmarkDto) => {
       console.log(`[Update] Updating bookmark ${data.id}:`, data);
 
-      // Prepare the data for submission
+      // Prepare the data for submission, ensuring dateModified is a string
       const submitData = {
         ...data,
-        dateModified: new Date(),
+        dateModified: new Date().toISOString(),
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : []
       };
