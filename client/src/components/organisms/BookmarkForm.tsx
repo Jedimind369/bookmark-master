@@ -48,13 +48,6 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       }
 
       onCancel();
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: [initialData.id] })
-        });
-      }
-
-      onCancel(); // Close the form after successful update
     } catch (error) {
       console.error('Error updating bookmark:', error);
       throw error;
