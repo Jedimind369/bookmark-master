@@ -5,8 +5,12 @@ import { AIService } from "./services/aiService";
 import { insertBookmarkSchema } from "@db/schema";
 import { parseHtmlBookmarks } from "./utils/bookmarkParser";
 import { z } from "zod";
+import * as express from 'express';
 
 export function registerRoutes(app: Express): Server {
+  // Configure raw body parsing for HTML content
+  app.use('/api/bookmarks/parse-html', express.text({ type: 'text/html', limit: '50mb' }));
+
   // AI Analysis endpoint
   app.post("/api/analyze-url", async (req, res) => {
     try {
@@ -98,6 +102,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // HTML Bookmark parsing endpoint
+  app.post("/api/bookmarks/parse-html", async (req, res) => {
+    try {
+      console.log("Received HTML content type:", req.get('Content-Type'));
+      const htmlContent = req.body;
+
+      if (typeof htmlContent !== 'string' || !htmlContent.trim()) {
+        console.error("Invalid HTML content received:", typeof htmlContent);
+        return res.status(400).json({ message: "Invalid HTML content" });
+      }
+
+      console.log("Parsing HTML content...");
+      const bookmarks = parseHtmlBookmarks(htmlContent);
+      console.log(`Successfully parsed ${bookmarks.length} bookmarks`);
+      res.json(bookmarks);
+    } catch (error) {
+      console.error("Failed to parse HTML bookmarks:", error);
+      res.status(500).json({ message: "Failed to parse HTML bookmarks" });
+    }
+  });
+
   // Get count of bookmarks that can be enriched
   app.get("/api/bookmarks/enrich/count", async (req, res) => {
     try {
@@ -130,25 +155,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to start bookmark enrichment" });
     }
   });
-
-  // HTML Bookmark parsing endpoint
-  app.post("/api/bookmarks/parse-html", async (req, res) => {
-    try {
-      // Get raw HTML content from request body
-      const htmlContent = req.body;
-      if (typeof htmlContent !== 'string') {
-        return res.status(400).json({ message: "Invalid HTML content" });
-      }
-
-      // Parse the HTML bookmarks
-      const bookmarks = parseHtmlBookmarks(htmlContent);
-      res.json(bookmarks);
-    } catch (error) {
-      console.error("Failed to parse HTML bookmarks:", error);
-      res.status(500).json({ message: "Failed to parse HTML bookmarks" });
-    }
-  });
-
   const httpServer = createServer(app);
   return httpServer;
 }

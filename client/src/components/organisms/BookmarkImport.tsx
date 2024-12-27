@@ -61,9 +61,10 @@ export const BookmarkImport = () => {
       if (file.name.endsWith('.json')) {
         bookmarks = JSON.parse(text);
       } else if (file.name.endsWith('.html')) {
+        // Set the proper content type for HTML
         const response = await fetch('/api/bookmarks/parse-html', {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'text/html' },
           body: text,
         });
 
@@ -72,6 +73,7 @@ export const BookmarkImport = () => {
         }
 
         bookmarks = await response.json();
+        console.log('Parsed bookmarks:', bookmarks);
       } else {
         toast({
           variant: "destructive",
@@ -95,10 +97,11 @@ export const BookmarkImport = () => {
       setProgress(50);
       await importMutation.mutateAsync(bookmarks);
     } catch (error) {
+      console.error('Error during import:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to parse the import file",
+        description: error instanceof Error ? error.message : "Failed to parse the import file",
       });
       setImporting(false);
       setProgress(0);
