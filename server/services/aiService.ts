@@ -100,7 +100,11 @@ export class AIService {
           'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)',
           'Accept-Language': '*'
         },
-        signal: controller.signal
+        signal: controller.signal,
+        // @ts-ignore
+        agent: new (require('https').Agent)({
+          rejectUnauthorized: false
+        })
       });
 
       clearTimeout(timeoutId);
