@@ -1,4 +1,3 @@
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { BookmarkModel } from "./models/bookmark";
@@ -20,6 +19,50 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error analyzing URL:', error);
       res.status(500).json({ error: 'Failed to analyze URL' });
+    }
+  });
+
+  // Get enrichment count
+  app.get("/api/bookmarks/enrich/count", async (req, res) => {
+    try {
+      const count = await BookmarkModel.getEnrichmentCount();
+      res.json(count);
+    } catch (error) {
+      console.error("Failed to get enrichment count:", error);
+      res.status(500).json({ message: "Failed to get enrichment count" });
+    }
+  });
+
+  // Start enrichment process
+  app.post("/api/bookmarks/enrich", async (req, res) => {
+    try {
+      console.log("[Enrichment] Starting enrichment process");
+      const result = await BookmarkModel.enrichAllBookmarks();
+      if (result) {
+        res.json({ message: "Enrichment process started successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to start enrichment process" });
+      }
+    } catch (error) {
+      console.error("Error starting enrichment:", error);
+      res.status(500).json({ message: "Failed to start enrichment process" });
+    }
+  });
+
+  // Get enrichment status
+  app.get("/api/bookmarks/enrich/status", async (req, res) => {
+    try {
+      const processedCount = await BookmarkModel.getProcessedCount();
+      const totalCount = await BookmarkModel.getEnrichmentCount();
+
+      res.json({
+        processedCount,
+        totalCount,
+        status: "processing",
+      });
+    } catch (error) {
+      console.error("Failed to get enrichment status:", error);
+      res.status(500).json({ message: "Failed to get enrichment status" });
     }
   });
 

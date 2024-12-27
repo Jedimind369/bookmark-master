@@ -1,5 +1,5 @@
 import { db } from "@db";
-import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
+import { bookmarks, users, type InsertBookmark, type SelectBookmark, type AnalysisStatus } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
@@ -227,12 +227,14 @@ export class BookmarkModel {
         .select()
         .from(bookmarks)
         .where(
-          sql`analysis IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100`
+          sql`analysis IS NULL OR 
+              analysis->>'status' IS NULL OR 
+              analysis->>'status' NOT IN ('success', 'error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')`
         );
 
       return results.length;
     } catch (error) {
-      console.error("Error getting enrichment count:", error);
+      console.error("[Enrichment] Error getting enrichment count:", error);
       return 0;
     }
   }
@@ -243,17 +245,13 @@ export class BookmarkModel {
         .select()
         .from(bookmarks)
         .where(
-          sql`analysis IS NOT NULL AND (
-            LENGTH(COALESCE(analysis->>'summary', '')) >= 100 
-            OR analysis->>'summary' = 'Failed to analyze this URL'
-            OR analysis->>'summary' = 'Error processing bookmark'
-            OR analysis->>'status' IN ('error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')
-          )`
+          sql`analysis IS NOT NULL AND 
+              analysis->>'status' IN ('success', 'error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')`
         );
 
       return results.length;
     } catch (error) {
-      console.error("Error getting processed count:", error);
+      console.error("[Enrichment] Error getting processed count:", error);
       return 0;
     }
   }
@@ -264,7 +262,9 @@ export class BookmarkModel {
         .select()
         .from(bookmarks)
         .where(
-          sql`analysis IS NULL OR LENGTH(COALESCE(analysis->>'summary', '')) < 100`
+          sql`analysis IS NULL OR 
+              analysis->>'status' IS NULL OR 
+              analysis->>'status' NOT IN ('success', 'error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')`
         );
 
       console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
@@ -304,92 +304,81 @@ export class BookmarkModel {
 
   static async enrichBookmarkAnalysis(bookmark: SelectBookmark) {
     try {
-      // Check if bookmark needs enrichment
-      const needsEnrichment = !bookmark.analysis ||
-                            !bookmark.analysis.summary ||
-                            bookmark.analysis.summary.length < 100;
+      console.log(`[Enrichment] Starting analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
 
-      if (needsEnrichment) {
-        console.log(`[Enrichment] Starting analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
+      // Update status to processing
+      await db
+        .update(bookmarks)
+        .set({
+          analysis: {
+            status: 'processing' as AnalysisStatus,
+            lastUpdated: new Date().toISOString()
+          }
+        })
+        .where(eq(bookmarks.id, bookmark.id));
 
-        // Update status to processing
-        await db
+      try {
+        const analysis = await AIService.analyzeUrl(bookmark.url);
+        console.log(`[Enrichment] Successfully analyzed bookmark ${bookmark.id}`);
+
+        // Store successful analysis
+        const [updated] = await db
           .update(bookmarks)
           .set({
             analysis: {
-              status: 'processing' as const,
-              lastUpdated: new Date().toISOString()
+              summary: analysis.description,
+              credibilityScore: 1.0,
+              status: 'success' as AnalysisStatus,
+              lastUpdated: new Date().toISOString(),
+              tags: analysis.tags,
             }
           })
-          .where(eq(bookmarks.id, bookmark.id));
+          .where(eq(bookmarks.id, bookmark.id))
+          .returning();
 
-        try {
-          const analysis = await AIService.analyzeUrl(bookmark.url);
-          console.log(`[Enrichment] Successfully analyzed bookmark ${bookmark.id}`);
+        return updated;
+      } catch (error) {
+        console.error(`[Enrichment] Failed to analyze URL for bookmark ${bookmark.id}:`, error);
 
-          // Store successful analysis
-          const [updated] = await db
-            .update(bookmarks)
-            .set({
-              analysis: {
-                summary: analysis.description,
-                credibilityScore: 1.0,
-                tags: analysis.tags,
-                isLandingPage: analysis.isLandingPage,
-                mainTopic: analysis.mainTopic,
-                lastUpdated: new Date().toISOString(),
-                status: 'success' as const
-              }
-            })
-            .where(eq(bookmarks.id, bookmark.id))
-            .returning();
+        let status: AnalysisStatus = 'error';
+        let errorSummary = "Failed to analyze this URL";
+        let retryable = true;
 
-          return updated;
-        } catch (error) {
-          console.error(`[Enrichment] Failed to analyze URL for bookmark ${bookmark.id}:`, error);
-
-          // Categorize the error and store it appropriately
-          let errorSummary = "Failed to analyze this URL";
-          let errorStatus: 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error' = 'error';
-          let retryable = true;
-
-          if (error instanceof Error) {
-            console.log(`[Enrichment] Error type for bookmark ${bookmark.id}:`, error.message);
-            if (error.message.includes('Invalid URL')) {
-              errorSummary = "Invalid URL format";
-              errorStatus = 'invalid_url';
-              retryable = false;
-            } else if (error.message.includes('rate limit')) {
-              errorSummary = "Rate limit exceeded";
-              errorStatus = 'rate_limited';
-              retryable = true;
-            } else if (error.message.includes('unreachable')) {
-              errorSummary = "Website unreachable";
-              errorStatus = 'unreachable';
-              retryable = true;
-            }
+        if (error instanceof Error) {
+          console.log(`[Enrichment] Error type for bookmark ${bookmark.id}:`, error.message);
+          if (error.message.includes('Invalid URL')) {
+            status = 'invalid_url';
+            errorSummary = "Invalid URL format";
+            retryable = false;
+          } else if (error.message.includes('rate limit')) {
+            status = 'rate_limited';
+            errorSummary = "Rate limit exceeded";
+            retryable = true;
+          } else if (error.message.includes('unreachable')) {
+            status = 'unreachable';
+            errorSummary = "Website unreachable";
+            retryable = true;
           }
-
-          // Store error information
-          const [updated] = await db
-            .update(bookmarks)
-            .set({
-              analysis: {
-                summary: errorSummary,
-                credibilityScore: 0,
-                lastUpdated: new Date().toISOString(),
-                status: errorStatus,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                retryable
-              }
-            })
-            .where(eq(bookmarks.id, bookmark.id))
-            .returning();
-
-          return updated;
         }
+
+        // Store error information
+        const [updated] = await db
+          .update(bookmarks)
+          .set({
+            analysis: {
+              summary: errorSummary,
+              credibilityScore: 0,
+              status,
+              lastUpdated: new Date().toISOString(),
+              error: error instanceof Error ? error.message : 'Unknown error',
+              retryable
+            }
+          })
+          .where(eq(bookmarks.id, bookmark.id))
+          .returning();
+
+        return updated;
       }
-      return bookmark;
     } catch (error) {
       console.error(`[Enrichment] Failed to process bookmark ${bookmark.id}:`, error);
       // Mark the bookmark as processed with error
@@ -400,8 +389,8 @@ export class BookmarkModel {
             analysis: {
               summary: "Error processing bookmark",
               credibilityScore: 0,
+              status: 'system_error' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
-              status: 'system_error' as const,
               error: error instanceof Error ? error.message : 'Unknown error',
               retryable: true
             }
@@ -415,7 +404,6 @@ export class BookmarkModel {
       }
     }
   }
-
   static async purgeAll() {
     try {
       await db.delete(bookmarks);

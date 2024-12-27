@@ -1,11 +1,15 @@
 import { pgTable, text, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
 });
+
+// Define the analysis status type
+export type AnalysisStatus = 'success' | 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error' | 'processing';
 
 export const bookmarks = pgTable("bookmarks", {
   id: serial("id").primaryKey(),
@@ -25,17 +29,12 @@ export const bookmarks = pgTable("bookmarks", {
   analysis: jsonb("analysis").$type<{
     summary?: string;
     credibilityScore?: number;
-    status?: 'success' | 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error';
+    status?: AnalysisStatus;
     lastUpdated?: string;
     error?: string;
     retryable?: boolean;
     tags?: string[];
   }>(),
-  updateHistory: jsonb("update_history").$type<{
-    timestamp: string;
-    changes: Record<string, any>;
-    previousState: Record<string, any>;
-  }[]>().default([]),
 });
 
 // User schemas
