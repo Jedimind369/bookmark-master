@@ -26,6 +26,19 @@ export const BookmarkImport = () => {
         throw new Error(errorData.message || "Failed to import bookmarks");
       }
 
+      const result = await response.json();
+      
+      // Start enrichment process automatically after import
+      const enrichResponse = await fetch("/api/bookmarks/enrich", {
+        method: "POST",
+      });
+      
+      if (!enrichResponse.ok) {
+        console.warn("Failed to start enrichment process after import");
+      }
+      
+      return result;
+
       return response.json();
     },
     onSuccess: (data) => {
