@@ -39,11 +39,21 @@ export class BookmarkModel {
     }
   }
 
-  static async create(data: Omit<InsertBookmark, "id" | "dateAdded">) {
+  static async create(data: Omit<InsertBookmark, "id" | "dateAdded" | "userId">) {
     try {
+      // Get default user id
+      const [defaultUser] = await db.execute<{ id: number }>(
+        "SELECT id FROM users WHERE username = 'default_user' LIMIT 1"
+      );
+
+      if (!defaultUser) {
+        throw new Error("Default user not found");
+      }
+
       // Ensure tags and collections are arrays
       const normalizedData = {
         ...data,
+        userId: defaultUser.id,
         dateAdded: new Date(),
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : [],
@@ -111,11 +121,21 @@ export class BookmarkModel {
     }
   }
 
-  static async bulkCreate(data: Array<Omit<InsertBookmark, "id" | "dateAdded">>) {
+  static async bulkCreate(data: Array<Omit<InsertBookmark, "id" | "dateAdded" | "userId">>) {
     try {
+      // Get default user id
+      const [defaultUser] = await db.execute<{ id: number }>(
+        "SELECT id FROM users WHERE username = 'default_user' LIMIT 1"
+      );
+
+      if (!defaultUser) {
+        throw new Error("Default user not found");
+      }
+
       const now = new Date();
       const bookmarksToInsert = data.map(bookmark => ({
         ...bookmark,
+        userId: defaultUser.id,
         dateAdded: now,
         tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
         collections: Array.isArray(bookmark.collections) ? bookmark.collections : [],
