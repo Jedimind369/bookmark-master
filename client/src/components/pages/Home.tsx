@@ -180,6 +180,30 @@ export const Home = () => {
     purgeMutation.mutate();
   };
 
+  const refreshMutation = useMutation({
+    mutationFn: async (bookmark: Bookmark) => {
+      const response = await fetch(`/api/bookmarks/${bookmark.id}/refresh`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("Failed to refresh bookmark");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      toast({
+        title: "Success",
+        description: "Bookmark refreshed successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to refresh bookmark",
+      });
+    },
+  });
+
   const handleRefresh = (bookmark: Bookmark) => {
     console.log(`[Refresh] Triggering refresh for bookmark ${bookmark.id}`);
     refreshMutation.mutate(bookmark);
