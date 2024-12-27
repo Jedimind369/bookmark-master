@@ -15,7 +15,9 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
     <Card className="w-full">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <h3 className="text-lg font-semibold line-clamp-1">{bookmark.title}</h3>
+          <h3 className="text-lg font-semibold line-clamp-1">
+            {bookmark.analysis?.title || bookmark.title}
+          </h3>
           <div className="flex gap-2">
             <Button variant="ghost" size="icon" onClick={() => onEdit(bookmark)}>
               <Edit2 className="h-4 w-4" />
@@ -36,7 +38,10 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
           {bookmark.analysis?.summary || bookmark.description || 'No description available'}
         </p>
         <div className="flex flex-wrap gap-2">
-          {[...new Set([...(bookmark.tags || []), ...(bookmark.analysis?.tags || [])])].map((tag) => (
+          {Array.from(new Set([
+            ...(bookmark.tags || []),
+            ...(bookmark.analysis?.tags || [])
+          ])).map((tag) => (
             <Tag key={tag} text={tag} />
           ))}
         </div>
