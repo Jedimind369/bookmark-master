@@ -1,8 +1,6 @@
 import OpenAI from "openai";
 import * as cheerio from "cheerio";
 import fetch from "node-fetch";
-import fs from "fs/promises";
-import path from "path";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is not set");
@@ -52,6 +50,7 @@ export class AIService {
   private static readonly MAX_DEPTH = 1;
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 2000; // 2 seconds
+  private static readonly NAVIGATION_TIMEOUT = 30000; // 30 seconds
   private static visitedUrls = new Set<string>();
 
   private static async delay(ms: number) {
@@ -84,220 +83,34 @@ export class AIService {
     }
   }
 
-  private static async checkLocalContent(url: string): Promise<PageContent | null> {
-    try {
-      // Convert URL to filename
-      const urlObj = new URL(url);
-      const baseFilename = urlObj.hostname + urlObj.pathname.replace(/\//g, '_');
-
-      // Check for markdown content
-      const mdPath = path.join('attached_assets', `${baseFilename}.md`);
-      const imgPath = path.join('attached_assets', `${baseFilename}.png`);
-
-      try {
-        const [mdContent, screenshot] = await Promise.all([
-          fs.readFile(mdPath, 'utf-8'),
-          fs.readFile(imgPath, 'base64')
-        ]);
-
-        // Parse the markdown content
-        const lines = mdContent.split('\n');
-        const title = lines.find(line => line.startsWith('# '))?.slice(2) || 
-                     lines[0].replace('URL: ', '') || 
-                     'Untitled Page';
-
-        // Extract description from content
-        let description = '';
-        const contentStart = lines.findIndex(line => line && !line.startsWith('#') && !line.startsWith('URL:'));
-        if (contentStart >= 0) {
-          description = lines[contentStart].trim();
-        }
-
-        // Extract links
-        const links = lines
-          .filter(line => line.includes(']('))
-          .map(line => {
-            const match = line.match(/\[.*?\]\((.*?)\)/);
-            return match ? match[1] : null;
-          })
-          .filter((link): link is string => !!link);
-
-        return {
-          url,
-          title,
-          description,
-          content: mdContent,
-          links,
-          type: 'webpage',
-          screenshot,
-          metadata: {
-            wordCount: mdContent.split(/\s+/).length
-          }
-        };
-      } catch (error) {
-        console.log('[Analysis] No local content found:', error);
-        return null;
-      }
-    } catch (error) {
-      console.error('[Analysis] Error checking local content:', error);
-      return null;
-    }
-  }
-
-  static async analyzeUrl(url: string): Promise<AIAnalysis> {
-    try {
-      const normalizedUrl = this.normalizeUrl(url);
-      if (!this.isValidUrl(normalizedUrl)) {
-        throw new Error('Invalid URL format');
-      }
-
-      console.log(`[Analysis] Starting analysis of: ${normalizedUrl}`);
-
-      // First check for local content
-      const localContent = await this.checkLocalContent(normalizedUrl);
-      if (localContent) {
-        console.log('[Analysis] Using local content for analysis');
-        return this.analyzeWithRetry(normalizedUrl, [localContent]);
-      }
-
-      // If no local content, try web crawling
-      const pages = await this.crawlWebsite(normalizedUrl);
-      console.log(`[Analysis] Crawled ${pages.length} pages from ${normalizedUrl}`);
-
-      if (!pages.length) {
-        // Create fallback analysis from URL
-        const urlParts = new URL(normalizedUrl);
-        return {
-          title: urlParts.hostname,
-          description: `Website at ${urlParts.hostname}${urlParts.pathname} - Currently unavailable or restricted access`,
-          tags: ['archived', 'unavailable'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
-        };
-      }
-
-      return await this.analyzeWithRetry(normalizedUrl, pages);
-    } catch (error) {
-      console.error('[Analysis] Error in analyzeUrl:', error);
-
-      // Create meaningful fallback analysis
-      try {
-        const urlParts = new URL(url);
-        return {
-          title: urlParts.hostname,
-          description: `Website at ${urlParts.hostname} - ${error instanceof Error ? error.message : 'Access error'}`,
-          tags: ['error', 'unavailable'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
-        };
-      } catch {
-        return {
-          title: 'Invalid URL',
-          description: 'The provided URL could not be processed',
-          tags: ['error', 'invalid'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
-        };
-      }
-    }
-  }
-
-  private static readonly MAX_PAGES = 3;
-  private static readonly MAX_DEPTH = 1;
-  private static readonly MAX_RETRIES = 3;
-  private static readonly RETRY_DELAY = 2000; // 2 seconds
-  private static visitedUrls = new Set<string>();
-
-  private static async delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  private static getContentType(url: string, $: cheerio.CheerioAPI): 'webpage' | 'video' | 'article' | 'product' {
-    const urlObj = new URL(url);
-
-    // Check for video platforms
-    if (urlObj.hostname.includes('youtube.com') ||
-        urlObj.hostname.includes('youtu.be') ||
-        urlObj.hostname.includes('vimeo.com') ||
-        urlObj.hostname.includes('dailymotion.com')) {
-      return 'video';
-    }
-
-    // Check for product pages
-    const priceSelectors = ['[itemprop="price"]', '.price', '#price', '[data-price]'];
-    const hasPrice = priceSelectors.some(selector => $(selector).length > 0);
-    if (hasPrice || $('[itemtype*="Product"]').length > 0) {
-      return 'product';
-    }
-
-    // Check for articles
-    const articleIndicators = [
-      'article',
-      '[itemtype*="Article"]',
-      '.post',
-      '.blog-post',
-      '[class*="article"]',
-      'time',
-      '.published',
-      '.author'
-    ];
-    const isArticle = articleIndicators.some(selector => $(selector).length > 0) ||
-                     urlObj.hostname.includes('medium.com') ||
-                     urlObj.hostname.includes('wordpress.com');
-
-    return isArticle ? 'article' : 'webpage';
-  }
-
-  private static extractMetadata($: cheerio.CheerioAPI): PageContent['metadata'] {
-    const metadata: PageContent['metadata'] = {};
-
-    // Extract author
-    metadata.author = $('meta[name="author"]').attr('content') ||
-                     $('[rel="author"]').first().text() ||
-                     $('.author').first().text() ||
-                     undefined;
-
-    // Extract dates
-    metadata.publishDate = $('meta[property="article:published_time"]').attr('content') ||
-                          $('time[pubdate]').attr('datetime') ||
-                          $('[itemprop="datePublished"]').attr('content') ||
-                          undefined;
-
-    metadata.lastModified = $('meta[property="article:modified_time"]').attr('content') ||
-                           $('[itemprop="dateModified"]').attr('content') ||
-                           undefined;
-
-    // Extract main image
-    metadata.mainImage = $('meta[property="og:image"]').attr('content') ||
-                        $('meta[name="twitter:image"]').attr('content') ||
-                        $('article img').first().attr('src') ||
-                        undefined;
-
-    // Calculate word count
-    const text = $('body').text();
-    metadata.wordCount = text.split(/\s+/).length;
-
-    return metadata;
-  }
-
   private static async fetchWithRetry(url: string, retries = 0): Promise<PageContent> {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
       console.log(`[Analysis] Attempting to fetch ${url} (attempt ${retries + 1})`);
 
       // Take screenshot using puppeteer
       const puppeteer = await import('puppeteer');
       const browser = await puppeteer.launch({ 
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox', 
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--window-size=1920,1080'
+        ],
         headless: 'new',
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
       });
 
       try {
         const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        await page.setDefaultNavigationTimeout(this.NAVIGATION_TIMEOUT);
+
+        // Set common browser headers
+        await page.setExtraHTTPHeaders({
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        });
 
         // Set viewport for better screenshots
         await page.setViewport({
@@ -308,15 +121,10 @@ export class AIService {
 
         // Navigate with timeout and error handling
         try {
-          const response = await Promise.race([
-            page.goto(url, { 
-              waitUntil: ['networkidle0', 'domcontentloaded'],
-              timeout: 30000
-            }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Navigation timeout')), 30000)
-            )
-          ]);
+          const response = await page.goto(url, { 
+            waitUntil: ['networkidle0', 'domcontentloaded'],
+            timeout: this.NAVIGATION_TIMEOUT
+          });
 
           if (!response) {
             throw new Error('unreachable');
@@ -326,27 +134,39 @@ export class AIService {
           if (response.status() >= 400) {
             throw new Error(`HTTP ${response.status()}: ${response.statusText()}`);
           }
+
+          // Wait for key elements to load
+          await Promise.race([
+            page.waitForSelector('body'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Content timeout')), this.NAVIGATION_TIMEOUT))
+          ]);
+
         } catch (error) {
+          if (error instanceof Error && error.message.includes('net::ERR_NAME_NOT_RESOLVED')) {
+            throw new Error('domain_not_found');
+          }
+          if (error instanceof Error && error.message.includes('net::ERR_CONNECTION_TIMED_OUT')) {
+            throw new Error('connection_timeout');
+          }
           throw new Error('unreachable');
         }
 
-        // Wait for content to load
+        // Wait for dynamic content and scroll
         await page.evaluate(() => new Promise(resolve => {
           let totalHeight = 0;
           const distance = 100;
           const timer = setInterval(() => {
-            const scrollHeight = document.body.scrollHeight;
             window.scrollBy(0, distance);
             totalHeight += distance;
-            if(totalHeight >= scrollHeight) {
+            if(totalHeight >= document.body.scrollHeight) {
               clearInterval(timer);
+              window.scrollTo(0, 0);
               resolve(true);
             }
           }, 100);
         }));
 
-        // Scroll back to top
-        await page.scrollTo(0, 0);
+        await this.delay(1000); // Wait for any lazy-loaded content
 
         // Take full page screenshot
         const screenshot = await page.screenshot({ 
@@ -358,27 +178,13 @@ export class AIService {
 
         // Get HTML content
         const html = await page.content();
-        clearTimeout(timeoutId);
-
         const $ = cheerio.load(html);
 
         // Remove non-content elements
-        $('script').remove();
-        $('style').remove();
-        $('nav').remove();
-        $('footer').remove();
-        $('iframe').remove();
-        $('noscript').remove();
-        $('header').remove();
-        $('.cookie-banner').remove();
-        $('.advertisement').remove();
-        $('.social-media').remove();
-        $('[class*="cookie"]').remove();
-        $('[class*="banner"]').remove();
-        $('[class*="popup"]').remove();
-        $('[class*="modal"]').remove();
-        $('[role="complementary"]').remove();
-        $('[role="banner"]').remove();
+        $('script, style, nav, footer, iframe, noscript, header').remove();
+        $('.cookie-banner, .advertisement, .social-media').remove();
+        $('[class*="cookie"], [class*="banner"], [class*="popup"], [class*="modal"]').remove();
+        $('[role="complementary"], [role="banner"]').remove();
 
         // Extract key content with better fallbacks
         const title = $('meta[property="og:title"]').attr('content')?.trim() ||
@@ -459,8 +265,9 @@ export class AIService {
       console.error(`[Analysis] Error fetching ${url}:`, error);
 
       // Don't retry certain errors
+      const fatalErrors = ['domain_not_found', 'invalid_url'];
       if (error instanceof Error && 
-          (error.message === 'unreachable' || 
+          (fatalErrors.includes(error.message) || 
            (error as any).code === 'ENOTFOUND')) {
         throw new Error(`Website unreachable: ${url}`);
       }
@@ -475,38 +282,72 @@ export class AIService {
     }
   }
 
-  private static async handleVideoContent(url: string): Promise<PageContent> {
-    // Extract video ID and basic info from URL
+  private static getContentType(url: string, $: cheerio.CheerioAPI): 'webpage' | 'video' | 'article' | 'product' {
     const urlObj = new URL(url);
-    let videoId = '';
-    let platform = '';
 
-    if (urlObj.hostname.includes('youtube.com')) {
-      videoId = urlObj.searchParams.get('v') || '';
-      platform = 'YouTube';
-    } else if (urlObj.hostname === 'youtu.be') {
-      videoId = urlObj.pathname.slice(1);
-      platform = 'YouTube';
-    }
-    // Add more video platforms as needed
-
-    // Try to fetch video thumbnail
-    let thumbnailUrl;
-    if (platform === 'YouTube' && videoId) {
-      thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    // Check for video platforms
+    if (urlObj.hostname.includes('youtube.com') ||
+        urlObj.hostname.includes('youtu.be') ||
+        urlObj.hostname.includes('vimeo.com') ||
+        urlObj.hostname.includes('dailymotion.com')) {
+      return 'video';
     }
 
-    return {
-      url,
-      title: `${platform} Video`,
-      description: `A video hosted on ${platform}`,
-      content: `This is a ${platform} video with ID: ${videoId}`,
-      links: [],
-      type: 'video',
-      metadata: {
-        mainImage: thumbnailUrl
-      }
-    };
+    // Check for product pages
+    const priceSelectors = ['[itemprop="price"]', '.price', '#price', '[data-price]'];
+    const hasPrice = priceSelectors.some(selector => $(selector).length > 0);
+    if (hasPrice || $('[itemtype*="Product"]').length > 0) {
+      return 'product';
+    }
+
+    // Check for articles
+    const articleIndicators = [
+      'article',
+      '[itemtype*="Article"]',
+      '.post',
+      '.blog-post',
+      '[class*="article"]',
+      'time',
+      '.published',
+      '.author'
+    ];
+    const isArticle = articleIndicators.some(selector => $(selector).length > 0) ||
+                     urlObj.hostname.includes('medium.com') ||
+                     urlObj.hostname.includes('wordpress.com');
+
+    return isArticle ? 'article' : 'webpage';
+  }
+
+  private static extractMetadata($: cheerio.CheerioAPI): PageContent['metadata'] {
+    const metadata: PageContent['metadata'] = {};
+
+    // Extract author
+    metadata.author = $('meta[name="author"]').attr('content') ||
+                     $('[rel="author"]').first().text() ||
+                     $('.author').first().text() ||
+                     undefined;
+
+    // Extract dates
+    metadata.publishDate = $('meta[property="article:published_time"]').attr('content') ||
+                          $('time[pubdate]').attr('datetime') ||
+                          $('[itemprop="datePublished"]').attr('content') ||
+                          undefined;
+
+    metadata.lastModified = $('meta[property="article:modified_time"]').attr('content') ||
+                           $('[itemprop="dateModified"]').attr('content') ||
+                           undefined;
+
+    // Extract main image
+    metadata.mainImage = $('meta[property="og:image"]').attr('content') ||
+                        $('meta[name="twitter:image"]').attr('content') ||
+                        $('article img').first().attr('src') ||
+                        undefined;
+
+    // Calculate word count
+    const text = $('body').text();
+    metadata.wordCount = text.split(/\s+/).length;
+
+    return metadata;
   }
 
   private static async crawlWebsite(startUrl: string): Promise<PageContent[]> {
@@ -544,6 +385,57 @@ export class AIService {
     }
 
     return pages;
+  }
+
+  static async analyzeUrl(url: string): Promise<AIAnalysis> {
+    try {
+      const normalizedUrl = this.normalizeUrl(url);
+      if (!this.isValidUrl(normalizedUrl)) {
+        throw new Error('Invalid URL format');
+      }
+
+      console.log(`[Analysis] Starting analysis of: ${normalizedUrl}`);
+
+      // Get page content through web crawling
+      const pages = await this.crawlWebsite(normalizedUrl);
+      console.log(`[Analysis] Crawled ${pages.length} pages from ${normalizedUrl}`);
+
+      if (!pages.length) {
+        // Create fallback analysis from URL
+        const urlParts = new URL(normalizedUrl);
+        return {
+          title: urlParts.hostname,
+          description: `Website at ${urlParts.hostname}${urlParts.pathname} - Currently inaccessible`,
+          tags: ['unavailable'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
+      }
+
+      return await this.analyzeWithRetry(normalizedUrl, pages);
+    } catch (error) {
+      console.error('[Analysis] Error in analyzeUrl:', error);
+
+      // Create meaningful fallback analysis
+      try {
+        const urlParts = new URL(url);
+        return {
+          title: urlParts.hostname,
+          description: `Website at ${urlParts.hostname} - ${error instanceof Error ? error.message : 'Access error'}`,
+          tags: ['error', 'unavailable'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
+      } catch {
+        return {
+          title: 'Invalid URL',
+          description: 'The provided URL could not be processed',
+          tags: ['error', 'invalid'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
+      }
+    }
   }
 
   private static async analyzeWithRetry(startUrl: string, pages: PageContent[], retries = 0): Promise<AIAnalysis> {
