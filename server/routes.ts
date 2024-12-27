@@ -26,6 +26,17 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Bookmark routes
+  app.put('/api/bookmarks/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const bookmark = await BookmarkModel.update(id, req.body);
+      res.json(bookmark);
+    } catch (error) {
+      console.error("Failed to update bookmark:", error);
+      res.status(500).json({ message: "Failed to update bookmark" });
+    }
+  });
+
   app.get("/api/bookmarks", async (req, res) => {
     try {
       const bookmarks = await BookmarkModel.findAll();

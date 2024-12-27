@@ -30,9 +30,24 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         url: formData.url,
         description: formData.description,
         tags,
+        analysis: initialData?.analysis
       };
 
-      const updatedBookmark = await onSubmit(submitData);
+      await onSubmit(submitData);
+      
+      if (initialData?.id) {
+        const enrichResponse = await fetch('/api/bookmarks/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: [initialData.id] })
+        });
+
+        if (!enrichResponse.ok) {
+          console.error('Failed to trigger enrichment');
+        }
+      }
+
+      onCancel();
       
       if (updatedBookmark && initialData?.id) {
         await fetch('/api/bookmarks/enrich', {
