@@ -1,12 +1,16 @@
 import { db } from "@db";
 import { bookmarks, users, type InsertBookmark, type SelectBookmark, type AnalysisStatus } from "@db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
 export class BookmarkModel {
   static async findAll() {
     try {
-      const results = await db.select().from(bookmarks);
+      const results = await db
+        .select()
+        .from(bookmarks)
+        .orderBy(desc(bookmarks.dateAdded));
+
       return results.map(bookmark => ({
         ...bookmark,
         tags: bookmark.tags || [],
