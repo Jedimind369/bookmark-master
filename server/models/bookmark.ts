@@ -157,13 +157,19 @@ export class BookmarkModel {
           return null;
         }
 
+        // Ensure proper date handling
+        const dateAdded = bookmark.dateAdded ? new Date(bookmark.dateAdded) : now;
+        const dateModified = bookmark.dateModified ? new Date(bookmark.dateModified) : now;
+
         return {
-          ...bookmark,
           userId: defaultUser.id,
-          title: bookmark.title.slice(0, 255), // Ensure title fits in DB
-          description: bookmark.description?.slice(0, 1000) || null, // Limit description length
+          url: bookmark.url,
+          title: (bookmark.title || '').slice(0, 255), // Ensure title fits in DB
+          description: (bookmark.description || '').slice(0, 1000) || null, // Limit description length
           tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
           collections: Array.isArray(bookmark.collections) ? bookmark.collections : [],
+          dateAdded: dateAdded.toISOString(),
+          dateModified: dateModified.toISOString()
         };
       }).filter((bookmark): bookmark is NonNullable<typeof bookmark> => bookmark !== null);
 
