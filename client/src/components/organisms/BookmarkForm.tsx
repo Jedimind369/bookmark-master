@@ -4,10 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Bookmark } from "@/types/bookmark";
 import { useToast } from "@/hooks/use-toast";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface BookmarkFormProps {
   initialData?: Bookmark;
-  onSubmit: (data: Partial<Bookmark>) => Promise<Bookmark>;
+  onSubmit: (data: Partial<Bookmark>) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -18,57 +20,84 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
     description: initialData?.description || "",
     tags: (initialData?.tags || []).join(", "),
   });
+  const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const analyzeUrl = async (url: string) => {
+    try {
+      console.log('Starting URL analysis:', url);
+      setAnalyzing(true);
+      setError(null);
+
+      const response = await fetch('/api/bookmarks/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+
+      console.log('Analysis response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to analyze URL');
+      }
+
+      const analysis = await response.json();
+      console.log('Analysis result:', analysis);
+
+      // Update form with analysis results
+      setFormData(prev => ({
+        ...prev,
+        title: prev.title || analysis.title || '',
+        description: prev.description || analysis.description || '',
+        tags: prev.tags || (analysis.tags ? analysis.tags.join(", ") : '')
+      }));
+
+      toast({
+        title: "Analysis Complete",
+        description: "URL has been analyzed successfully"
+      });
+
+    } catch (error) {
+      console.error('Analysis error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to analyze URL';
+      setError(message);
+      toast({
+        variant: "destructive",
+        title: "Analysis Error",
+        description: message
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setFormData(prev => ({ ...prev, url }));
+
+    // If this is a new bookmark and we have a valid URL, trigger analysis
+    if (!initialData?.id && url && url.startsWith('http')) {
+      await analyzeUrl(url);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      console.log('Starting bookmark submission with URL:', formData.url);
-
-      // If this is a new bookmark, analyze with AI first
-      if (!initialData?.id) {
-        try {
-          console.log('Analyzing URL with AI...');
-          const enrichResponse = await fetch('/api/bookmarks/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: formData.url })
-          });
-
-          if (!enrichResponse.ok) {
-            const error = await enrichResponse.json();
-            throw new Error(error.message || 'Failed to analyze URL');
-          }
-
-          const analysis = await enrichResponse.json();
-          console.log('AI analysis result:', analysis);
-
-          formData.title = formData.title || analysis.title;
-          formData.description = formData.description || analysis.description;
-          if (analysis.tags && analysis.tags.length > 0) {
-            formData.tags = formData.tags || analysis.tags.join(", ");
-          }
-        } catch (error) {
-          console.error('Error during AI analysis:', error);
-          toast({
-            variant: "destructive",
-            title: "Analysis Error",
-            description: error instanceof Error ? error.message : "Failed to analyze URL"
-          });
-        }
-      }
+      console.log('Starting bookmark submission');
+      setError(null);
 
       const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
 
       const submitData = {
         id: initialData?.id,
-        title: formData.title || initialData?.title,
-        url: formData.url || initialData?.url,
+        title: formData.title,
+        url: formData.url,
         description: formData.description,
-        tags: tags,
+        tags,
         collections: initialData?.collections || [],
-        dateModified: new Date(),
-        analysis: initialData?.analysis
       };
 
       if (!submitData.title || !submitData.url) {
@@ -76,53 +105,51 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       }
 
       console.log('Submitting bookmark data:', submitData);
-      const result = await onSubmit(submitData);
-      if (!result) {
-        throw new Error('Failed to update bookmark');
-      }
-      console.log('Bookmark submission successful:', result);
+      await onSubmit(submitData);
 
-      // If this is an existing bookmark, trigger enrichment
-      if (initialData?.id) {
-        try {
-          console.log('Triggering enrichment for existing bookmark');
-          await fetch('/api/bookmarks/enrich', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: [initialData.id] })
-          });
-        } catch (error) {
-          console.error('Failed to trigger enrichment:', error);
-        }
-      }
+      toast({
+        title: "Success",
+        description: `Bookmark ${initialData ? 'updated' : 'created'} successfully`
+      });
 
       onCancel();
     } catch (error) {
-      console.error('Error updating bookmark:', error);
+      console.error('Submission error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to save bookmark';
+      setError(message);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save bookmark"
+        description: message
       });
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Input
-          placeholder="Title"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          required
-        />
-      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       <div>
         <Input
           placeholder="URL"
           type="url"
           value={formData.url}
-          onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+          onChange={handleUrlChange}
+          disabled={analyzing}
+          required
+          className="mb-2"
+        />
+      </div>
+      <div>
+        <Input
+          placeholder="Title"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          disabled={analyzing}
           required
         />
       </div>
@@ -131,6 +158,7 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
           placeholder="Description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          disabled={analyzing}
         />
       </div>
       <div>
@@ -138,14 +166,15 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
           placeholder="Tags (comma-separated)"
           value={formData.tags}
           onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+          disabled={analyzing}
         />
       </div>
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={analyzing}>
           Cancel
         </Button>
-        <Button type="submit">
-          {initialData ? "Update" : "Add"} Bookmark
+        <Button type="submit" disabled={analyzing}>
+          {analyzing ? "Analyzing..." : initialData ? "Update" : "Add"} Bookmark
         </Button>
       </div>
     </form>
