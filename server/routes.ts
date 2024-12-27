@@ -179,16 +179,19 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/bookmarks/enrich/status", async (req, res) => {
     try {
       console.log("[Enrichment] Checking enrichment status");
-      const [processedCount, totalCount] = await Promise.all([
+      const [processedCount, remainingCount, totalCount] = await Promise.all([
         BookmarkModel.getProcessedCount(),
-        BookmarkModel.getEnrichmentCount()
+        BookmarkModel.getEnrichmentCount(),
+        BookmarkModel.getTotalBookmarkCount()
       ]);
 
-      console.log(`[Enrichment] Status: ${processedCount}/${totalCount} processed`);
+      console.log(`[Enrichment] Status: Processed=${processedCount}, Remaining=${remainingCount}, Total=${totalCount}`);
 
-      const status = processedCount === totalCount ? "completed" : "processing";
+      // Ensure we don't exceed 100%
+      const status = remainingCount === 0 ? "completed" : "processing";
+
       res.json({
-        processedCount,
+        processedCount: Math.min(processedCount, totalCount),
         totalCount,
         status
       });

@@ -155,7 +155,12 @@ export const BookmarkEnrichment = () => {
   });
 
   const isProcessing = enrichmentStatus.status === "processing";
-  const progress = Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100) || 0;
+  const getProgress = (processedCount: number, totalCount: number) => {
+    if (totalCount === 0) return 0;
+    // Ensure progress never exceeds 100%
+    return Math.min(100, Math.round((processedCount / totalCount) * 100));
+  };
+  const progress = getProgress(enrichmentStatus.processedCount, enrichmentStatus.totalCount);
 
   if (countError) {
     return (
@@ -202,14 +207,16 @@ export const BookmarkEnrichment = () => {
                     : "Analyzing Bookmarks..."}
                 </h3>
               </div>
-              <div className="text-lg font-bold text-primary">{progress}%</div>
+              <div className="text-lg font-bold text-primary">
+                {progress}%
+              </div>
             </div>
 
             <Progress value={progress} className="h-4 transition-all" />
 
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                Processed {enrichmentStatus.processedCount} of{" "}
+                Processed {Math.min(enrichmentStatus.processedCount, enrichmentStatus.totalCount)} of{" "}
                 {enrichmentStatus.totalCount} bookmarks
               </span>
               {enrichmentStatus.message && (

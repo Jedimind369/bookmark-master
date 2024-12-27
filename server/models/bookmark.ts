@@ -1,6 +1,6 @@
 import { db } from "@db";
 import { bookmarks, users, type InsertBookmark, type SelectBookmark, type AnalysisStatus } from "@db/schema";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, isNull, or, and } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
 export class BookmarkModel {
@@ -207,16 +207,18 @@ export class BookmarkModel {
 
   static async getEnrichmentCount() {
     try {
+      // Get count of bookmarks that need enrichment (no analysis or processing status)
       const results = await db
-        .select()
+        .select({ count: sql<number>`count(*)::int` })
         .from(bookmarks)
         .where(
-          sql`analysis IS NULL OR 
-              (analysis->>'status')::text IS NULL OR 
-              (analysis->>'status')::text = 'processing'`
+          or(
+            isNull(bookmarks.analysis),
+            eq(sql`${bookmarks.analysis}->>'status'`, 'processing')
+          )
         );
 
-      return results.length;
+      return results[0]?.count || 0;
     } catch (error) {
       console.error("[Enrichment] Error getting enrichment count:", error);
       return 0;
@@ -225,17 +227,33 @@ export class BookmarkModel {
 
   static async getProcessedCount() {
     try {
+      // Get count of successfully processed bookmarks
       const results = await db
-        .select()
+        .select({ count: sql<number>`count(*)::int` })
         .from(bookmarks)
         .where(
-          sql`analysis IS NOT NULL AND 
-              analysis->>'status' IN ('success', 'error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')`
+          and(
+            sql`${bookmarks.analysis} is not null`,
+            sql`${bookmarks.analysis}->>'status' != 'processing'`
+          )
         );
 
-      return results.length;
+      return results[0]?.count || 0;
     } catch (error) {
       console.error("[Enrichment] Error getting processed count:", error);
+      return 0;
+    }
+  }
+
+  static async getTotalBookmarkCount() {
+    try {
+      const results = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookmarks);
+
+      return results[0]?.count || 0;
+    } catch (error) {
+      console.error("[Enrichment] Error getting total count:", error);
       return 0;
     }
   }
