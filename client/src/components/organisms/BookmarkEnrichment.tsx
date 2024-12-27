@@ -20,10 +20,10 @@ export const BookmarkEnrichment = () => {
     totalCount: 0,
     status: "idle"
   });
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Query to get initial count of bookmarks needing enrichment
   const { data: enrichmentCount } = useQuery({
     queryKey: ["enrichmentCount"],
     queryFn: async () => {
@@ -33,57 +33,59 @@ export const BookmarkEnrichment = () => {
     }
   });
 
-  // Poll status when enrichment is in progress
-  useEffect(() => {
-    let pollInterval: NodeJS.Timeout;
+  const pollStatus = async () => {
+    try {
+      const response = await fetch("/api/bookmarks/enrich/status");
+      if (!response.ok) throw new Error("Failed to get enrichment status");
+      const status = await response.json();
+      
+      const isComplete = status.processedCount === status.totalCount;
+      setEnrichmentStatus({
+        ...status,
+        status: isComplete ? "completed" : "processing",
+        message: isComplete 
+          ? "All bookmarks have been analyzed!"
+          : `Analyzing bookmark ${status.processedCount + 1} of ${status.totalCount}...`
+      });
 
-    const pollStatus = async () => {
-      try {
-        const response = await fetch("/api/bookmarks/enrich/status");
-        if (!response.ok) throw new Error("Failed to get enrichment status");
-        const status = await response.json();
-        
-        if (status.totalCount > 0) {
-          const isComplete = status.processedCount === status.totalCount;
-          setEnrichmentStatus({
-            ...status,
-            status: isComplete ? "completed" : "processing",
-            message: isComplete 
-              ? "All bookmarks have been analyzed!"
-              : `Analyzing bookmark ${status.processedCount + 1} of ${status.totalCount}...`
-          });
-
-          if (isComplete) {
-            clearInterval(pollInterval);
-            queryClient.invalidateQueries({ queryKey: ["enrichmentCount"] });
-            queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-            toast({
-              title: "Success",
-              description: "All bookmarks have been enriched with AI analysis",
-            });
-          }
-        }
-      } catch (error) {
-        console.error("[Enrichment] Error polling status:", error);
-        clearInterval(pollInterval);
-        setEnrichmentStatus(prev => ({ ...prev, status: "error" }));
+      if (isComplete) {
+        queryClient.invalidateQueries({ queryKey: ["enrichmentCount"] });
+        queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
         toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to get enrichment status",
+          title: "Success",
+          description: "All bookmarks have been enriched with AI analysis",
         });
+        return true;
       }
-    };
+      return false;
+    } catch (error) {
+      console.error("[Enrichment] Error polling status:", error);
+      setEnrichmentStatus(prev => ({ ...prev, status: "error" }));
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to get enrichment status",
+      });
+      return true;
+    }
+  };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
 
     if (enrichmentStatus.status === "processing") {
-      pollStatus();
-      pollInterval = setInterval(pollStatus, 2000);
+      interval = setInterval(async () => {
+        const shouldStop = await pollStatus();
+        if (shouldStop) {
+          clearInterval(interval);
+        }
+      }, 2000);
     }
 
     return () => {
-      if (pollInterval) clearInterval(pollInterval);
+      if (interval) clearInterval(interval);
     };
-  }, [enrichmentStatus.status, queryClient, toast]);
+  }, [enrichmentStatus.status]);
 
   const enrichMutation = useMutation({
     mutationFn: async () => {
@@ -96,16 +98,12 @@ export const BookmarkEnrichment = () => {
       }
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       setEnrichmentStatus({
         processedCount: 0,
-        totalCount: data.count,
+        totalCount: enrichmentCount || 0,
         status: "processing",
-        message: `Starting analysis of ${data.count} bookmarks...`
-      });
-      toast({
-        title: "Starting Enrichment",
-        description: `Beginning analysis of ${data.count} bookmarks...`,
+        message: "Starting analysis..."
       });
     },
     onError: (error: Error) => {
@@ -119,14 +117,16 @@ export const BookmarkEnrichment = () => {
   });
 
   const isProcessing = enrichmentStatus.status === "processing";
-  const progress = Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100) || 0;
+  const progress = enrichmentStatus.totalCount > 0 
+    ? Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100)
+    : 0;
 
   return (
     <div className="space-y-4">
       <Button 
         variant={isProcessing ? "secondary" : "default"}
         onClick={() => enrichMutation.mutate()}
-        disabled={isProcessing || enrichmentCount === 0}
+        disabled={isProcessing || !enrichmentCount}
         className="w-full sm:w-auto"
       >
         {isProcessing ? (
@@ -157,10 +157,7 @@ export const BookmarkEnrichment = () => {
               </div>
             </div>
 
-            <Progress 
-              value={progress} 
-              className="h-2"
-            />
+            <Progress value={progress} className="h-2" />
 
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
