@@ -76,7 +76,7 @@ export class AIService {
     try {
       console.log(`[Analysis] Attempting to fetch ${url} (attempt ${retries + 1})`);
       
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
       const response = await fetch(proxyUrl, {
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
