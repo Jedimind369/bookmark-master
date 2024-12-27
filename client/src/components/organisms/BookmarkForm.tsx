@@ -1,3 +1,4 @@
+import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tag } from "../atoms/Tag";
 import { CreateBookmarkDto, UpdateBookmarkDto } from "@/types/bookmark";
+import { X } from "lucide-react";
 
 const bookmarkSchema = z.object({
   url: z.string().url(),
@@ -52,9 +54,17 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
     }
   };
 
+  const handleFormSubmit = (data: z.infer<typeof bookmarkSchema>) => {
+    if (initialData?.id) {
+      onSubmit({ ...data, id: initialData.id });
+    } else {
+      onSubmit(data);
+    }
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="url"

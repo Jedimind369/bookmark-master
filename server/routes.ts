@@ -9,8 +9,8 @@ const importBookmarkSchema = z.object({
   url: z.string().url(),
   title: z.string(),
   description: z.string().optional(),
-  tags: z.array(z.string()).optional().default([]),
-  collections: z.array(z.string()).optional().default([]),
+  tags: z.array(z.string()).default([]),
+  collections: z.array(z.string()).default([]),
 }).array();
 
 export function registerRoutes(app: Express): Server {
@@ -27,15 +27,17 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/bookmarks", async (req, res) => {
     try {
-      const validatedData = insertBookmarkSchema.omit({ id: true, dateAdded: true }).parse(req.body);
-      const bookmark = await BookmarkModel.create({
-        ...validatedData,
-        tags: validatedData.tags || [],
-        collections: validatedData.collections || [],
-      });
+      const validatedData = await insertBookmarkSchema.omit({ id: true, dateAdded: true }).parseAsync(req.body);
+      const bookmark = await BookmarkModel.create(validatedData);
       res.status(201).json(bookmark);
     } catch (error) {
       console.error("Failed to create bookmark:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid bookmark data",
+          errors: error.errors
+        });
+      }
       res.status(500).json({ message: "Failed to create bookmark" });
     }
   });
@@ -47,18 +49,22 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ message: "Invalid bookmark ID" });
       }
 
-      const validatedData = insertBookmarkSchema.partial().omit({ id: true }).parse(req.body);
-      const bookmark = await BookmarkModel.update(id, {
-        ...validatedData,
-        tags: validatedData.tags || undefined,
-        collections: validatedData.collections || undefined,
-      });
+      const validatedData = await insertBookmarkSchema.partial().omit({ id: true }).parseAsync(req.body);
+      const bookmark = await BookmarkModel.update(id, validatedData);
+
       if (!bookmark) {
         return res.status(404).json({ message: "Bookmark not found" });
       }
+
       res.json(bookmark);
     } catch (error) {
       console.error("Failed to update bookmark:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid bookmark data",
+          errors: error.errors
+        });
+      }
       res.status(500).json({ message: "Failed to update bookmark" });
     }
   });
@@ -85,7 +91,7 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/bookmarks/import", async (req, res) => {
     try {
       // Validate the incoming data
-      const bookmarks = importBookmarkSchema.parse(req.body);
+      const bookmarks = await importBookmarkSchema.parseAsync(req.body);
 
       // Check if the request is too large
       if (bookmarks.length > 15000) {
