@@ -1,16 +1,22 @@
-import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+
+import { ArrowUpRight, Edit2, Trash2 } from "lucide-react";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader } from "../ui/card";
 import { Tag } from "../atoms/Tag";
 import { Bookmark } from "@/types/bookmark";
-import { Edit2, Trash2, ExternalLink } from "lucide-react";
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
   onEdit: (bookmark: Bookmark) => void;
-  onDelete: (id: number) => void;
+  onDelete: (bookmark: Bookmark) => void;
 }
 
 export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) => {
+  const combinedTags = Array.from(new Set([
+    ...(bookmark.tags || []),
+    ...(bookmark.analysis?.tags || [])
+  ]));
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
@@ -22,13 +28,13 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
             <Button variant="ghost" size="icon" onClick={() => onEdit(bookmark)}>
               <Edit2 className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => onDelete(bookmark.id)}
-              className="text-destructive hover:text-destructive"
-            >
+            <Button variant="ghost" size="icon" onClick={() => onDelete(bookmark)}>
               <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" asChild>
+              <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
             </Button>
           </div>
         </div>
@@ -38,25 +44,11 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
           {bookmark.analysis?.summary || bookmark.description || 'No description available'}
         </p>
         <div className="flex flex-wrap gap-2">
-          {Array.from(new Set([
-            ...(bookmark.tags || []),
-            ...(bookmark.analysis?.tags || [])
-          ])).map((tag) => (
+          {combinedTags.map((tag) => (
             <Tag key={tag} text={tag} />
           ))}
         </div>
       </CardContent>
-      <CardFooter>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => window.open(bookmark.url, '_blank')}
-          className="w-full"
-        >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Visit Site
-        </Button>
-      </CardFooter>
     </Card>
   );
 };
