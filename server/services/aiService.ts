@@ -49,23 +49,35 @@ export class AIService {
 
   static async analyzeContent(url: string, content: string): Promise<AIAnalysis> {
     try {
-      const prompt = `Analyze this webpage content and provide a concise title, description, and relevant tags.
+      const prompt = `Analyze this webpage content and provide the following in English, regardless of the original language:
+
+1. A concise title
+2. A brief description (max 200 characters)
+3. Relevant tags that categorize the content (include both general category tags and specific topic tags)
+
+If the content is not in English, please translate and analyze it appropriately.
+
 URL: ${url}
 Content: ${content}
 
 Provide the response in the following JSON format:
 {
-  "title": "Brief, engaging title",
-  "description": "Concise description (max 200 characters)",
-  "tags": ["tag1", "tag2", "tag3"] (maximum 5 relevant tags)
-}`;
+  "title": "Brief, engaging title in English",
+  "description": "Concise description in English (max 200 characters)",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"] (5-7 relevant tags, starting with broader categories)
+}
+
+Make sure the tags are comprehensive and follow this structure:
+- First tag: Main category (e.g., "technology", "science", "business")
+- Second tag: Subcategory (e.g., "programming", "physics", "marketing")
+- Remaining tags: Specific topics and themes`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that analyzes web content and provides structured metadata.",
+            content: "You are a helpful assistant that analyzes web content in any language and provides structured metadata in English. You excel at categorization and identifying key themes.",
           },
           {
             role: "user",
