@@ -95,7 +95,8 @@ export class AIService {
           '--disable-setuid-sandbox', 
           '--disable-dev-shm-usage',
           '--disable-gpu',
-          '--window-size=1920,1080'
+          '--window-size=1920,1080',
+          '--headless'
         ],
         headless: 'new',
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
