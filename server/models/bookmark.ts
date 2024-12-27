@@ -1,6 +1,6 @@
 import { db } from "@db";
 import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
-import { eq, sql, isNull, COALESCE } from "drizzle-orm";
+import { eq, sql, isNull } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
 export class BookmarkModel {
@@ -69,7 +69,6 @@ export class BookmarkModel {
       const normalizedData = {
         ...data,
         userId: defaultUser.id,
-        dateAdded: new Date(),
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : [],
       };
@@ -133,32 +132,62 @@ export class BookmarkModel {
       const defaultUser = await this.getOrCreateDefaultUser();
       const now = new Date();
 
-      const bookmarksToInsert = data.map(bookmark => ({
-        ...bookmark,
-        userId: defaultUser.id,
-        dateAdded: now,
-        tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
-        collections: Array.isArray(bookmark.collections) ? bookmark.collections : [],
-      }));
+      // Deduplicate bookmarks by URL
+      const uniqueBookmarks = Array.from(
+        new Map(data.map(item => [item.url, item])).values()
+      );
 
-      // Use batch size of 1000 for optimal performance
-      const batchSize = 1000;
+      console.log(`Processing ${data.length} bookmarks, ${uniqueBookmarks.length} unique URLs`);
+
+      // Transform and validate bookmarks
+      const bookmarksToInsert = uniqueBookmarks.map(bookmark => {
+        // Ensure URL is valid
+        try {
+          new URL(bookmark.url);
+        } catch (error) {
+          console.warn(`Skipping invalid URL: ${bookmark.url}`);
+          return null;
+        }
+
+        return {
+          ...bookmark,
+          userId: defaultUser.id,
+          title: bookmark.title.slice(0, 255), // Ensure title fits in DB
+          description: bookmark.description?.slice(0, 1000) || null, // Limit description length
+          tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
+          collections: Array.isArray(bookmark.collections) ? bookmark.collections : [],
+        };
+      }).filter((bookmark): bookmark is NonNullable<typeof bookmark> => bookmark !== null);
+
+      console.log(`Validated ${bookmarksToInsert.length} bookmarks for insertion`);
+
+      // Use batch size of 100 for optimal performance
+      const batchSize = 100;
       const results = [];
 
       for (let i = 0; i < bookmarksToInsert.length; i += batchSize) {
         const batch = bookmarksToInsert.slice(i, i + batchSize);
-        const inserted = await db
-          .insert(bookmarks)
-          .values(batch)
-          .returning();
-        results.push(...inserted);
+        console.log(`Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(bookmarksToInsert.length/batchSize)}`);
 
-        // Add a small delay between batches to prevent overwhelming the database
-        if (i + batchSize < bookmarksToInsert.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+          const inserted = await db
+            .insert(bookmarks)
+            .values(batch)
+            .returning();
+          results.push(...inserted);
+
+          // Add a small delay between batches to prevent overwhelming the database
+          if (i + batchSize < bookmarksToInsert.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (error) {
+          console.error(`Error inserting batch ${Math.floor(i/batchSize) + 1}:`, error);
+          // Continue with next batch even if current fails
+          continue;
         }
       }
 
+      console.log(`Successfully inserted ${results.length} bookmarks`);
       return results;
     } catch (error) {
       console.error("Error bulk creating bookmarks:", error);
@@ -172,8 +201,7 @@ export class BookmarkModel {
         .select()
         .from(bookmarks)
         .where(
-          sql`(analysis IS NULL) OR 
-              (analysis->>'description' IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100)`
+          sql`analysis IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100`
         );
 
       return results.length;
@@ -189,8 +217,7 @@ export class BookmarkModel {
         .select()
         .from(bookmarks)
         .where(
-          sql`(analysis IS NULL) OR 
-              (analysis->>'description' IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100)`
+          sql`analysis IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100`
         );
 
       console.log(`Found ${bookmarksToUpdate.length} bookmarks to enrich with analysis`);
@@ -218,8 +245,8 @@ export class BookmarkModel {
     try {
       // Check if bookmark needs enrichment
       const needsEnrichment = !bookmark.analysis ||
-                            !bookmark.analysis.summary ||
-                            bookmark.analysis.summary.length < 100;
+                          !bookmark.analysis.summary ||
+                          bookmark.analysis.summary.length < 100;
 
       if (needsEnrichment) {
         console.log(`Enriching analysis for bookmark ${bookmark.id}: ${bookmark.url}`);

@@ -39,7 +39,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/bookmarks", async (req, res) => {
     try {
-      const validatedData = await insertBookmarkSchema.omit({ id: true, dateAdded: true }).parseAsync(req.body);
+      const validatedData = await insertBookmarkSchema.omit({ id: true, dateAdded: true, userId: true }).parseAsync(req.body);
       const bookmark = await BookmarkModel.create(validatedData);
       res.status(201).json(bookmark);
     } catch (error) {
@@ -57,18 +57,20 @@ export function registerRoutes(app: Express): Server {
   // Bulk import endpoint
   app.post("/api/bookmarks/import", async (req, res) => {
     try {
+      console.log(`Received ${req.body.length} bookmarks for import`);
+
       // Create a modified schema for import that handles string dates
       const importBookmarkSchema = z.object({
         url: z.string().url(),
         title: z.string(),
         description: z.string().optional().nullable(),
         tags: z.array(z.string()).default([]),
-        collections: z.array(z.string()).default([]),
-        dateAdded: z.string().transform(str => new Date(str)).optional()
+        collections: z.array(z.string()).default([])
       });
 
       // Validate and transform the incoming data
       const bookmarksData = await z.array(importBookmarkSchema).parseAsync(req.body);
+      console.log(`Validated ${bookmarksData.length} bookmarks`);
 
       // Transform the validated data for bulk creation
       const normalizedBookmarks = bookmarksData.map(bookmark => ({
@@ -76,8 +78,7 @@ export function registerRoutes(app: Express): Server {
         title: bookmark.title,
         description: bookmark.description || null,
         tags: bookmark.tags,
-        collections: bookmark.collections,
-        dateAdded: bookmark.dateAdded || new Date()
+        collections: bookmark.collections
       }));
 
       // Use the bulk create method from BookmarkModel
@@ -85,14 +86,16 @@ export function registerRoutes(app: Express): Server {
 
       res.status(201).json({
         message: "Bookmarks imported successfully",
-        count: createdBookmarks.length
+        count: createdBookmarks.length,
+        totalReceived: req.body.length,
+        duplicatesRemoved: req.body.length - createdBookmarks.length
       });
     } catch (error) {
       console.error("Failed to import bookmarks:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
           message: "Invalid bookmark data",
-          errors: error.errors 
+          errors: error.errors
         });
       }
       res.status(500).json({ message: "Failed to import bookmarks" });
