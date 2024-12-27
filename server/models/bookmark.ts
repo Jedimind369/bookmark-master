@@ -221,6 +221,7 @@ export class BookmarkModel {
             LENGTH(COALESCE(analysis->>'summary', '')) >= 100 
             OR analysis->>'summary' = 'Failed to analyze this URL'
             OR analysis->>'summary' = 'Error processing bookmark'
+            OR analysis->>'status' IN ('error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')
           )`
         );
 

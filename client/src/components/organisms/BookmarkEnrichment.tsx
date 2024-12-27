@@ -106,17 +106,17 @@ export const BookmarkEnrichment = () => {
 
     if (enrichmentStatus.status === "processing" || enrichmentStatus.status === "completed") {
       const progress = Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100);
-      const isComplete = enrichmentStatus.status === "completed" || enrichmentStatus.processedCount >= enrichmentStatus.totalCount;
+      const isComplete = enrichmentStatus.processedCount >= enrichmentStatus.totalCount;
       
       return (
         <Alert>
           <AlertDescription className="flex items-center gap-4">
             <Progress value={progress} className="w-[200px]" />
             <span className="text-sm text-muted-foreground">
-              {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} enriched
+              {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} processed
               {isComplete ? " (Completed)" : ""}
             </span>
-            {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
+            {!isComplete && enrichmentStatus.status === "processing" && <Loader2 className="h-4 w-4 animate-spin" />}
           </AlertDescription>
         </Alert>
       );
