@@ -17,6 +17,15 @@ export interface AIAnalysis {
   tags: string[];
   isLandingPage?: boolean;
   mainTopic?: string;
+  screenshot?: string;
+  metadata?: {
+    author?: string;
+    publishDate?: string;
+    lastModified?: string;
+    contentType?: string;
+    mainImage?: string;
+    wordCount?: number;
+  };
 }
 
 interface PageContent {
@@ -25,7 +34,15 @@ interface PageContent {
   description: string;
   content: string;
   links: string[];
-  type?: 'webpage' | 'video' | 'article';
+  type?: 'webpage' | 'video' | 'article' | 'product';
+  screenshot?: string;
+  metadata?: {
+    author?: string;
+    publishDate?: string;
+    lastModified?: string;
+    mainImage?: string;
+    wordCount?: number;
+  };
 }
 
 export class AIService {
@@ -75,20 +92,72 @@ export class AIService {
     }
   }
 
-  private static getContentType(url: string): 'webpage' | 'video' | 'article' {
+  private static getContentType(url: string, $: cheerio.CheerioAPI): 'webpage' | 'video' | 'article' | 'product' {
     const urlObj = new URL(url);
-    if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+
+    // Check for video platforms
+    if (urlObj.hostname.includes('youtube.com') || 
+        urlObj.hostname.includes('youtu.be') ||
+        urlObj.hostname.includes('vimeo.com') || 
+        urlObj.hostname.includes('dailymotion.com')) {
       return 'video';
     }
-    // Add more video platforms as needed
-    if (urlObj.hostname.includes('vimeo.com') || urlObj.hostname.includes('dailymotion.com')) {
-      return 'video';
+
+    // Check for product pages
+    const priceSelectors = ['[itemprop="price"]', '.price', '#price', '[data-price]'];
+    const hasPrice = priceSelectors.some(selector => $(selector).length > 0);
+    if (hasPrice || $('[itemtype*="Product"]').length > 0) {
+      return 'product';
     }
-    // Check for common article/blog platforms
-    if (urlObj.hostname.includes('medium.com') || urlObj.hostname.includes('wordpress.com')) {
-      return 'article';
-    }
-    return 'webpage';
+
+    // Check for articles
+    const articleIndicators = [
+      'article',
+      '[itemtype*="Article"]',
+      '.post',
+      '.blog-post',
+      '[class*="article"]',
+      'time',
+      '.published',
+      '.author'
+    ];
+    const isArticle = articleIndicators.some(selector => $(selector).length > 0) ||
+                     urlObj.hostname.includes('medium.com') || 
+                     urlObj.hostname.includes('wordpress.com');
+
+    return isArticle ? 'article' : 'webpage';
+  }
+
+  private static extractMetadata($: cheerio.CheerioAPI): PageContent['metadata'] {
+    const metadata: PageContent['metadata'] = {};
+
+    // Extract author
+    metadata.author = $('meta[name="author"]').attr('content') ||
+                     $('[rel="author"]').first().text() ||
+                     $('.author').first().text() ||
+                     undefined;
+
+    // Extract dates
+    metadata.publishDate = $('meta[property="article:published_time"]').attr('content') ||
+                          $('time[pubdate]').attr('datetime') ||
+                          $('[itemprop="datePublished"]').attr('content') ||
+                          undefined;
+
+    metadata.lastModified = $('meta[property="article:modified_time"]').attr('content') ||
+                           $('[itemprop="dateModified"]').attr('content') ||
+                           undefined;
+
+    // Extract main image
+    metadata.mainImage = $('meta[property="og:image"]').attr('content') ||
+                        $('meta[name="twitter:image"]').attr('content') ||
+                        $('article img').first().attr('src') ||
+                        undefined;
+
+    // Calculate word count
+    const text = $('body').text();
+    metadata.wordCount = text.split(/\s+/).length;
+
+    return metadata;
   }
 
   private static async fetchWithRetry(url: string, retries = 0): Promise<PageContent> {
@@ -98,42 +167,60 @@ export class AIService {
 
       // Take screenshot using puppeteer
       const puppeteer = await import('puppeteer');
-      const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+      const browser = await puppeteer.launch({ 
+        args: ['--no-sandbox'],
+        defaultViewport: {
+          width: 1920,
+          height: 1080
+        }
+      });
+
       const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle0' });
-      const screenshot = await page.screenshot({ encoding: 'base64' });
-      
-      // Get meta tags and main content
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+      // Set viewport for better screenshots
+      await page.setViewport({
+        width: 1920,
+        height: 1080,
+        deviceScaleFactor: 1,
+      });
+
+      // Wait for network to be idle
+      await page.goto(url, { 
+        waitUntil: ['networkidle0', 'domcontentloaded'],
+        timeout: 30000
+      });
+
+      // Wait for content to load
+      await page.evaluate(() => new Promise(resolve => {
+        let totalHeight = 0;
+        const distance = 100;
+        const timer = setInterval(() => {
+          const scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+          if(totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve(true);
+          }
+        }, 100);
+      }));
+
+      // Scroll back to top
+      await page.evaluate(() => window.scrollTo(0, 0));
+
+      // Take full page screenshot
+      const screenshot = await page.screenshot({ 
+        encoding: 'base64',
+        fullPage: true,
+        type: 'jpeg',
+        quality: 80
+      });
+
+      // Get HTML content
       const html = await page.content();
       await browser.close();
 
-      const contentType = this.getContentType(url);
-      if (contentType === 'video') {
-        clearTimeout(timeoutId);
-        return this.handleVideoContent(url);
-      }
-
-      const isHttps = url.startsWith('https://');
-      const agent = isHttps 
-        ? new (await import('node:https')).Agent({ rejectUnauthorized: false })
-        : new (await import('node:http')).Agent();
-
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)',
-          'Accept-Language': '*'
-        },
-        signal: controller.signal,
-        agent
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const html = await response.text();
       const $ = cheerio.load(html);
 
       // Remove non-content elements
@@ -147,18 +234,52 @@ export class AIService {
       $('.cookie-banner').remove();
       $('.advertisement').remove();
       $('.social-media').remove();
+      $('[class*="cookie"]').remove();
+      $('[class*="banner"]').remove();
+      $('[class*="popup"]').remove();
+      $('[class*="modal"]').remove();
+      $('[role="complementary"]').remove();
+      $('[role="banner"]').remove();
 
       // Extract key content with better fallbacks
-      const title = $('title').text().trim() || 
-                   $('meta[property="og:title"]').attr('content')?.trim() || 
-                   $('h1').first().text().trim() || 
+      const title = $('meta[property="og:title"]').attr('content')?.trim() ||
+                   $('title').text().trim() ||
+                   $('h1').first().text().trim() ||
                    'Untitled Page';
 
-      const metaDescription = $('meta[name="description"]').attr('content')?.trim() || 
-                            $('meta[property="og:description"]').attr('content')?.trim() || '';
+      const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
+                            $('meta[name="description"]').attr('content')?.trim() ||
+                            '';
 
-      const mainContent = $('main, article, #content, .content, [role="main"]').text() || 
-                         $('body').clone().children('nav,header,footer,aside').remove().end().text();
+      // Identify main content area
+      const contentSelectors = [
+        'article',
+        '[role="main"]',
+        'main',
+        '#content',
+        '.content',
+        '.post-content',
+        '.article-content'
+      ];
+
+      let mainContent = '';
+      for (const selector of contentSelectors) {
+        const element = $(selector).first();
+        if (element.length) {
+          mainContent = element.text().trim();
+          break;
+        }
+      }
+
+      // Fallback to body if no main content found
+      if (!mainContent) {
+        mainContent = $('body').clone()
+          .children('nav,header,footer,aside')
+          .remove()
+          .end()
+          .text()
+          .trim();
+      }
 
       // Extract navigation links for deeper crawling
       const links = $('a[href]')
@@ -174,19 +295,25 @@ export class AIService {
         })
         .filter((url): url is string => url !== null && this.isSameOrigin(url, url));
 
+      const contentType = this.getContentType(url, $);
+      const metadata = this.extractMetadata($);
+
+      clearTimeout(timeoutId);
+
       return {
         url,
         title,
         description: metaDescription,
-        screenshot: screenshot,
         content: [title, metaDescription, mainContent]
           .filter(Boolean)
           .join('\n\n')
           .replace(/\s+/g, ' ')
           .trim()
-          .slice(0, 1000),
+          .slice(0, 2000), // Increased content length
         links: Array.from(new Set(links)),
-        type: contentType
+        type: contentType,
+        screenshot: screenshot.toString(),
+        metadata
       };
     } catch (error) {
       // Don't retry DNS failures
@@ -194,7 +321,7 @@ export class AIService {
           (error as any).code === 'ENOTFOUND') {
         throw new Error(`Domain not found: ${url}`);
       }
-      
+
       if (retries < this.MAX_RETRIES) {
         if (error instanceof Error && error.name === 'AbortError') {
           console.warn(`Request timeout for ${url}, attempt ${retries + 1}`);
@@ -226,13 +353,22 @@ export class AIService {
     }
     // Add more video platforms as needed
 
+    // Try to fetch video thumbnail
+    let thumbnailUrl;
+    if (platform === 'YouTube' && videoId) {
+      thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    }
+
     return {
       url,
       title: `${platform} Video`,
       description: `A video hosted on ${platform}`,
       content: `This is a ${platform} video with ID: ${videoId}`,
       links: [],
-      type: 'video'
+      type: 'video',
+      metadata: {
+        mainImage: thumbnailUrl
+      }
     };
   }
 
@@ -275,6 +411,7 @@ export class AIService {
 
   private static async analyzeWithRetry(startUrl: string, pages: PageContent[], retries = 0): Promise<AIAnalysis> {
     try {
+      const mainPage = pages[0]; // Use the first page as the main one for analysis
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         response_format: { type: "json_object" },
@@ -282,47 +419,44 @@ export class AIService {
           {
             role: "system",
             content: `You are an expert website analyzer with the following capabilities:
-1. Identify if a page is a landing page or part of a larger website
-2. Determine the main purpose and target audience
-3. Generate meaningful descriptions even for partially accessible content
-4. Make educated guesses about website purpose based on URL structure and available context
-5. Extract key themes and topics for better bookmark categorization`
+1. Identify the type of website and its primary purpose
+2. Determine the target audience and content quality
+3. Extract key themes and topics
+4. Evaluate content credibility and relevance
+5. Generate meaningful descriptions even for partially accessible content
+
+Consider these content types:
+- Article: Focus on author, publish date, and key points
+- Product: Highlight features, pricing, and target market
+- Video: Describe the platform and content type
+- General webpage: Focus on main purpose and user value`
           },
           {
             role: "user",
             content: `Analyze these pages from ${startUrl} and provide a comprehensive analysis:
 
-1. If the URL is unreachable but the domain exists, make an educated guess about its purpose.
-2. For landing pages, focus on the specific product/service/purpose.
-3. For general websites, provide an overview of the main topics and target audience.
+Main page type: ${mainPage.type}
+Metadata: ${JSON.stringify(mainPage.metadata, null, 2)}
 
-Available content from crawling:
+Available content:
 ${pages.map(page => `
 URL: ${page.url}
 Title: ${page.title}
+Type: ${page.type}
 Content: ${page.content.slice(0, 500)}
-Type: ${page.type || 'webpage'}
 ---`).join('\n')}
 
 Return a JSON object with:
 - title: Clear, concise website purpose (max 60 chars)
-- description: If landing page, specific focus and call-to-action. If general site, overview of main topics and purpose. (max 200 chars)
+- description: Detailed analysis based on content type (max 200 chars)
 - tags: 3-5 relevant tags for content type, purpose, and target audience
 - isLandingPage: boolean indicating if this is a focused landing page
-- mainTopic: primary topic or purpose if landing page, "general" if multi-topic site
-
-Use this structure:
-{
-  "title": string,
-  "description": string,
-  "tags": string[],
-  "isLandingPage": boolean,
-  "mainTopic": string
-}`
+- mainTopic: primary topic or purpose
+- metadata: include relevant metadata from the page`
           },
         ],
         temperature: 0.3,
-        max_tokens: 500,
+        max_tokens: 800,
       });
 
       const result = response.choices[0]?.message?.content;
@@ -341,7 +475,9 @@ Use this structure:
         description: analysis.description.slice(0, 200),
         tags: analysis.tags.slice(0, 5).map((tag: string) => tag.toLowerCase()),
         isLandingPage: analysis.isLandingPage,
-        mainTopic: analysis.mainTopic
+        mainTopic: analysis.mainTopic,
+        screenshot: mainPage.screenshot,
+        metadata: mainPage.metadata
       };
     } catch (error) {
       if (retries < this.MAX_RETRIES && 
@@ -361,12 +497,11 @@ Use this structure:
         throw new Error('Invalid URL format');
       }
 
-      console.log(`Starting analysis of: ${normalizedUrl}`);
+      console.log(`[Analysis] Starting analysis of: ${normalizedUrl}`);
       const pages = await this.crawlWebsite(normalizedUrl);
 
-      // Even if no pages were fetched, try to analyze based on URL structure
-      console.log(`Attempted to crawl ${normalizedUrl}, got ${pages.length} pages`);
-      
+      console.log(`[Analysis] Crawled ${pages.length} pages from ${normalizedUrl}`);
+
       if (!pages.length) {
         // Create fallback analysis from URL
         const urlParts = new URL(normalizedUrl);
@@ -381,11 +516,11 @@ Use this structure:
 
       return await this.analyzeWithRetry(normalizedUrl, pages);
     } catch (error) {
-      console.error('Error in analyzeUrl:', error);
+      console.error('[Analysis] Error in analyzeUrl:', error);
 
       // Create meaningful fallback analysis
       try {
-        const urlParts = new URL(normalizedUrl);
+        const urlParts = new URL(url);
         return {
           title: urlParts.hostname,
           description: `Website at ${urlParts.hostname} - ${error instanceof Error ? error.message : 'Access error'}`,
