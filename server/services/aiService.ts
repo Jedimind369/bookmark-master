@@ -49,31 +49,9 @@ export class AIService {
 
   static async analyzeContent(url: string, content: string): Promise<AIAnalysis> {
     try {
-      const prompt = `Analyze this webpage content and provide the following in English, regardless of the original language:
-
-1. A concise title
-2. A brief description (max 200 characters)
-3. Relevant tags that categorize the content (include both general category tags and specific topic tags)
-
-If the content is not in English, please translate and analyze it appropriately.
-
-URL: ${url}
-Content: ${content}
-
-Provide the response in the following JSON format:
-{
-  "title": "Brief, engaging title in English",
-  "description": "Concise description in English (max 200 characters)",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"] (5-7 relevant tags, starting with broader categories)
-}
-
-Make sure the tags are comprehensive and follow this structure:
-- First tag: Main category (e.g., "technology", "science", "business")
-- Second tag: Subcategory (e.g., "programming", "physics", "marketing")
-- Remaining tags: Specific topics and themes`;
-
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
+        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
@@ -81,7 +59,21 @@ Make sure the tags are comprehensive and follow this structure:
           },
           {
             role: "user",
-            content: prompt,
+            content: `Analyze this webpage content and provide the following in English, regardless of the original language:
+
+1. A concise title
+2. A brief description (max 200 characters)
+3. Relevant tags that categorize the content
+
+URL: ${url}
+Content: ${content}
+
+Return only a JSON object with the following structure exactly:
+{
+  "title": "Brief, engaging title in English",
+  "description": "Concise description in English",
+  "tags": ["category", "subcategory", "specific-topic-1", "specific-topic-2", "specific-topic-3"]
+}`
           },
         ],
         temperature: 0.7,
@@ -93,7 +85,19 @@ Make sure the tags are comprehensive and follow this structure:
         throw new Error("No response from OpenAI");
       }
 
-      return JSON.parse(result) as AIAnalysis;
+      // Parse and validate the response
+      let analysis: AIAnalysis;
+      try {
+        analysis = JSON.parse(result);
+        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
+          throw new Error("Invalid response format from OpenAI");
+        }
+      } catch (e) {
+        console.error('Error parsing OpenAI response:', result);
+        throw new Error('Failed to parse AI response');
+      }
+
+      return analysis;
     } catch (error) {
       console.error('Error analyzing content:', error);
       throw new Error('Failed to analyze content');
@@ -101,7 +105,12 @@ Make sure the tags are comprehensive and follow this structure:
   }
 
   static async analyzeUrl(url: string): Promise<AIAnalysis> {
-    const content = await this.fetchUrlContent(url);
-    return this.analyzeContent(url, content);
+    try {
+      const content = await this.fetchUrlContent(url);
+      return this.analyzeContent(url, content);
+    } catch (error) {
+      console.error('Error in analyzeUrl:', error);
+      throw new Error('Failed to analyze URL');
+    }
   }
 }
