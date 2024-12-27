@@ -84,6 +84,25 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update bookmark by ID
+  app.put("/api/bookmarks/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid bookmark ID" });
+      }
+
+      console.log(`[Update] Updating bookmark ${id}:`, req.body);
+      const result = await BookmarkModel.update(id, req.body);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating bookmark:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to update bookmark" 
+      });
+    }
+  });
+
   // Get all bookmarks
   app.get("/api/bookmarks", async (req, res) => {
     try {
