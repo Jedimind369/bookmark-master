@@ -26,15 +26,17 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       
       const submitData = {
         id: initialData?.id,
-        title: formData.title || initialData?.title,
-        url: formData.url || initialData?.url,
+        title: formData.title,
+        url: formData.url,
         description: formData.description,
         tags: tags,
         collections: initialData?.collections || [],
-        dateModified: new Date().toISOString()
+        dateModified: new Date().toISOString(),
+        analysis: initialData?.analysis
       };
 
-      await onSubmit(submitData);
+      const result = await onSubmit(submitData);
+      console.log('Update result:', result);
       
       if (initialData?.id) {
         try {
