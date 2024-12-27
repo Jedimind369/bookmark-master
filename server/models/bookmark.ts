@@ -240,16 +240,22 @@ export class BookmarkModel {
           sql`analysis IS NULL OR LENGTH(COALESCE(analysis->>'summary', '')) < 100`
         );
 
-      console.log(`Found ${bookmarksToUpdate.length} bookmarks to enrich with analysis`);
+      console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
 
       // Process in batches of 5 to avoid overloading
       const batchSize = 5;
       for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
         const batch = bookmarksToUpdate.slice(i, i + batchSize);
+        console.log(`[Enrichment] Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(bookmarksToUpdate.length/batchSize)}`);
+
         try {
-          await Promise.all(batch.map(bookmark => this.enrichBookmarkAnalysis(bookmark)));
+          // Process each bookmark in the batch sequentially to better track failures
+          for (const bookmark of batch) {
+            console.log(`[Enrichment] Processing bookmark ${bookmark.id}: ${bookmark.url}`);
+            await this.enrichBookmarkAnalysis(bookmark);
+          }
         } catch (error) {
-          console.error(`Error processing batch starting at index ${i}:`, error);
+          console.error(`[Enrichment] Error processing batch starting at index ${i}:`, error);
           // Continue with next batch even if current batch fails
         }
 
@@ -259,9 +265,10 @@ export class BookmarkModel {
         }
       }
 
+      console.log('[Enrichment] Completed enrichment process');
       return true;
     } catch (error) {
-      console.error("Failed to enrich bookmarks:", error);
+      console.error("[Enrichment] Failed to enrich bookmarks:", error);
       return false;
     }
   }
@@ -274,9 +281,22 @@ export class BookmarkModel {
                             bookmark.analysis.summary.length < 100;
 
       if (needsEnrichment) {
-        console.log(`Enriching analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
+        console.log(`[Enrichment] Starting analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
+
+        // Update status to processing
+        await db
+          .update(bookmarks)
+          .set({
+            analysis: {
+              status: 'processing' as const,
+              lastUpdated: new Date().toISOString()
+            }
+          })
+          .where(eq(bookmarks.id, bookmark.id));
+
         try {
           const analysis = await AIService.analyzeUrl(bookmark.url);
+          console.log(`[Enrichment] Successfully analyzed bookmark ${bookmark.id}`);
 
           // Store successful analysis
           const [updated] = await db
@@ -295,7 +315,7 @@ export class BookmarkModel {
 
           return updated;
         } catch (error) {
-          console.error(`Failed to analyze URL for bookmark ${bookmark.id}:`, error);
+          console.error(`[Enrichment] Failed to analyze URL for bookmark ${bookmark.id}:`, error);
 
           // Categorize the error and store it appropriately
           let errorSummary = "Failed to analyze this URL";
@@ -303,6 +323,7 @@ export class BookmarkModel {
           let retryable = true;
 
           if (error instanceof Error) {
+            console.log(`[Enrichment] Error type for bookmark ${bookmark.id}:`, error.message);
             if (error.message.includes('Invalid URL')) {
               errorSummary = "Invalid URL format";
               errorStatus = 'invalid_url';
@@ -339,7 +360,7 @@ export class BookmarkModel {
       }
       return bookmark;
     } catch (error) {
-      console.error(`Failed to process bookmark ${bookmark.id}:`, error);
+      console.error(`[Enrichment] Failed to process bookmark ${bookmark.id}:`, error);
       // Mark the bookmark as processed with error
       try {
         const [updated] = await db
@@ -358,7 +379,7 @@ export class BookmarkModel {
           .returning();
         return updated;
       } catch (dbError) {
-        console.error(`Failed to update error status for bookmark ${bookmark.id}:`, dbError);
+        console.error(`[Enrichment] Failed to update error status for bookmark ${bookmark.id}:`, dbError);
         return bookmark;
       }
     }
