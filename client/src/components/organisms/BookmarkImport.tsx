@@ -19,12 +19,12 @@ export const BookmarkImport = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bookmarks),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message);
       }
-      
+
       return response.json();
     },
     onSuccess: (data) => {
@@ -57,15 +57,28 @@ export const BookmarkImport = () => {
     try {
       const text = await file.text();
       let bookmarks;
-      
+
       if (file.name.endsWith('.json')) {
         bookmarks = JSON.parse(text);
+      } else if (file.name.endsWith('.html')) {
+        const response = await fetch('/api/bookmarks/parse-html', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: text,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to parse HTML bookmarks');
+        }
+
+        bookmarks = await response.json();
       } else {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Unsupported file format. Please upload a JSON file.",
+          description: "Unsupported file format. Please upload a JSON or HTML file.",
         });
+        setImporting(false);
         return;
       }
 
@@ -75,6 +88,7 @@ export const BookmarkImport = () => {
           title: "Error",
           description: "Invalid file format. Expected an array of bookmarks.",
         });
+        setImporting(false);
         return;
       }
 
@@ -96,7 +110,7 @@ export const BookmarkImport = () => {
       <div className="flex items-center gap-4">
         <input
           type="file"
-          accept=".json"
+          accept=".json,.html"
           onChange={handleFileUpload}
           disabled={importing}
           className="hidden"

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { BookmarkModel } from "./models/bookmark";
 import { AIService } from "./services/aiService";
 import { insertBookmarkSchema } from "@db/schema";
+import { parseHtmlBookmarks } from "./utils/bookmarkParser";
 import { z } from "zod";
 
 export function registerRoutes(app: Express): Server {
@@ -127,6 +128,24 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Failed to start bookmark enrichment:", error);
       res.status(500).json({ message: "Failed to start bookmark enrichment" });
+    }
+  });
+
+  // HTML Bookmark parsing endpoint
+  app.post("/api/bookmarks/parse-html", async (req, res) => {
+    try {
+      // Get raw HTML content from request body
+      const htmlContent = req.body;
+      if (typeof htmlContent !== 'string') {
+        return res.status(400).json({ message: "Invalid HTML content" });
+      }
+
+      // Parse the HTML bookmarks
+      const bookmarks = parseHtmlBookmarks(htmlContent);
+      res.json(bookmarks);
+    } catch (error) {
+      console.error("Failed to parse HTML bookmarks:", error);
+      res.status(500).json({ message: "Failed to parse HTML bookmarks" });
     }
   });
 
