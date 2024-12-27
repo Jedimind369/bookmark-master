@@ -15,6 +15,8 @@ export interface AIAnalysis {
   title: string;
   description: string;
   tags: string[];
+  isLandingPage?: boolean;
+  mainTopic?: string;
 }
 
 interface PageContent {
@@ -283,8 +285,6 @@ export class AIService {
 3. For general websites, provide an overview of the main topics and target audience.
 
 Available content from crawling:
-</old_str>
-
 ${pages.map(page => `
 URL: ${page.url}
 Title: ${page.title}
@@ -328,6 +328,8 @@ Use this structure:
         title: analysis.title.slice(0, 60),
         description: analysis.description.slice(0, 200),
         tags: analysis.tags.slice(0, 5).map((tag: string) => tag.toLowerCase()),
+        isLandingPage: analysis.isLandingPage,
+        mainTopic: analysis.mainTopic
       };
     } catch (error) {
       if (retries < this.MAX_RETRIES && 
@@ -350,26 +352,44 @@ Use this structure:
       console.log(`Starting analysis of: ${normalizedUrl}`);
       const pages = await this.crawlWebsite(normalizedUrl);
 
-      if (pages.length === 0) {
-        throw new Error('Failed to fetch any pages from the website');
+      // Even if no pages were fetched, try to analyze based on URL structure
+      console.log(`Attempted to crawl ${normalizedUrl}, got ${pages.length} pages`);
+      
+      if (!pages.length) {
+        // Create fallback analysis from URL
+        const urlParts = new URL(normalizedUrl);
+        return {
+          title: urlParts.hostname,
+          description: `Website at ${urlParts.hostname}${urlParts.pathname} - Currently unavailable or restricted access`,
+          tags: ['archived', 'unavailable'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
       }
 
-      console.log(`Successfully crawled ${pages.length} pages from ${normalizedUrl}`);
       return await this.analyzeWithRetry(normalizedUrl, pages);
     } catch (error) {
       console.error('Error in analyzeUrl:', error);
 
-      // Return a structured error response that can be stored in the database
-      if (error instanceof Error) {
-        if (error.message.includes('Invalid URL')) {
-          throw new Error('Invalid URL format: Please provide a valid http:// or https:// URL');
-        } else if (error.message.includes('rate limit')) {
-          throw new Error('Service temporarily unavailable: Rate limit exceeded, please try again later');
-        } else if (error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
-          throw new Error('Website unreachable: The URL provided could not be accessed');
-        }
+      // Create meaningful fallback analysis
+      try {
+        const urlParts = new URL(normalizedUrl);
+        return {
+          title: urlParts.hostname,
+          description: `Website at ${urlParts.hostname} - ${error instanceof Error ? error.message : 'Access error'}`,
+          tags: ['error', 'unavailable'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
+      } catch {
+        return {
+          title: 'Invalid URL',
+          description: 'The provided URL could not be processed',
+          tags: ['error', 'invalid'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
       }
-      throw new Error('Analysis failed: Unable to process the website content');
     }
   }
 }
