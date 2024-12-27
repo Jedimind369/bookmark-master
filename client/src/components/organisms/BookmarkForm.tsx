@@ -48,9 +48,6 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       }
 
       onCancel();
-      
-      if (updatedBookmark && initialData?.id) {
-        await fetch('/api/bookmarks/enrich', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ids: [initialData.id] })
