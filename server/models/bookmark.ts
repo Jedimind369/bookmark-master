@@ -5,10 +5,15 @@ import { eq } from "drizzle-orm";
 export class BookmarkModel {
   static async findAll() {
     try {
-      return await db.select().from(bookmarks);
+      const results = await db.select().from(bookmarks);
+      return results.map(bookmark => ({
+        ...bookmark,
+        tags: bookmark.tags || [],
+        collections: bookmark.collections || []
+      }));
     } catch (error) {
       console.error("Error fetching bookmarks:", error);
-      throw error;
+      throw new Error("Failed to fetch bookmarks");
     }
   }
 
@@ -19,55 +24,90 @@ export class BookmarkModel {
         .from(bookmarks)
         .where(eq(bookmarks.id, id))
         .limit(1);
-      return results[0] || null;
+
+      if (!results.length) return null;
+
+      const bookmark = results[0];
+      return {
+        ...bookmark,
+        tags: bookmark.tags || [],
+        collections: bookmark.collections || []
+      };
     } catch (error) {
       console.error("Error fetching bookmark:", error);
-      throw error;
+      throw new Error(`Failed to fetch bookmark with id ${id}`);
     }
   }
 
   static async create(data: Omit<InsertBookmark, "id" | "dateAdded">) {
     try {
+      // Ensure tags and collections are arrays
+      const normalizedData = {
+        ...data,
+        dateAdded: new Date(),
+        tags: Array.isArray(data.tags) ? data.tags : [],
+        collections: Array.isArray(data.collections) ? data.collections : [],
+      };
+
       const [bookmark] = await db
         .insert(bookmarks)
-        .values({
-          ...data,
-          dateAdded: new Date(),
-          tags: data.tags || [],
-          collections: data.collections || [],
-        })
+        .values(normalizedData)
         .returning();
+
       return bookmark;
     } catch (error) {
       console.error("Error creating bookmark:", error);
-      throw error;
+      throw new Error("Failed to create bookmark");
     }
   }
 
   static async update(id: number, data: Partial<Omit<InsertBookmark, "id">>) {
     try {
+      // First check if bookmark exists
+      const existing = await this.findById(id);
+      if (!existing) {
+        throw new Error(`Bookmark with id ${id} not found`);
+      }
+
+      // Normalize arrays
+      const normalizedData = {
+        ...data,
+        tags: data.tags !== undefined ? (Array.isArray(data.tags) ? data.tags : []) : undefined,
+        collections: data.collections !== undefined ? (Array.isArray(data.collections) ? data.collections : []) : undefined,
+      };
+
       const [bookmark] = await db
         .update(bookmarks)
-        .set(data)
+        .set(normalizedData)
         .where(eq(bookmarks.id, id))
         .returning();
-      return bookmark || null;
+
+      return bookmark;
     } catch (error) {
       console.error("Error updating bookmark:", error);
-      throw error;
+      if (error instanceof Error) throw error;
+      throw new Error(`Failed to update bookmark with id ${id}`);
     }
   }
 
   static async delete(id: number) {
     try {
+      // First check if bookmark exists
+      const existing = await this.findById(id);
+      if (!existing) {
+        throw new Error(`Bookmark with id ${id} not found`);
+      }
+
       const [bookmark] = await db
         .delete(bookmarks)
         .where(eq(bookmarks.id, id))
         .returning();
-      return !!bookmark;
+
+      return true;
     } catch (error) {
       console.error("Error deleting bookmark:", error);
-      throw error;
+      if (error instanceof Error) throw error;
+      throw new Error(`Failed to delete bookmark with id ${id}`);
     }
   }
 
@@ -77,8 +117,8 @@ export class BookmarkModel {
       const bookmarksToInsert = data.map(bookmark => ({
         ...bookmark,
         dateAdded: now,
-        tags: bookmark.tags || [],
-        collections: bookmark.collections || [],
+        tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
+        collections: Array.isArray(bookmark.collections) ? bookmark.collections : [],
       }));
 
       // Use batch size of 1000 for optimal performance
@@ -102,7 +142,7 @@ export class BookmarkModel {
       return results;
     } catch (error) {
       console.error("Error bulk creating bookmarks:", error);
-      throw error;
+      throw new Error("Failed to bulk create bookmarks");
     }
   }
 }
