@@ -76,6 +76,21 @@ export class AIService {
     try {
       console.log(`[Analysis] Attempting to fetch ${url} (attempt ${retries + 1})`);
 
+      // Add DNS error check
+      try {
+        await new Promise((resolve, reject) => {
+          const { hostname } = new URL(url);
+          require('dns').lookup(hostname, (err: any) => {
+            if (err) {
+              reject(new Error('unreachable'));
+            }
+            resolve(true);
+          });
+        });
+      } catch (err) {
+        throw new Error('unreachable');
+      }
+
       const response = await fetch(url, {
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
