@@ -26,6 +26,7 @@ export const Home = () => {
 
   const refreshMutation = useMutation({
     mutationFn: async (bookmark: Bookmark) => {
+      console.log(`[Refresh] Refreshing analysis for bookmark ${bookmark.id}`);
       const response = await fetch(`/api/bookmarks/${bookmark.id}/analyze`, {
         method: "POST",
       });
@@ -75,14 +76,11 @@ export const Home = () => {
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateBookmarkDto) => {
+      console.log('[Create] Creating new bookmark:', data);
       const response = await fetch("/api/bookmarks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          tags: data.tags || [],
-          collections: data.collections || [],
-        }),
+        body: JSON.stringify(data),
       });
       if (!response.ok) throw new Error("Failed to create bookmark");
       return response.json();
@@ -106,27 +104,28 @@ export const Home = () => {
 
   const updateMutation = useMutation({
     mutationFn: async (data: UpdateBookmarkDto) => {
-      // First update the bookmark
+      console.log(`[Update] Updating bookmark ${data.id}:`, data);
+
+      // First update the bookmark data
       const response = await fetch(`/api/bookmarks/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          tags: data.tags || [],
-          collections: data.collections || [],
-        }),
+        body: JSON.stringify(data),
       });
       if (!response.ok) throw new Error("Failed to update bookmark");
+      const updatedBookmark = await response.json();
 
-      // Then trigger reanalysis
+      // Then trigger a reanalysis
+      console.log(`[Update] Refreshing analysis for bookmark ${data.id}`);
       const reanalyzeResponse = await fetch(`/api/bookmarks/${data.id}/analyze`, {
         method: "POST",
       });
+
       if (!reanalyzeResponse.ok) {
-        console.warn("Failed to reanalyze bookmark after update");
+        throw new Error("Failed to refresh bookmark analysis after update");
       }
 
-      return response.json();
+      return await reanalyzeResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
@@ -147,6 +146,7 @@ export const Home = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
+      console.log(`[Delete] Deleting bookmark ${id}`);
       const response = await fetch(`/api/bookmarks/${id}`, {
         method: "DELETE",
       });
@@ -178,11 +178,24 @@ export const Home = () => {
     setIsFormOpen(true);
   };
 
-  const handleSubmit = (data: CreateBookmarkDto | UpdateBookmarkDto) => {
-    if ("id" in data) {
-      updateMutation.mutate(data as UpdateBookmarkDto);
-    } else {
-      createMutation.mutate(data as CreateBookmarkDto);
+  const handleSubmit = async (data: Partial<Bookmark>) => {
+    try {
+      console.log('[Submit] Handling form submission:', data);
+      if (data.id) {
+        await updateMutation.mutateAsync({
+          id: data.id,
+          ...data,
+        } as UpdateBookmarkDto);
+      } else {
+        await createMutation.mutateAsync(data as CreateBookmarkDto);
+      }
+    } catch (error) {
+      console.error('[Submit] Error submitting bookmark:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save bookmark",
+      });
     }
   };
 
@@ -191,6 +204,7 @@ export const Home = () => {
   };
 
   const handleRefresh = (bookmark: Bookmark) => {
+    console.log(`[Refresh] Triggering refresh for bookmark ${bookmark.id}`);
     refreshMutation.mutate(bookmark);
   };
 
@@ -222,7 +236,6 @@ export const Home = () => {
         onRefresh={handleRefresh}
       />
 
-      {/* Purge confirmation dialog */}
       <Dialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -249,7 +262,6 @@ export const Home = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Existing form dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
