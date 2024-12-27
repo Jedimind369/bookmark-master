@@ -101,8 +101,7 @@ export class AIService {
           'Accept-Language': '*'
         },
         signal: controller.signal,
-        // @ts-ignore
-        agent: new (require('https').Agent)({
+        agent: new (await import('node:https')).Agent({
           rejectUnauthorized: false
         })
       });
