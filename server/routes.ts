@@ -156,9 +156,7 @@ export function registerRoutes(app: Express): Server {
       const processed = await BookmarkModel.getProcessedCount();
 
       let status: "idle" | "processing" | "completed" | "error" = "idle";
-      if (total === 0) {
-        status = "completed";
-      } else if (processed === total) {
+      if (total === 0 || processed >= total) {
         status = "completed";
       } else if (processed < total) {
         status = "processing";
