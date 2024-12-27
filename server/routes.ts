@@ -116,6 +116,12 @@ export function registerRoutes(app: Express): Server {
       console.log("Parsing HTML content...");
       const bookmarks = parseHtmlBookmarks(htmlContent);
       console.log(`Successfully parsed ${bookmarks.length} bookmarks`);
+
+      // Log sample bookmarks for debugging
+      if (bookmarks.length > 0) {
+        console.log("Sample bookmark:", JSON.stringify(bookmarks[0], null, 2));
+      }
+
       res.json(bookmarks);
     } catch (error) {
       console.error("Failed to parse HTML bookmarks:", error);

@@ -15,44 +15,65 @@ export function parseHtmlBookmarks(html: string): ParsedBookmark[] {
 
   function processNode(node: Element, currentPath: string[] = []) {
     // Process all DT elements (bookmark items)
-    const items = node.getElementsByTagName('dt');
-    
+    const items = node.querySelectorAll('dt');
+
     for (const item of Array.from(items)) {
       const link = item.querySelector('a');
       if (link) {
         const url = link.getAttribute('href');
         const title = link.textContent;
         const dateAdded = link.getAttribute('add_date');
-        const tags = link.getAttribute('tags')?.split(',').map(tag => tag.trim()) || [];
-        
+        const tags = link.getAttribute('tags')?.split(',').map(tag => tag.trim()).filter(Boolean) || [];
+
         if (url && title) {
-          bookmarks.push({
-            url,
-            title,
-            dateAdded: dateAdded ? new Date(parseInt(dateAdded) * 1000) : undefined,
-            tags,
-            collections: [...currentPath].filter(Boolean),
-          });
+          try {
+            // Validate URL
+            new URL(url);
+
+            // Get the folder path (collections)
+            const parentFolders = item.closest('dl')?.
+              querySelectorAll(':scope > dt > h3')?.
+              textContent?.split('>')?.
+              map(folder => folder.trim())?.
+              filter(Boolean) || [];
+
+            bookmarks.push({
+              url,
+              title: title.trim(),
+              dateAdded: dateAdded ? new Date(parseInt(dateAdded) * 1000) : undefined,
+              tags,
+              collections: [...currentPath, ...parentFolders].filter(Boolean),
+            });
+          } catch (error) {
+            console.warn(`Skipping invalid URL: ${url}`);
+            continue;
+          }
         }
       }
-      
+
       // Process folders (DL elements)
       const folder = item.querySelector('h3');
-      if (folder) {
-        const folderName = folder.textContent;
+      if (folder && folder.textContent) {
+        const folderName = folder.textContent.trim();
         const sublist = item.querySelector('dl');
         if (sublist) {
-          processNode(sublist, [...currentPath, folderName || '']);
+          processNode(sublist, [...currentPath, folderName]);
         }
       }
     }
   }
 
-  // Start processing from the root DL element
-  const rootList = document.querySelector('dl');
-  if (rootList) {
-    processNode(rootList);
-  }
+  try {
+    // Start processing from the root DL element
+    const rootList = document.querySelector('dl');
+    if (rootList) {
+      processNode(rootList);
+    }
 
-  return bookmarks;
+    console.log(`Successfully parsed ${bookmarks.length} bookmarks`);
+    return bookmarks;
+  } catch (error) {
+    console.error('Error parsing bookmarks:', error);
+    throw new Error(`Failed to parse bookmarks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
