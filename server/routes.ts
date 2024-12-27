@@ -137,10 +137,12 @@ export function registerRoutes(app: Express): Server {
   // Get enrichment count
   app.get("/api/bookmarks/enrich/count", async (req, res) => {
     try {
+      console.log("[Enrichment] Getting enrichment count");
       const count = await BookmarkModel.getEnrichmentCount();
+      console.log(`[Enrichment] Count: ${count} bookmarks need enrichment`);
       res.json(count);
     } catch (error) {
-      console.error("Failed to get enrichment count:", error);
+      console.error("[Enrichment] Failed to get enrichment count:", error);
       res.status(500).json({ message: "Failed to get enrichment count" });
     }
   });
@@ -149,33 +151,49 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/bookmarks/enrich", async (req, res) => {
     try {
       console.log("[Enrichment] Starting enrichment process");
+      const count = await BookmarkModel.getEnrichmentCount();
+      console.log(`[Enrichment] Found ${count} bookmarks to enrich`);
+
+      if (count === 0) {
+        return res.json({ message: "No bookmarks to enrich", count: 0 });
+      }
+
       const result = await BookmarkModel.enrichAllBookmarks();
+      console.log(`[Enrichment] Process started: ${result}`);
+
       if (result) {
-        res.json({ message: "Enrichment process started successfully", count: result });
+        res.json({ message: "Enrichment process started successfully", count });
       } else {
+        console.error("[Enrichment] Failed to start enrichment process");
         res.status(500).json({ message: "Failed to start enrichment process" });
       }
     } catch (error) {
-      console.error("Error starting enrichment:", error);
-      res.status(500).json({ message: "Failed to start enrichment process" });
+      console.error("[Enrichment] Error starting enrichment:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to start enrichment process" 
+      });
     }
   });
 
   // Get enrichment status
   app.get("/api/bookmarks/enrich/status", async (req, res) => {
     try {
+      console.log("[Enrichment] Checking enrichment status");
       const [processedCount, totalCount] = await Promise.all([
         BookmarkModel.getProcessedCount(),
-        db.select().from(bookmarks).execute().then(results => results.length)
+        BookmarkModel.getEnrichmentCount()
       ]);
 
+      console.log(`[Enrichment] Status: ${processedCount}/${totalCount} processed`);
+
+      const status = processedCount === totalCount ? "completed" : "processing";
       res.json({
         processedCount,
         totalCount,
-        status: processedCount === totalCount ? "completed" : "processing",
+        status
       });
     } catch (error) {
-      console.error("Failed to get enrichment status:", error);
+      console.error("[Enrichment] Failed to get enrichment status:", error);
       res.status(500).json({ message: "Failed to get enrichment status" });
     }
   });

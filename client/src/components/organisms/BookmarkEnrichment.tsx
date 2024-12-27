@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Wand2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,114 +19,220 @@ export const BookmarkEnrichment = () => {
     totalCount: 0,
     status: "idle"
   });
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: enrichmentCount } = useQuery({
-    queryKey: ["enrichmentCount"],
-    queryFn: async () => {
-      const response = await fetch("/api/bookmarks/enrich/count");
-      if (!response.ok) throw new Error("Failed to get enrichment count");
-      return response.json();
-    }
-  });
-
-  const pollStatus = async () => {
-    try {
-      const response = await fetch("/api/bookmarks/enrich/status");
-      if (!response.ok) throw new Error("Failed to get enrichment status");
-      const status = await response.json();
-      
-      const isComplete = status.processedCount === status.totalCount;
-      setEnrichmentStatus({
-        ...status,
-        status: isComplete ? "completed" : "processing",
-        message: isComplete 
-          ? "All bookmarks have been analyzed!"
-          : `Analyzing bookmark ${status.processedCount + 1} of ${status.totalCount}...`
-      });
-
-      if (isComplete) {
-        queryClient.invalidateQueries({ queryKey: ["enrichmentCount"] });
-        queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-        toast({
-          title: "Success",
-          description: "All bookmarks have been enriched with AI analysis",
-        });
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("[Enrichment] Error polling status:", error);
-      setEnrichmentStatus(prev => ({ ...prev, status: "error" }));
+  // Query to get initial count of bookmarks needing enrichment
+  const { data: enrichmentCount, isError: isCountError } = useQuery({
+    queryKey: ["/api/bookmarks/enrich/count"],
+    onError: (error) => {
+      console.error("[Enrichment] Error fetching count:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to get enrichment status",
+        description: "Failed to get enrichment count",
       });
-      return true;
     }
-  };
+  });
 
+  // Set up polling when enrichment is in progress
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let pollInterval: NodeJS.Timeout;
+
+    const pollStatus = async () => {
+      try {
+        console.log("[Enrichment] Polling status...");
+        const response = await fetch("/api/bookmarks/enrich/status");
+
+        if (!response.ok) {
+          throw new Error(`Status check failed: ${response.status}`);
+        }
+
+        const status = await response.json();
+        console.log("[Enrichment] Status update:", status);
+
+        setEnrichmentStatus(prev => {
+          const isComplete = status.processedCount === status.totalCount;
+
+          if (isComplete) {
+            console.log("[Enrichment] Process completed");
+            clearInterval(pollInterval);
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+            toast({
+              title: "Success",
+              description: "All bookmarks have been enriched with AI analysis",
+            });
+            return { 
+              ...status, 
+              status: "completed",
+              message: "Analysis complete!" 
+            };
+          }
+
+          return { 
+            ...status, 
+            status: "processing",
+            message: `Analyzing bookmark ${status.processedCount + 1} of ${status.totalCount}...`
+          };
+        });
+      } catch (error) {
+        console.error("[Enrichment] Error polling status:", error);
+        clearInterval(pollInterval);
+        setEnrichmentStatus(prev => ({ 
+          ...prev, 
+          status: "error",
+          message: "Failed to get status update" 
+        }));
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to get enrichment status",
+        });
+      }
+    };
 
     if (enrichmentStatus.status === "processing") {
-      interval = setInterval(async () => {
-        const shouldStop = await pollStatus();
-        if (shouldStop) {
-          clearInterval(interval);
-        }
-      }, 2000);
+      console.log("[Enrichment] Starting status polling");
+      // Poll immediately when starting
+      pollStatus();
+      // Then set up regular polling
+      pollInterval = setInterval(pollStatus, 2000);
     }
 
     return () => {
-      if (interval) clearInterval(interval);
+      if (pollInterval) {
+        console.log("[Enrichment] Cleaning up polling interval");
+        clearInterval(pollInterval);
+      }
     };
-  }, [enrichmentStatus.status]);
+  }, [enrichmentStatus.status, queryClient, toast]);
 
   const enrichMutation = useMutation({
     mutationFn: async () => {
+      console.log("[Enrichment] Starting enrichment process");
       const response = await fetch("/api/bookmarks/enrich", {
         method: "POST",
       });
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message);
+        throw new Error(error.message || "Failed to start enrichment");
       }
+
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("[Enrichment] Process started successfully:", data);
+      if (data.count === 0) {
+        toast({
+          title: "No Action Needed",
+          description: "All bookmarks are already analyzed.",
+        });
+        return;
+      }
+
       setEnrichmentStatus({
         processedCount: 0,
-        totalCount: enrichmentCount || 0,
+        totalCount: data.count,
         status: "processing",
-        message: "Starting analysis..."
+        message: `Starting analysis of ${data.count} bookmarks...`
+      });
+
+      toast({
+        title: "Starting Analysis",
+        description: `Beginning analysis of ${data.count} bookmarks...`,
       });
     },
     onError: (error: Error) => {
+      console.error("[Enrichment] Error starting process:", error);
+      setEnrichmentStatus(prev => ({
+        ...prev,
+        status: "error",
+        message: error.message
+      }));
       toast({
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to start enrichment process",
       });
-      setEnrichmentStatus(prev => ({ ...prev, status: "error" }));
     },
   });
 
-  const isProcessing = enrichmentStatus.status === "processing";
-  const progress = enrichmentStatus.totalCount > 0 
-    ? Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100)
-    : 0;
+  const getProgressStatus = () => {
+    // Always show the progress section when processing
+    if (enrichmentStatus.status === "processing" || enrichmentStatus.status === "completed") {
+      const progress = Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100) || 0;
+      const isComplete = enrichmentStatus.status === "completed";
+
+      return (
+        <div className="mt-4 p-6 bg-card border rounded-lg shadow-sm">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {!isComplete && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+                <h3 className="text-lg font-semibold text-primary">
+                  {isComplete ? "Analysis Complete!" : "Analyzing Bookmarks..."}
+                </h3>
+              </div>
+              <div className="text-lg font-bold text-primary">
+                {progress}%
+              </div>
+            </div>
+
+            <Progress 
+              value={progress} 
+              className="h-4 transition-all"
+            />
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Processed {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} bookmarks
+              </span>
+              {enrichmentStatus.message && (
+                <span className="text-muted-foreground">
+                  {enrichmentStatus.message}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (enrichmentStatus.status === "error") {
+      return (
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>
+            {enrichmentStatus.message || "Failed to process bookmarks. Please try again."}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    return null;
+  };
+
+  const isProcessing = enrichmentStatus.status === "processing" || enrichMutation.isPending;
+
+  // Don't render if we had an error getting the count
+  if (isCountError) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          Failed to load enrichment status. Please refresh the page.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <Button 
         variant={isProcessing ? "secondary" : "default"}
         onClick={() => enrichMutation.mutate()}
         disabled={isProcessing || !enrichmentCount}
-        className="w-full sm:w-auto"
+        className="w-full sm:w-auto relative"
       >
         {isProcessing ? (
           <>
@@ -141,43 +246,7 @@ export const BookmarkEnrichment = () => {
           </>
         )}
       </Button>
-
-      {(isProcessing || enrichmentStatus.status === "completed") && (
-        <div className="mt-4 p-6 bg-card border rounded-lg shadow-sm">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-card-foreground">
-              <div className="flex items-center gap-2">
-                {isProcessing && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-                <h3 className="text-lg font-semibold">
-                  {enrichmentStatus.status === "completed" ? "Analysis Complete!" : "Analyzing Bookmarks..."}
-                </h3>
-              </div>
-              <div className="text-lg font-bold text-primary">
-                {progress}%
-              </div>
-            </div>
-
-            <Progress value={progress} className="h-2" />
-
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                Processed {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} bookmarks
-              </span>
-              {enrichmentStatus.message && (
-                <span>{enrichmentStatus.message}</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {enrichmentStatus.status === "error" && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Failed to process bookmarks. Please try again.
-          </AlertDescription>
-        </Alert>
-      )}
+      {getProgressStatus()}
     </div>
   );
 };
