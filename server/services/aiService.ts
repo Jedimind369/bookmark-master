@@ -167,6 +167,12 @@ export class AIService {
         type: contentType
       };
     } catch (error) {
+      // Don't retry DNS failures
+      if (error instanceof Error && 
+          (error as any).code === 'ENOTFOUND') {
+        throw new Error(`Domain not found: ${url}`);
+      }
+      
       if (retries < this.MAX_RETRIES) {
         if (error instanceof Error && error.name === 'AbortError') {
           console.warn(`Request timeout for ${url}, attempt ${retries + 1}`);
