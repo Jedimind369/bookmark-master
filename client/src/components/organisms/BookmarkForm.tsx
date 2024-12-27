@@ -31,12 +31,12 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       tags,
     };
 
-    // First submit the basic update
-    onSubmit(submitData);
+    try {
+      // First submit the basic update
+      await onSubmit(submitData);
 
-    // Then trigger enrichment if this is an update
-    if (initialData?.id) {
-      try {
+      // Then trigger enrichment if this is an update
+      if (initialData?.id) {
         const response = await fetch('/api/bookmarks/enrich', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -46,9 +46,10 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         if (!response.ok) {
           throw new Error('Failed to enrich bookmark');
         }
-      } catch (error) {
-        console.error('Error enriching bookmark:', error);
       }
+    } catch (error) {
+      console.error('Error updating bookmark:', error);
+      throw error; // Re-throw to trigger error handling in parent component
     }
   };
 
