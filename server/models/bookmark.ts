@@ -1,6 +1,6 @@
 import { db } from "@db";
 import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
-import { eq, sql, isNull } from "drizzle-orm";
+import { eq, sql, isNull, COALESCE } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
 export class BookmarkModel {
@@ -168,18 +168,15 @@ export class BookmarkModel {
 
   static async getEnrichmentCount() {
     try {
-      const bookmarks = await db
+      const results = await db
         .select()
         .from(bookmarks)
         .where(
-          sql`analysis IS NULL OR 
-              (analysis->>'description' IS NULL) OR 
-              LENGTH(analysis->>'description') < 100 OR
-              (analysis->>'summary' IS NULL) OR 
-              LENGTH(analysis->>'summary') < 100`
+          sql`(analysis IS NULL) OR 
+              (analysis->>'description' IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100)`
         );
 
-      return bookmarks.length;
+      return results.length;
     } catch (error) {
       console.error("Error getting enrichment count:", error);
       return 0;
@@ -189,8 +186,8 @@ export class BookmarkModel {
   static async enrichBookmarkAnalysis(bookmark: SelectBookmark) {
     try {
       // Check if bookmark needs enrichment
-      const needsEnrichment = !bookmark.analysis || 
-                            !bookmark.analysis.summary || 
+      const needsEnrichment = !bookmark.analysis ||
+                            !bookmark.analysis.summary ||
                             bookmark.analysis.summary.length < 100;
 
       if (needsEnrichment) {
