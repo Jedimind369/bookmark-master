@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Wand2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,8 +53,6 @@ export const BookmarkEnrichment = () => {
             clearInterval(pollInterval);
             // Force refetch bookmarks to get updated data
             queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks/enrich/count"] });
             toast({
               title: "Success",
               description: "All bookmarks have been enriched with AI analysis",
@@ -121,16 +118,25 @@ export const BookmarkEnrichment = () => {
       const isComplete = enrichmentStatus.status === "completed" || 
                         enrichmentStatus.processedCount === enrichmentStatus.totalCount ||
                         progress >= 100;
-      
+
       return (
         <Alert>
-          <AlertDescription className="flex items-center gap-4">
-            <Progress value={progress} className="w-[200px]" />
-            <span className="text-sm text-muted-foreground">
-              {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} processed
-              {isComplete ? " (Completed)" : ""}
-            </span>
-            {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
+          <AlertDescription className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Processed {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} bookmarks
+                {isComplete ? " (Completed)" : ""}
+              </div>
+              <div className="text-sm font-medium">
+                {progress}%
+              </div>
+            </div>
+            <Progress value={progress} className="h-2" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
+              {enrichmentStatus.message || 
+                (isComplete ? "Analysis complete!" : "Analyzing bookmarks...")}
+            </div>
           </AlertDescription>
         </Alert>
       );
