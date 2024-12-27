@@ -94,12 +94,13 @@ export class BookmarkModel {
 
       const normalizedData = {
         ...existing,
-        ...data,
         title: data.title || existing.title,
-        description: data.description || existing.description,
+        url: data.url || existing.url,
+        description: data.description !== undefined ? data.description : existing.description,
         tags: Array.isArray(data.tags) ? data.tags : (existing.tags || []),
         collections: Array.isArray(data.collections) ? data.collections : (existing.collections || []),
-        dateModified: new Date().toISOString()
+        dateModified: new Date().toISOString(),
+        analysis: existing.analysis
       };
 
       const [bookmark] = await db
