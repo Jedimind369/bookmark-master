@@ -168,12 +168,18 @@ export class BookmarkModel {
 
   static async getEnrichmentCount() {
     try {
-      const result = await db
-        .select({ count: sql<number>`count(*)` })
+      const bookmarks = await db
+        .select()
         .from(bookmarks)
-        .where(isNull(bookmarks.analysis));
+        .where(
+          sql`analysis IS NULL OR 
+              (analysis->>'description' IS NULL) OR 
+              LENGTH(analysis->>'description') < 100 OR
+              (analysis->>'summary' IS NULL) OR 
+              LENGTH(analysis->>'summary') < 100`
+        );
 
-      return Number(result[0]?.count || 0);
+      return bookmarks.length;
     } catch (error) {
       console.error("Error getting enrichment count:", error);
       return 0;
@@ -182,7 +188,12 @@ export class BookmarkModel {
 
   static async enrichBookmarkAnalysis(bookmark: SelectBookmark) {
     try {
-      if (!bookmark.analysis) {
+      // Check if bookmark needs enrichment
+      const needsEnrichment = !bookmark.analysis || 
+                            !bookmark.analysis.summary || 
+                            bookmark.analysis.summary.length < 100;
+
+      if (needsEnrichment) {
         console.log(`Enriching analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
         const analysis = await AIService.analyzeUrl(bookmark.url);
 
