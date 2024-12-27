@@ -1,5 +1,4 @@
-
-import { ArrowUpRight, Edit2, Trash2 } from "lucide-react";
+import { ArrowUpRight, Edit2, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { Tag } from "../atoms/Tag";
@@ -9,9 +8,10 @@ interface BookmarkCardProps {
   bookmark: Bookmark;
   onEdit: (bookmark: Bookmark) => void;
   onDelete: (bookmark: Bookmark) => void;
+  onRefresh: (bookmark: Bookmark) => void;
 }
 
-export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) => {
+export const BookmarkCard = ({ bookmark, onEdit, onDelete, onRefresh }: BookmarkCardProps) => {
   const combinedTags = Array.from(new Set([
     ...(bookmark.tags || []),
     ...(bookmark.analysis?.tags || [])
@@ -25,6 +25,15 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
             {bookmark.analysis?.title || bookmark.title}
           </h3>
           <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => onRefresh(bookmark)}
+              disabled={bookmark.analysis?.status === 'processing'}
+              className="relative"
+            >
+              <RefreshCw className={`h-4 w-4 ${bookmark.analysis?.status === 'processing' ? 'animate-spin' : ''}`} />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => onEdit(bookmark)}>
               <Edit2 className="h-4 w-4" />
             </Button>

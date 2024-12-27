@@ -24,7 +24,30 @@ export const Home = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Add purge mutation
+  const refreshMutation = useMutation({
+    mutationFn: async (bookmark: Bookmark) => {
+      const response = await fetch(`/api/bookmarks/${bookmark.id}/analyze`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("Failed to refresh bookmark analysis");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      toast({
+        title: "Success",
+        description: "Bookmark analysis refreshed",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to refresh bookmark analysis",
+      });
+    },
+  });
+
   const purgeMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/bookmarks/purge", {
@@ -83,6 +106,7 @@ export const Home = () => {
 
   const updateMutation = useMutation({
     mutationFn: async (data: UpdateBookmarkDto) => {
+      // First update the bookmark
       const response = await fetch(`/api/bookmarks/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -93,13 +117,22 @@ export const Home = () => {
         }),
       });
       if (!response.ok) throw new Error("Failed to update bookmark");
+
+      // Then trigger reanalysis
+      const reanalyzeResponse = await fetch(`/api/bookmarks/${data.id}/analyze`, {
+        method: "POST",
+      });
+      if (!reanalyzeResponse.ok) {
+        console.warn("Failed to reanalyze bookmark after update");
+      }
+
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       toast({
         title: "Success",
-        description: "Bookmark updated successfully",
+        description: "Bookmark updated and analysis refreshed",
       });
       handleCloseForm();
     },
@@ -157,6 +190,10 @@ export const Home = () => {
     purgeMutation.mutate();
   };
 
+  const handleRefresh = (bookmark: Bookmark) => {
+    refreshMutation.mutate(bookmark);
+  };
+
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="flex justify-between items-center mb-8">
@@ -182,6 +219,7 @@ export const Home = () => {
       <BookmarkList
         onEdit={handleEdit}
         onDelete={(id) => deleteMutation.mutate(id)}
+        onRefresh={handleRefresh}
       />
 
       {/* Purge confirmation dialog */}

@@ -29,6 +29,29 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Reanalyze specific bookmark
+  app.post("/api/bookmarks/:id/analyze", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid bookmark ID" });
+      }
+
+      const bookmark = await BookmarkModel.findById(id);
+      if (!bookmark) {
+        return res.status(404).json({ message: "Bookmark not found" });
+      }
+
+      const result = await BookmarkModel.enrichBookmarkAnalysis(bookmark);
+      res.json(result);
+    } catch (error) {
+      console.error("Error reanalyzing bookmark:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to reanalyze bookmark" 
+      });
+    }
+  });
+
   // Get enrichment count
   app.get("/api/bookmarks/enrich/count", async (req, res) => {
     try {
