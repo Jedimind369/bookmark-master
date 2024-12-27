@@ -54,6 +54,31 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Bulk import endpoint
+  app.post("/api/bookmarks/import", async (req, res) => {
+    try {
+      // Validate the array of bookmarks
+      const bookmarksData = await z.array(insertBookmarkSchema.omit({ id: true })).parseAsync(req.body);
+
+      // Use the bulk create method from BookmarkModel
+      const createdBookmarks = await BookmarkModel.bulkCreate(bookmarksData);
+
+      res.status(201).json({
+        message: "Bookmarks imported successfully",
+        count: createdBookmarks.length
+      });
+    } catch (error) {
+      console.error("Failed to import bookmarks:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid bookmark data",
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Failed to import bookmarks" });
+    }
+  });
+
   app.put("/api/bookmarks/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -152,6 +177,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to start bookmark enrichment" });
     }
   });
+
   const httpServer = createServer(app);
   return httpServer;
 }

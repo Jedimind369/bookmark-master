@@ -1,0 +1,128 @@
+[vite] connecting...
+[vite] connected.
+Parsed bookmarks: 
+(2133) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, …]
+[0 … 99]
+[100 … 199]
+100: Object
+101: Object
+102: Object
+103: Object
+104: Object
+105: Object
+106: Object
+107: Object
+108: Object
+109: Object
+110: Object
+111: Object
+112: Object
+113: Object
+114: Object
+115: Object
+116: Object
+117: Object
+118: Object
+119: Object
+120: Object
+121: Object
+122: Object
+123: Object
+124: Object
+125: Object
+126: Object
+127: Object
+128: Object
+129: Object
+130: Object
+131: Object
+132: Object
+133: Object
+134: Object
+135: Object
+136: Object
+137: Object
+138: Object
+139: Object
+140: Object
+141: Object
+142: Object
+143: Object
+144: Object
+145: Object
+146: Object
+147: Object
+148: Object
+149: Object
+150: Object
+151: Object
+152: Object
+153: Object
+154: Object
+155: Object
+156: Object
+157: Object
+158: Object
+159: Object
+160: Object
+161: Object
+162: Object
+163: Object
+164: Object
+165: Object
+166: Object
+167: Object
+168: Object
+169: Object
+170: Object
+171: Object
+172: Object
+173: Object
+174: Object
+175: Object
+176: Object
+177: Object
+178: Object
+179: Object
+180: Object
+181: Object
+182: Object
+183: Object
+184: Object
+185: Object
+186: Object
+187: Object
+188: Object
+189: Object
+190: Object
+191: Object
+192: Object
+193: Object
+194: Object
+195: Object
+196: Object
+197: Object
+198: Object
+199: Object
+[200 … 299]
+[300 … 399]
+[400 … 499]
+[500 … 599]
+[600 … 699]
+[700 … 799]
+[800 … 899]
+[900 … 999]
+[1000 … 1099]
+[1100 … 1199]
+[1200 … 1299]
+[1300 … 1399]
+[1400 … 1499]
+[1500 … 1599]
+[1600 … 1699]
+[1700 … 1799]
+[1800 … 1899]
+[1900 … 1999]
+[2000 … 2099]
+[2100 … 2132]
+length: 2133
+[[Prototype]]: Array(0)
