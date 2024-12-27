@@ -5,7 +5,14 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: async ({ queryKey }) => {
         try {
-          const res = await fetch(queryKey[0] as string);
+          const res = await fetch(queryKey[0] as string, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+          });
 
           if (!res.ok) {
             const errorText = await res.text();
