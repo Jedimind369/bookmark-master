@@ -157,10 +157,6 @@ export class BookmarkModel {
           return null;
         }
 
-        // Ensure proper date handling
-        const dateAdded = bookmark.dateAdded ? new Date(bookmark.dateAdded) : now;
-        const dateModified = bookmark.dateModified ? new Date(bookmark.dateModified) : now;
-
         return {
           userId: defaultUser.id,
           url: bookmark.url,
@@ -168,8 +164,8 @@ export class BookmarkModel {
           description: (bookmark.description || '').slice(0, 1000) || null, // Limit description length
           tags: Array.isArray(bookmark.tags) ? bookmark.tags : [],
           collections: Array.isArray(bookmark.collections) ? bookmark.collections : [],
-          dateAdded: dateAdded.toISOString(),
-          dateModified: dateModified.toISOString()
+          dateAdded: now,
+          dateModified: now
         };
       }).filter((bookmark): bookmark is NonNullable<typeof bookmark> => bookmark !== null);
 
