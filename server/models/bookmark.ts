@@ -320,26 +320,31 @@ export class BookmarkModel {
 
       try {
         const analysis = await AIService.analyzeUrl(bookmark.url);
-        console.log(`[Enrichment] Successfully analyzed bookmark ${bookmark.id}`);
+        console.log(`[Enrichment] Successfully analyzed bookmark ${bookmark.id}:`, analysis);
 
         // Store successful analysis
         const [updated] = await db
           .update(bookmarks)
           .set({
+            title: analysis.title || bookmark.title, // Use analyzed title if available
+            description: analysis.description || bookmark.description, // Use analyzed description if available
+            tags: analysis.tags || bookmark.tags || [], // Merge or use analyzed tags
             analysis: {
-              summary: analysis.description,
-              credibilityScore: 1.0,
               status: 'success' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
+              summary: analysis.description,
               tags: analysis.tags,
               title: analysis.title,
-              mainTopic: analysis.mainTopic
+              mainTopic: analysis.mainTopic,
+              isLandingPage: analysis.isLandingPage,
+              metadata: analysis.metadata
             },
             dateModified: new Date()
           })
           .where(eq(bookmarks.id, bookmark.id))
           .returning();
 
+        console.log(`[Enrichment] Updated bookmark ${bookmark.id} with analysis results`);
         return updated;
       } catch (error) {
         console.error(`[Enrichment] Failed to analyze URL for bookmark ${bookmark.id}:`, error);
@@ -370,10 +375,9 @@ export class BookmarkModel {
           .update(bookmarks)
           .set({
             analysis: {
-              summary: errorSummary,
-              credibilityScore: 0,
               status,
               lastUpdated: new Date().toISOString(),
+              summary: errorSummary,
               error: error instanceof Error ? error.message : 'Unknown error',
               retryable
             },
@@ -392,10 +396,9 @@ export class BookmarkModel {
           .update(bookmarks)
           .set({
             analysis: {
-              summary: "Error processing bookmark",
-              credibilityScore: 0,
               status: 'system_error' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
+              summary: "Error processing bookmark",
               error: error instanceof Error ? error.message : 'Unknown error',
               retryable: true
             },
