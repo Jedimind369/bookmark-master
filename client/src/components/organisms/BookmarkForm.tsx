@@ -26,8 +26,8 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       
       const submitData = {
         id: initialData?.id,
-        title: formData.title,
-        url: formData.url,
+        title: formData.title || initialData?.title,
+        url: formData.url || initialData?.url,
         description: formData.description,
         tags: tags,
         collections: initialData?.collections || [],
@@ -35,7 +35,14 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         analysis: initialData?.analysis
       };
 
+      if (!submitData.title || !submitData.url) {
+        throw new Error('Title and URL are required');
+      }
+
       const result = await onSubmit(submitData);
+      if (!result) {
+        throw new Error('Failed to update bookmark');
+      }
       console.log('Update result:', result);
       
       if (initialData?.id) {
