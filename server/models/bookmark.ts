@@ -166,6 +166,20 @@ export class BookmarkModel {
     }
   }
 
+  static async getEnrichmentCount() {
+    try {
+      const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(bookmarks)
+        .where(isNull(bookmarks.analysis));
+
+      return Number(result[0]?.count || 0);
+    } catch (error) {
+      console.error("Error getting enrichment count:", error);
+      return 0;
+    }
+  }
+
   static async enrichBookmarkAnalysis(bookmark: SelectBookmark) {
     try {
       if (!bookmark.analysis) {

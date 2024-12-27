@@ -28,15 +28,6 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/bookmarks", async (req, res) => {
     try {
       const bookmarks = await BookmarkModel.findAll();
-
-      // Start background enrichment if there are bookmarks without analysis
-      const needsEnrichment = bookmarks.some(b => !b.analysis);
-      if (needsEnrichment) {
-        BookmarkModel.enrichAllBookmarks().catch(error => {
-          console.error("Background enrichment failed:", error);
-        });
-      }
-
       res.json(bookmarks);
     } catch (error) {
       console.error("Failed to fetch bookmarks:", error);
@@ -106,49 +97,20 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Bulk import endpoint
-  app.post("/api/bookmarks/import", async (req, res) => {
-    try {
-      // Validate the incoming data
-      const bookmarks = await importBookmarkSchema.parseAsync(req.body);
-
-      // Check if the request is too large
-      if (bookmarks.length > 15000) {
-        return res.status(400).json({
-          message: "Import size too large. Maximum 15,000 bookmarks allowed per import."
-        });
-      }
-
-      // Process the import
-      const imported = await BookmarkModel.bulkCreate(bookmarks);
-
-      res.status(201).json({
-        message: `Successfully imported ${imported.length} bookmarks`,
-        count: imported.length
-      });
-    } catch (error) {
-      console.error("Failed to import bookmarks:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          message: "Invalid bookmark data format",
-          errors: error.errors
-        });
-      }
-      res.status(500).json({ message: "Failed to import bookmarks" });
-    }
-  });
-
-  // Endpoint to trigger background enrichment of bookmarks
+  // Endpoint to manually enrich bookmarks with comprehensive analysis
   app.post("/api/bookmarks/enrich", async (req, res) => {
     try {
+      // Get count of bookmarks that need enrichment
+      const count = await BookmarkModel.getEnrichmentCount();
+
       // Start the enrichment process
       BookmarkModel.enrichAllBookmarks().catch(error => {
-        console.error("Background enrichment failed:", error);
+        console.error("Enrichment process failed:", error);
       });
 
-      // Respond immediately as this runs in the background
       res.json({ 
-        message: "Started enriching bookmarks in the background",
+        message: `Started enriching ${count} bookmarks with comprehensive analysis`,
+        count,
         status: "processing"
       });
     } catch (error) {

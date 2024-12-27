@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookmarkList } from "../organisms/BookmarkList";
 import { BookmarkForm } from "../organisms/BookmarkForm";
 import { BookmarkImport } from "../organisms/BookmarkImport";
+import { BookmarkEnrichment } from "../organisms/BookmarkEnrichment";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -128,6 +129,7 @@ export const Home = () => {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Bookmarks</h1>
         <div className="flex gap-4">
+          <BookmarkEnrichment />
           <BookmarkImport />
           <Button onClick={() => setIsFormOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
