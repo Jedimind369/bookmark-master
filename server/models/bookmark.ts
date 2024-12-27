@@ -1,6 +1,6 @@
 import { db } from "@db";
 import { bookmarks, type InsertBookmark, type SelectBookmark } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export class BookmarkModel {
   static async findAll() {
@@ -41,11 +41,12 @@ export class BookmarkModel {
 
   static async create(data: Omit<InsertBookmark, "id" | "dateAdded" | "userId">) {
     try {
-      // Get default user id
-      const [defaultUser] = await db.execute<{ id: number }>(
-        "SELECT id FROM users WHERE username = 'default_user' LIMIT 1"
+      // Get default user id using a SQL query
+      const defaultUserResult = await db.execute(
+        sql`SELECT id FROM users WHERE username = 'default_user' LIMIT 1`
       );
 
+      const defaultUser = defaultUserResult.rows[0];
       if (!defaultUser) {
         throw new Error("Default user not found");
       }
@@ -123,11 +124,12 @@ export class BookmarkModel {
 
   static async bulkCreate(data: Array<Omit<InsertBookmark, "id" | "dateAdded" | "userId">>) {
     try {
-      // Get default user id
-      const [defaultUser] = await db.execute<{ id: number }>(
-        "SELECT id FROM users WHERE username = 'default_user' LIMIT 1"
+      // Get default user id using a SQL query
+      const defaultUserResult = await db.execute(
+        sql`SELECT id FROM users WHERE username = 'default_user' LIMIT 1`
       );
 
+      const defaultUser = defaultUserResult.rows[0];
       if (!defaultUser) {
         throw new Error("Default user not found");
       }
