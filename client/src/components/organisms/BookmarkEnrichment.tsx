@@ -104,6 +104,7 @@ export const BookmarkEnrichment = () => {
             <Progress value={progress} className="w-[200px]" />
             <span className="text-sm text-muted-foreground">
               {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} enriched
+              {enrichmentStatus.status === "completed" && " (Completed)"}
             </span>
             {enrichmentStatus.status === "processing" && <Loader2 className="h-4 w-4 animate-spin" />}
           </AlertDescription>
