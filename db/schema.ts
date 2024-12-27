@@ -27,6 +27,18 @@ export const bookmarks = pgTable("bookmarks", {
     error?: string;
     retryable?: boolean;
     tags?: string[];
+    contentQuality?: {
+      relevance: number;
+      informativeness: number;
+      credibility: number;
+      overallScore: number;
+    };
+    mainTopics?: string[];
+    recommendations?: {
+      improvedTitle?: string;
+      improvedDescription?: string;
+      suggestedTags?: string[];
+    };
   }>(),
 });
 

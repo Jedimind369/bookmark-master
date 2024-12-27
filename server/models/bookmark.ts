@@ -306,17 +306,20 @@ export class BookmarkModel {
         const analysis = await AIService.analyzeUrl(bookmark.url);
         console.log(`[Enrichment] Successfully analyzed bookmark ${bookmark.id}:`, analysis);
 
-        // Store successful analysis
+        // Store successful analysis with quality metrics
         const [updated] = await db
           .update(bookmarks)
           .set({
-            title: analysis.title || bookmark.title,
-            description: analysis.description || bookmark.description,
-            tags: analysis.tags || bookmark.tags || [],
+            title: analysis.recommendations?.improvedTitle || analysis.title || bookmark.title,
+            description: analysis.recommendations?.improvedDescription || analysis.description || bookmark.description,
+            tags: analysis.recommendations?.suggestedTags || analysis.tags || bookmark.tags || [],
             analysis: {
               status: 'success' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
               summary: analysis.description,
+              contentQuality: analysis.contentQuality,
+              mainTopics: analysis.mainTopics,
+              recommendations: analysis.recommendations,
               tags: analysis.tags,
               retryable: false
             },
@@ -325,7 +328,7 @@ export class BookmarkModel {
           .where(eq(bookmarks.id, bookmark.id))
           .returning();
 
-        console.log(`[Enrichment] Updated bookmark ${bookmark.id} with analysis results`);
+        console.log(`[Enrichment] Updated bookmark ${bookmark.id} with enhanced analysis results`);
         return updated;
       } catch (error) {
         console.error(`[Enrichment] Failed to analyze URL for bookmark ${bookmark.id}:`, error);
@@ -360,7 +363,13 @@ export class BookmarkModel {
               lastUpdated: new Date().toISOString(),
               summary: errorSummary,
               error: error instanceof Error ? error.message : 'Unknown error',
-              retryable
+              retryable,
+              contentQuality: {
+                relevance: 0,
+                informativeness: 0,
+                credibility: 0,
+                overallScore: 0
+              }
             },
             dateModified: new Date()
           })
@@ -371,7 +380,6 @@ export class BookmarkModel {
       }
     } catch (error) {
       console.error(`[Enrichment] Failed to process bookmark ${bookmark.id}:`, error);
-      // Mark the bookmark as processed with error
       try {
         const [updated] = await db
           .update(bookmarks)
@@ -381,7 +389,13 @@ export class BookmarkModel {
               lastUpdated: new Date().toISOString(),
               summary: "Error processing bookmark",
               error: error instanceof Error ? error.message : 'Unknown error',
-              retryable: true
+              retryable: true,
+              contentQuality: {
+                relevance: 0,
+                informativeness: 0,
+                credibility: 0,
+                overallScore: 0
+              }
             },
             dateModified: new Date()
           })

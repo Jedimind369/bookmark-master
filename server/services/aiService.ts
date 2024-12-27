@@ -18,6 +18,18 @@ export interface AIAnalysis {
   tags: string[];
   isLandingPage?: boolean;
   mainTopic?: string;
+  contentQuality: {
+    relevance: number;
+    informativeness: number;
+    credibility: number;
+    overallScore: number;
+  };
+  mainTopics: string[];
+  recommendations?: {
+    improvedTitle?: string;
+    improvedDescription?: string;
+    suggestedTags?: string[];
+  };
   metadata?: {
     author?: string;
     publishDate?: string;
@@ -204,14 +216,21 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: `You are an expert content analyzer. Your task is to analyze web content and provide comprehensive, accurate analysis focusing on extracting the most meaningful information. Always return complete analysis with all fields.
+            content: `You are an expert content analyst and curator. Your task is to thoroughly analyze web content for quality, relevance, and value. Provide a comprehensive analysis focusing on what makes this content valuable or not valuable for users.
 
-Key requirements:
-1. Title should be clear and descriptive (max 60 chars)
-2. Description should be informative and engaging (max 200 chars)
-3. Tags should be relevant and specific (3-5 tags)
-4. Detect if it's a landing page
-5. Identify the main topic/purpose`
+Key Analysis Requirements:
+1. Title: Clear, concise, descriptive (max 60 chars)
+2. Description: Informative summary highlighting value (max 200 chars)
+3. Tags: Relevant and specific (3-5 tags)
+4. Content Quality Assessment:
+   - Relevance (0-1): How well does it serve its intended purpose?
+   - Informativeness (0-1): How much useful information does it provide?
+   - Credibility (0-1): How trustworthy and well-sourced is the content?
+   - Overall Score (0-1): Combined assessment of content value
+5. Main Topics: List key subjects covered
+6. Recommendations: Suggest improvements if needed
+
+Return a complete JSON analysis with all these aspects.`
           },
           {
             role: "user",
@@ -222,18 +241,28 @@ Title: ${pageContent.title}
 Type: ${pageContent.type}
 Content: ${pageContent.content}
 
-Return a JSON object with these fields:
+Return analysis in JSON format with fields:
 {
-  "title": "Clear, concise title (max 60 chars)",
-  "description": "Detailed summary of the content (max 200 chars)",
-  "tags": ["3-5 relevant tags"],
-  "isLandingPage": boolean,
-  "mainTopic": "primary topic or purpose"
+  "title": string,
+  "description": string,
+  "tags": string[],
+  "contentQuality": {
+    "relevance": number,
+    "informativeness": number,
+    "credibility": number,
+    "overallScore": number
+  },
+  "mainTopics": string[],
+  "recommendations": {
+    "improvedTitle": string?,
+    "improvedDescription": string?,
+    "suggestedTags": string[]?
+  }
 }`
           },
         ],
         temperature: 0.3,
-        max_tokens: 800,
+        max_tokens: 1000,
       });
 
       const result = response.choices[0]?.message?.content;
@@ -242,20 +271,20 @@ Return a JSON object with these fields:
       }
 
       console.log(`[Analysis] Raw analysis result:`, result);
-      const analysis = JSON.parse(result) as {
-        title: string;
-        description: string;
-        tags: string[];
-        isLandingPage: boolean;
-        mainTopic: string;
-      };
+      const analysis = JSON.parse(result);
 
       return {
+        ...analysis,
         title: analysis.title.slice(0, 60),
         description: analysis.description.slice(0, 200),
         tags: analysis.tags.slice(0, 5).map((tag: string) => tag.toLowerCase()),
-        isLandingPage: analysis.isLandingPage,
-        mainTopic: analysis.mainTopic,
+        contentQuality: {
+          relevance: Math.max(0, Math.min(1, analysis.contentQuality.relevance)),
+          informativeness: Math.max(0, Math.min(1, analysis.contentQuality.informativeness)),
+          credibility: Math.max(0, Math.min(1, analysis.contentQuality.credibility)),
+          overallScore: Math.max(0, Math.min(1, analysis.contentQuality.overallScore))
+        },
+        mainTopics: analysis.mainTopics.slice(0, 3),
         metadata: pageContent.metadata
       };
     } catch (error) {
@@ -268,16 +297,36 @@ Return a JSON object with these fields:
           title: urlParts.hostname,
           description: `Website at ${urlParts.hostname}${urlParts.pathname} - ${error instanceof Error ? error.message : 'Access error'}`,
           tags: ['error', 'unavailable'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
+          contentQuality: {
+            relevance: 0,
+            informativeness: 0,
+            credibility: 0,
+            overallScore: 0
+          },
+          mainTopics: ['unknown'],
+          recommendations: {
+            improvedTitle: 'Unable to analyze content',
+            improvedDescription: 'Content analysis failed due to access or processing error',
+            suggestedTags: ['needs-review']
+          }
         };
       } catch {
         return {
           title: 'Invalid URL',
           description: 'The provided URL could not be processed',
           tags: ['error', 'invalid'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
+          contentQuality: {
+            relevance: 0,
+            informativeness: 0,
+            credibility: 0,
+            overallScore: 0
+          },
+          mainTopics: ['unknown'],
+          recommendations: {
+            improvedTitle: 'Invalid URL Entry',
+            improvedDescription: 'Please provide a valid URL for analysis',
+            suggestedTags: ['invalid-url']
+          }
         };
       }
     }
