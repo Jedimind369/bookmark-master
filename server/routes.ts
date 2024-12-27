@@ -41,7 +41,15 @@ export function registerRoutes(app: Express): Server {
       const validatedData = await insertBookmarkSchema
         .omit({ id: true, dateAdded: true, userId: true })
         .parseAsync(req.body);
-      const bookmark = await BookmarkModel.create(validatedData);
+
+      // Ensure tags and collections are arrays
+      const normalizedData = {
+        ...validatedData,
+        tags: Array.isArray(validatedData.tags) ? validatedData.tags : [],
+        collections: Array.isArray(validatedData.collections) ? validatedData.collections : [],
+      };
+
+      const bookmark = await BookmarkModel.create(normalizedData);
       res.status(201).json(bookmark);
     } catch (error) {
       console.error("Failed to create bookmark:", error);
