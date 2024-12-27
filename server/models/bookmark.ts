@@ -115,7 +115,7 @@ export class BookmarkModel {
         collections: Array.isArray(data.collections) ? data.collections : [],
         dateModified: new Date(),
         analysis: data.analysis || existing.analysis,
-        updateHistory: [...(existing.updateHistory || []), updateRecord]
+        update_history: [...(existing.update_history || []), updateRecord]
       };
 
       console.log('[Update History]', {
