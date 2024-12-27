@@ -87,7 +87,7 @@ export class AIService {
   private static async fetchWithRetry(url: string, retries = 0): Promise<PageContent> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
       const contentType = this.getContentType(url);
       if (contentType === 'video') {
@@ -165,9 +165,16 @@ export class AIService {
       };
     } catch (error) {
       if (retries < this.MAX_RETRIES) {
-        console.warn(`Retry ${retries + 1} for ${url}:`, error);
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn(`Request timeout for ${url}, attempt ${retries + 1}`);
+        } else {
+          console.warn(`Retry ${retries + 1} for ${url}:`, error);
+        }
         await this.delay(this.RETRY_DELAY * Math.pow(2, retries));
         return this.fetchWithRetry(url, retries + 1);
+      }
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${this.MAX_RETRIES} attempts: ${url}`);
       }
       throw new Error(`Failed to fetch page after ${this.MAX_RETRIES} retries: ${url}`);
     }
