@@ -57,11 +57,31 @@ export function registerRoutes(app: Express): Server {
   // Bulk import endpoint
   app.post("/api/bookmarks/import", async (req, res) => {
     try {
-      // Validate the array of bookmarks
-      const bookmarksData = await z.array(insertBookmarkSchema.omit({ id: true })).parseAsync(req.body);
+      // Create a modified schema for import that handles string dates
+      const importBookmarkSchema = z.object({
+        url: z.string().url(),
+        title: z.string(),
+        description: z.string().optional().nullable(),
+        tags: z.array(z.string()).default([]),
+        collections: z.array(z.string()).default([]),
+        dateAdded: z.string().transform(str => new Date(str)).optional()
+      });
+
+      // Validate and transform the incoming data
+      const bookmarksData = await z.array(importBookmarkSchema).parseAsync(req.body);
+
+      // Transform the validated data for bulk creation
+      const normalizedBookmarks = bookmarksData.map(bookmark => ({
+        url: bookmark.url,
+        title: bookmark.title,
+        description: bookmark.description || null,
+        tags: bookmark.tags,
+        collections: bookmark.collections,
+        dateAdded: bookmark.dateAdded || new Date()
+      }));
 
       // Use the bulk create method from BookmarkModel
-      const createdBookmarks = await BookmarkModel.bulkCreate(bookmarksData);
+      const createdBookmarks = await BookmarkModel.bulkCreate(normalizedBookmarks);
 
       res.status(201).json({
         message: "Bookmarks imported successfully",
@@ -76,51 +96,6 @@ export function registerRoutes(app: Express): Server {
         });
       }
       res.status(500).json({ message: "Failed to import bookmarks" });
-    }
-  });
-
-  app.put("/api/bookmarks/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid bookmark ID" });
-      }
-
-      const validatedData = await insertBookmarkSchema.partial().omit({ id: true }).parseAsync(req.body);
-      const bookmark = await BookmarkModel.update(id, validatedData);
-
-      if (!bookmark) {
-        return res.status(404).json({ message: "Bookmark not found" });
-      }
-
-      res.json(bookmark);
-    } catch (error) {
-      console.error("Failed to update bookmark:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Invalid bookmark data",
-          errors: error.errors
-        });
-      }
-      res.status(500).json({ message: "Failed to update bookmark" });
-    }
-  });
-
-  app.delete("/api/bookmarks/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid bookmark ID" });
-      }
-
-      const success = await BookmarkModel.delete(id);
-      if (!success) {
-        return res.status(404).json({ message: "Bookmark not found" });
-      }
-      res.status(204).send();
-    } catch (error) {
-      console.error("Failed to delete bookmark:", error);
-      res.status(500).json({ message: "Failed to delete bookmark" });
     }
   });
 
