@@ -242,21 +242,23 @@ export class BookmarkModel {
 
       console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
 
-      // Process in batches of 5 to avoid overloading
-      const batchSize = 5;
+      // Process in batches of 3 to avoid overloading
+      const batchSize = 3;
       for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
         const batch = bookmarksToUpdate.slice(i, i + batchSize);
         console.log(`[Enrichment] Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(bookmarksToUpdate.length/batchSize)}`);
 
-        try {
-          // Process each bookmark in the batch sequentially to better track failures
-          for (const bookmark of batch) {
+        // Process each bookmark in the batch sequentially to better track failures
+        for (const bookmark of batch) {
+          try {
             console.log(`[Enrichment] Processing bookmark ${bookmark.id}: ${bookmark.url}`);
             await this.enrichBookmarkAnalysis(bookmark);
+          } catch (error) {
+            console.error(`[Enrichment] Error processing bookmark ${bookmark.id}:`, error);
+            // Continue with next bookmark even if current one fails
           }
-        } catch (error) {
-          console.error(`[Enrichment] Error processing batch starting at index ${i}:`, error);
-          // Continue with next batch even if current batch fails
+          // Add a small delay between bookmarks
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         // Add a delay between batches to prevent rate limiting
