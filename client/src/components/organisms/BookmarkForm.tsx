@@ -7,16 +7,16 @@ import { Bookmark } from "@/types/bookmark";
 
 interface BookmarkFormProps {
   initialData?: Bookmark;
-  onSubmit: (data: Partial<Bookmark>) => void;
+  onSubmit: (data: Partial<Bookmark>) => Promise<Bookmark>;
   onCancel: () => void;
 }
 
 export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormProps) => {
   const [formData, setFormData] = useState({
-    title: initialData?.analysis?.title || initialData?.title || "",
+    title: initialData?.title || "",
     url: initialData?.url || "",
-    description: initialData?.analysis?.summary || initialData?.description || "",
-    tags: (initialData?.analysis?.tags || initialData?.tags || []).join(", "),
+    description: initialData?.description || "",
+    tags: (initialData?.tags || []).join(", "),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,26 +30,24 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         url: formData.url,
         description: formData.description,
         tags,
-        analysis: null // Force re-analysis
+        analysis: null
       };
 
-      const updatedBookmark = await onSubmit(submitData);
+      await onSubmit(submitData);
       
-      if (updatedBookmark?.id) {
-        // Trigger re-analysis immediately after update
+      if (initialData?.id) {
         try {
           await fetch('/api/bookmarks/enrich', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: [updatedBookmark.id] })
+            body: JSON.stringify({ ids: [initialData.id] })
           });
         } catch (error) {
           console.error('Failed to trigger enrichment:', error);
         }
       }
-
-      // Force refresh of bookmark list
-      window.location.reload();
+      
+      onCancel();
     } catch (error) {
       console.error('Error updating bookmark:', error);
       throw error;
