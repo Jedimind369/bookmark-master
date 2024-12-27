@@ -4,6 +4,8 @@ import { BookmarkModel } from "./models/bookmark";
 import { AIService } from "./services/aiService";
 import { insertBookmarkSchema } from "@db/schema";
 import { parseHtmlBookmarks } from "./utils/bookmarkParser";
+import { db } from "@db";
+import { bookmarks } from "@db/schema";
 import { z } from "zod";
 
 export function registerRoutes(app: Express): Server {
@@ -164,7 +166,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const [processedCount, totalCount] = await Promise.all([
         BookmarkModel.getProcessedCount(),
-        db.select().from(bookmarks).execute().then(res => res.length)
+        db.select().from(bookmarks).execute().then(results => results.length)
       ]);
 
       res.json({

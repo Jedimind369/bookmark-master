@@ -105,8 +105,8 @@ export class AIService {
                    'Untitled Page';
 
       const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
-                            $('meta[name="description"]').attr('content')?.trim() ||
-                            '';
+                             $('meta[name="description"]').attr('content')?.trim() ||
+                             '';
 
       // Identify main content area
       const contentSelectors = [
@@ -204,7 +204,14 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: `You are an expert content analyzer. Your task is to analyze web content and provide detailed, accurate analysis focusing on the main purpose and value of the page. Always return a complete analysis with all requested fields.`
+            content: `You are an expert content analyzer. Your task is to analyze web content and provide comprehensive, accurate analysis focusing on extracting the most meaningful information. Always return complete analysis with all fields.
+
+Key requirements:
+1. Title should be clear and descriptive (max 60 chars)
+2. Description should be informative and engaging (max 200 chars)
+3. Tags should be relevant and specific (3-5 tags)
+4. Detect if it's a landing page
+5. Identify the main topic/purpose`
           },
           {
             role: "user",
