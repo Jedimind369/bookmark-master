@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import * as cheerio from "cheerio";
 import fetch from "node-fetch";
+import type { Response } from "node-fetch";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is not set");
@@ -47,7 +48,7 @@ export class AIService {
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 2000;
 
-  private static async delay(ms: number) {
+  private static async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -75,18 +76,13 @@ export class AIService {
   private static async fetchWithRetry(url: string, retries = 0): Promise<PageContent> {
     try {
       console.log(`[Analysis] Attempting to fetch ${url} (attempt ${retries + 1})`);
-      
+
       const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
       const response = await fetch(proxyUrl, {
         headers: {
           'Accept': 'text/html',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        timeout: 10000
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        timeout: 15000,
-        redirect: 'follow'
+        }
       });
 
       if (!response.ok) {
@@ -109,8 +105,8 @@ export class AIService {
                    'Untitled Page';
 
       const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
-                           $('meta[name="description"]').attr('content')?.trim() ||
-                           '';
+                            $('meta[name="description"]').attr('content')?.trim() ||
+                            '';
 
       // Identify main content area
       const contentSelectors = [
@@ -239,7 +235,13 @@ Return a JSON object with these fields:
       }
 
       console.log(`[Analysis] Raw analysis result:`, result);
-      const analysis = JSON.parse(result);
+      const analysis = JSON.parse(result) as {
+        title: string;
+        description: string;
+        tags: string[];
+        isLandingPage: boolean;
+        mainTopic: string;
+      };
 
       return {
         title: analysis.title.slice(0, 60),
