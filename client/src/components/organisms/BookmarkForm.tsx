@@ -92,19 +92,19 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
 
       const submitData = {
-        id: initialData?.id,
+        ...initialData, // Preserve existing data
         title: formData.title,
         url: formData.url,
         description: formData.description,
         tags,
-        collections: initialData?.collections || [],
       };
+
+      console.log('Submitting bookmark data:', submitData);
 
       if (!submitData.title || !submitData.url) {
         throw new Error('Title and URL are required');
       }
 
-      console.log('Submitting bookmark data:', submitData);
       await onSubmit(submitData);
 
       toast({
@@ -148,7 +148,7 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         <Input
           placeholder="Title"
           value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
           disabled={analyzing}
           required
         />
@@ -157,7 +157,7 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         <Textarea
           placeholder="Description"
           value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           disabled={analyzing}
         />
       </div>
@@ -165,7 +165,7 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         <Input
           placeholder="Tags (comma-separated)"
           value={formData.tags}
-          onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+          onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
           disabled={analyzing}
         />
       </div>
