@@ -22,6 +22,22 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // If this is a new bookmark, analyze with AI first
+      if (!initialData?.id) {
+        const enrichResponse = await fetch('/api/bookmarks/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: formData.url })
+        });
+        
+        if (enrichResponse.ok) {
+          const analysis = await enrichResponse.json();
+          formData.title = formData.title || analysis.title;
+          formData.description = formData.description || analysis.description;
+          formData.tags = formData.tags || analysis.tags.join(", ");
+        }
+      }
+
       const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       
       const submitData = {
