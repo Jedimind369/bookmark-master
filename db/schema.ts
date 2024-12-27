@@ -16,6 +16,7 @@ export const bookmarks = pgTable("bookmarks", {
   collections: jsonb("collections").$type<string[]>().default([]),
   userId: serial("user_id").references(() => users.id),
   dateAdded: timestamp("date_added").defaultNow(),
+  dateModified: timestamp("date_modified"),
   analysis: jsonb("analysis").$type<{
     summary?: string;
     credibilityScore?: number;
