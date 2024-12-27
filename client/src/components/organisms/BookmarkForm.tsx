@@ -1,9 +1,9 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Bookmark } from "@/types/bookmark";
+import { useToast } from "@/hooks/use-toast";
 
 interface BookmarkFormProps {
   initialData?: Bookmark;
@@ -18,28 +18,48 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
     description: initialData?.description || "",
     tags: (initialData?.tags || []).join(", "),
   });
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log('Starting bookmark submission with URL:', formData.url);
+
       // If this is a new bookmark, analyze with AI first
       if (!initialData?.id) {
-        const enrichResponse = await fetch('/api/bookmarks/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: formData.url })
-        });
-        
-        if (enrichResponse.ok) {
+        try {
+          console.log('Analyzing URL with AI...');
+          const enrichResponse = await fetch('/api/bookmarks/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: formData.url })
+          });
+
+          if (!enrichResponse.ok) {
+            const error = await enrichResponse.json();
+            throw new Error(error.message || 'Failed to analyze URL');
+          }
+
           const analysis = await enrichResponse.json();
+          console.log('AI analysis result:', analysis);
+
           formData.title = formData.title || analysis.title;
           formData.description = formData.description || analysis.description;
-          formData.tags = formData.tags || analysis.tags.join(", ");
+          if (analysis.tags && analysis.tags.length > 0) {
+            formData.tags = formData.tags || analysis.tags.join(", ");
+          }
+        } catch (error) {
+          console.error('Error during AI analysis:', error);
+          toast({
+            variant: "destructive",
+            title: "Analysis Error",
+            description: error instanceof Error ? error.message : "Failed to analyze URL"
+          });
         }
       }
 
       const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
-      
+
       const submitData = {
         id: initialData?.id,
         title: formData.title || initialData?.title,
@@ -55,14 +75,17 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         throw new Error('Title and URL are required');
       }
 
+      console.log('Submitting bookmark data:', submitData);
       const result = await onSubmit(submitData);
       if (!result) {
         throw new Error('Failed to update bookmark');
       }
-      console.log('Update result:', result);
-      
+      console.log('Bookmark submission successful:', result);
+
+      // If this is an existing bookmark, trigger enrichment
       if (initialData?.id) {
         try {
+          console.log('Triggering enrichment for existing bookmark');
           await fetch('/api/bookmarks/enrich', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -72,11 +95,15 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
           console.error('Failed to trigger enrichment:', error);
         }
       }
-      
+
       onCancel();
     } catch (error) {
       console.error('Error updating bookmark:', error);
-      throw error;
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save bookmark"
+      });
     }
   };
 
