@@ -8,20 +8,6 @@ import { z } from "zod";
 import * as express from 'express';
 
 export function registerRoutes(app: Express): Server {
-  // Configure raw body parsing for HTML content with increased size limit
-  app.use('/api/bookmarks/parse-html', express.text({ 
-    type: 'text/html', 
-    limit: '50mb',
-    verify: (req, res, buf) => {
-      if (buf.length > 50 * 1024 * 1024) { // 50MB limit
-        throw new Error('File size too large. Maximum size is 50MB.');
-      }
-    }
-  }));
-
-  // Also increase JSON body parser limit for the bulk import
-  app.use(express.json({ limit: '50mb' }));
-
   // AI Analysis endpoint
   app.post("/api/analyze-url", async (req, res) => {
     try {

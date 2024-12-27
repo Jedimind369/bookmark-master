@@ -3,8 +3,28 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Configure express with increased limits for large files
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, res, buf) => {
+    if (buf.length > 50 * 1024 * 1024) { // 50MB limit
+      throw new Error('File size too large. Maximum size is 50MB.');
+    }
+  }
+}));
+
+app.use(express.text({
+  type: 'text/html',
+  limit: '50mb',
+  verify: (req, res, buf) => {
+    if (buf.length > 50 * 1024 * 1024) { // 50MB limit
+      throw new Error('File size too large. Maximum size is 50MB.');
+    }
+  }
+}));
+
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();
