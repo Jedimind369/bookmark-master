@@ -97,6 +97,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get count of bookmarks that can be enriched
+  app.get("/api/bookmarks/enrich/count", async (req, res) => {
+    try {
+      const count = await BookmarkModel.getEnrichmentCount();
+      res.json(count);
+    } catch (error) {
+      console.error("Failed to get enrichment count:", error);
+      res.status(500).json({ message: "Failed to get enrichment count" });
+    }
+  });
+
   // Endpoint to manually enrich bookmarks with comprehensive analysis
   app.post("/api/bookmarks/enrich", async (req, res) => {
     try {
