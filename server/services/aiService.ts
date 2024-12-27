@@ -96,9 +96,9 @@ export class AIService {
     const urlObj = new URL(url);
 
     // Check for video platforms
-    if (urlObj.hostname.includes('youtube.com') || 
+    if (urlObj.hostname.includes('youtube.com') ||
         urlObj.hostname.includes('youtu.be') ||
-        urlObj.hostname.includes('vimeo.com') || 
+        urlObj.hostname.includes('vimeo.com') ||
         urlObj.hostname.includes('dailymotion.com')) {
       return 'video';
     }
@@ -122,7 +122,7 @@ export class AIService {
       '.author'
     ];
     const isArticle = articleIndicators.some(selector => $(selector).length > 0) ||
-                     urlObj.hostname.includes('medium.com') || 
+                     urlObj.hostname.includes('medium.com') ||
                      urlObj.hostname.includes('wordpress.com');
 
     return isArticle ? 'article' : 'webpage';
@@ -165,10 +165,13 @@ export class AIService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+      console.log(`[Analysis] Attempting to fetch ${url} (attempt ${retries + 1})`);
+
       // Take screenshot using puppeteer
       const puppeteer = await import('puppeteer');
       const browser = await puppeteer.launch({ 
-        args: ['--no-sandbox'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: 'new',
         defaultViewport: {
           width: 1920,
           height: 1080
@@ -185,11 +188,21 @@ export class AIService {
         deviceScaleFactor: 1,
       });
 
-      // Wait for network to be idle
-      await page.goto(url, { 
-        waitUntil: ['networkidle0', 'domcontentloaded'],
-        timeout: 30000
-      });
+      // Navigate with timeout and error handling
+      try {
+        await Promise.race([
+          page.goto(url, { 
+            waitUntil: ['networkidle0', 'domcontentloaded'],
+            timeout: 30000
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Navigation timeout')), 30000)
+          )
+        ]);
+      } catch (error) {
+        await browser.close();
+        throw new Error('unreachable');
+      }
 
       // Wait for content to load
       await page.evaluate(() => new Promise(resolve => {
@@ -220,6 +233,8 @@ export class AIService {
       // Get HTML content
       const html = await page.content();
       await browser.close();
+
+      clearTimeout(timeoutId);
 
       const $ = cheerio.load(html);
 
@@ -298,8 +313,6 @@ export class AIService {
       const contentType = this.getContentType(url, $);
       const metadata = this.extractMetadata($);
 
-      clearTimeout(timeoutId);
-
       return {
         url,
         title,
@@ -309,31 +322,28 @@ export class AIService {
           .join('\n\n')
           .replace(/\s+/g, ' ')
           .trim()
-          .slice(0, 2000), // Increased content length
+          .slice(0, 2000),
         links: Array.from(new Set(links)),
         type: contentType,
         screenshot: screenshot.toString(),
         metadata
       };
     } catch (error) {
-      // Don't retry DNS failures
+      console.error(`[Analysis] Error fetching ${url}:`, error);
+
+      // Don't retry DNS failures or unreachable sites
       if (error instanceof Error && 
-          (error as any).code === 'ENOTFOUND') {
-        throw new Error(`Domain not found: ${url}`);
+          (error.message === 'unreachable' || 
+           (error as any).code === 'ENOTFOUND')) {
+        throw new Error(`Website unreachable: ${url}`);
       }
 
       if (retries < this.MAX_RETRIES) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.warn(`Request timeout for ${url}, attempt ${retries + 1}`);
-        } else {
-          console.warn(`Retry ${retries + 1} for ${url}:`, error);
-        }
+        console.warn(`[Analysis] Retrying ${url} (attempt ${retries + 1})`);
         await this.delay(this.RETRY_DELAY * Math.pow(2, retries));
         return this.fetchWithRetry(url, retries + 1);
       }
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Request timed out after ${this.MAX_RETRIES} attempts: ${url}`);
-      }
+
       throw new Error(`Failed to fetch page after ${this.MAX_RETRIES} retries: ${url}`);
     }
   }
@@ -480,7 +490,7 @@ Return a JSON object with:
         metadata: mainPage.metadata
       };
     } catch (error) {
-      if (retries < this.MAX_RETRIES && 
+      if (retries < this.MAX_RETRIES &&
           (error instanceof Error && error.message.includes('rate limit'))) {
         console.warn(`Retry ${retries + 1} for analysis:`, error);
         await this.delay(this.RETRY_DELAY * Math.pow(2, retries));
