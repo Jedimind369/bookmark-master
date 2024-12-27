@@ -31,7 +31,7 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         description: formData.description,
         tags: tags,
         collections: initialData?.collections || [],
-        dateModified: new Date().toISOString(),
+        dateModified: new Date(),
         analysis: initialData?.analysis
       };
 

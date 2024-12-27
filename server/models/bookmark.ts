@@ -113,7 +113,7 @@ export class BookmarkModel {
         description: data.description,
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : [],
-        dateModified: new Date().toISOString(),
+        dateModified: new Date(),
         analysis: data.analysis || existing.analysis,
         updateHistory: [...(existing.updateHistory || []), updateRecord]
       };
