@@ -261,30 +261,47 @@ export class BookmarkModel {
     try {
       // Check if bookmark needs enrichment
       const needsEnrichment = !bookmark.analysis ||
-                              !bookmark.analysis.summary ||
-                              bookmark.analysis.summary.length < 100;
+                            !bookmark.analysis.summary ||
+                            bookmark.analysis.summary.length < 100;
 
       if (needsEnrichment) {
         console.log(`Enriching analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
-        const analysis = await AIService.analyzeUrl(bookmark.url);
+        try {
+          const analysis = await AIService.analyzeUrl(bookmark.url);
 
-        const [updated] = await db
-          .update(bookmarks)
-          .set({
-            analysis: {
-              summary: analysis.description,
-              credibilityScore: 1.0 // Default score, can be enhanced later
-            }
-          })
-          .where(eq(bookmarks.id, bookmark.id))
-          .returning();
+          const [updated] = await db
+            .update(bookmarks)
+            .set({
+              analysis: {
+                summary: analysis.description,
+                credibilityScore: 1.0 // Default score, can be enhanced later
+              }
+            })
+            .where(eq(bookmarks.id, bookmark.id))
+            .returning();
 
-        return updated;
+          return updated;
+        } catch (error) {
+          console.error(`Failed to analyze URL for bookmark ${bookmark.id}:`, error);
+          // Update the bookmark with error status but don't fail the whole process
+          const [updated] = await db
+            .update(bookmarks)
+            .set({
+              analysis: {
+                summary: "Failed to analyze this URL",
+                credibilityScore: 0,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            })
+            .where(eq(bookmarks.id, bookmark.id))
+            .returning();
+          return updated;
+        }
       }
       return bookmark;
     } catch (error) {
-      console.error(`Failed to enrich bookmark ${bookmark.id}:`, error);
-      return bookmark;
+      console.error(`Failed to process bookmark ${bookmark.id}:`, error);
+      return bookmark; // Return original bookmark on error to continue processing others
     }
   }
 

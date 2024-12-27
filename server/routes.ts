@@ -155,15 +155,29 @@ export function registerRoutes(app: Express): Server {
       const total = await BookmarkModel.getEnrichmentCount();
       const processed = await BookmarkModel.getProcessedCount();
 
+      let status: "idle" | "processing" | "completed" | "error" = "idle";
+      if (total === 0) {
+        status = "completed";
+      } else if (processed === total) {
+        status = "completed";
+      } else if (processed < total) {
+        status = "processing";
+      }
+
       res.json({
         processedCount: processed,
         totalCount: total,
-        status: processed === total ? "completed" : "processing",
-        message: `Enriched ${processed} of ${total} bookmarks`
+        status,
+        message: status === "completed" 
+          ? "All bookmarks have been enriched"
+          : `Enriching bookmarks: ${processed} of ${total} processed`
       });
     } catch (error) {
       console.error("Failed to get enrichment status:", error);
-      res.status(500).json({ message: "Failed to get enrichment status" });
+      res.status(500).json({ 
+        message: "Failed to get enrichment status",
+        status: "error"
+      });
     }
   });
 
