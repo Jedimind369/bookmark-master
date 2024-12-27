@@ -1,5 +1,5 @@
 import { db } from "@db";
-import { bookmarks, type InsertBookmark, type SelectBookmark } from "@db/schema";
+import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
 
 export class BookmarkModel {
@@ -39,19 +39,32 @@ export class BookmarkModel {
     }
   }
 
-  static async create(data: Omit<InsertBookmark, "id" | "dateAdded" | "userId">) {
+  private static async getOrCreateDefaultUser() {
     try {
-      // Get default user id using a SQL query
-      const defaultUserResult = await db.execute(
-        sql`SELECT id FROM users WHERE username = 'default_user' LIMIT 1`
-      );
+      // Try to find default user
+      const defaultUserResult = await db.select().from(users).where(eq(users.username, 'default_user')).limit(1);
 
-      const defaultUser = defaultUserResult.rows[0];
-      if (!defaultUser) {
-        throw new Error("Default user not found");
+      if (defaultUserResult.length > 0) {
+        return defaultUserResult[0];
       }
 
-      // Ensure tags and collections are arrays
+      // Create default user if not found
+      const [defaultUser] = await db.insert(users).values({
+        username: 'default_user',
+        password: 'not_used', // We don't use password auth for default user
+      }).returning();
+
+      return defaultUser;
+    } catch (error) {
+      console.error("Error getting/creating default user:", error);
+      throw new Error("Failed to get/create default user");
+    }
+  }
+
+  static async create(data: Omit<InsertBookmark, "id" | "dateAdded" | "userId">) {
+    try {
+      const defaultUser = await this.getOrCreateDefaultUser();
+
       const normalizedData = {
         ...data,
         userId: defaultUser.id,
@@ -74,13 +87,11 @@ export class BookmarkModel {
 
   static async update(id: number, data: Partial<Omit<InsertBookmark, "id">>) {
     try {
-      // First check if bookmark exists
       const existing = await this.findById(id);
       if (!existing) {
         throw new Error(`Bookmark with id ${id} not found`);
       }
 
-      // Normalize arrays
       const normalizedData = {
         ...data,
         tags: data.tags !== undefined ? (Array.isArray(data.tags) ? data.tags : []) : undefined,
@@ -103,38 +114,24 @@ export class BookmarkModel {
 
   static async delete(id: number) {
     try {
-      // First check if bookmark exists
       const existing = await this.findById(id);
       if (!existing) {
-        throw new Error(`Bookmark with id ${id} not found`);
+        return false;
       }
 
-      const [bookmark] = await db
-        .delete(bookmarks)
-        .where(eq(bookmarks.id, id))
-        .returning();
-
+      await db.delete(bookmarks).where(eq(bookmarks.id, id));
       return true;
     } catch (error) {
       console.error("Error deleting bookmark:", error);
-      if (error instanceof Error) throw error;
       throw new Error(`Failed to delete bookmark with id ${id}`);
     }
   }
 
   static async bulkCreate(data: Array<Omit<InsertBookmark, "id" | "dateAdded" | "userId">>) {
     try {
-      // Get default user id using a SQL query
-      const defaultUserResult = await db.execute(
-        sql`SELECT id FROM users WHERE username = 'default_user' LIMIT 1`
-      );
-
-      const defaultUser = defaultUserResult.rows[0];
-      if (!defaultUser) {
-        throw new Error("Default user not found");
-      }
-
+      const defaultUser = await this.getOrCreateDefaultUser();
       const now = new Date();
+
       const bookmarksToInsert = data.map(bookmark => ({
         ...bookmark,
         userId: defaultUser.id,

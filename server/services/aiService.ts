@@ -38,7 +38,7 @@ export class AIService {
       const content = `${title}\n${description}\n${mainContent}`
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 1500); // Limit content length
+        .slice(0, 2000); // Allow slightly more content for better analysis
 
       return content;
     } catch (error) {
@@ -55,28 +55,29 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that analyzes web content in any language and provides structured metadata in English. You excel at categorization and identifying key themes.",
+            content: "You are a specialized content analyzer. Your task is to analyze web content in any language and provide metadata in English. Focus on extracting the core meaning and themes, regardless of the original language.",
           },
           {
             role: "user",
-            content: `Analyze this webpage content and provide the following in English, regardless of the original language:
+            content: `Analyze this webpage content and translate/summarize into English:
 
-1. A concise title
-2. A brief description (max 200 characters)
-3. Relevant tags that categorize the content
+Content from URL ${url}:
+${content}
 
-URL: ${url}
-Content: ${content}
+Return a JSON object with:
+- title: A clear, concise English title (max 60 chars)
+- description: A brief English summary (max 150 chars)
+- tags: 3-5 relevant English tags, starting with the main category
 
-Return only a JSON object with the following structure exactly:
+Use this exact JSON structure:
 {
-  "title": "Brief, engaging title in English",
-  "description": "Concise description in English",
-  "tags": ["category", "subcategory", "specific-topic-1", "specific-topic-2", "specific-topic-3"]
+  "title": "string",
+  "description": "string",
+  "tags": ["string"]
 }`
           },
         ],
-        temperature: 0.7,
+        temperature: 0.3, // Lower temperature for more consistent output
         max_tokens: 500,
       });
 
@@ -85,19 +86,19 @@ Return only a JSON object with the following structure exactly:
         throw new Error("No response from OpenAI");
       }
 
-      // Parse and validate the response
-      let analysis: AIAnalysis;
-      try {
-        analysis = JSON.parse(result);
-        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
-          throw new Error("Invalid response format from OpenAI");
-        }
-      } catch (e) {
-        console.error('Error parsing OpenAI response:', result);
-        throw new Error('Failed to parse AI response');
+      const analysis = JSON.parse(result);
+
+      // Validate and clean up the response
+      if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
+        console.error('Invalid OpenAI response format:', result);
+        throw new Error("Invalid response format");
       }
 
-      return analysis;
+      return {
+        title: analysis.title.slice(0, 60),
+        description: analysis.description.slice(0, 150),
+        tags: analysis.tags.slice(0, 5).map(tag => tag.toLowerCase()),
+      };
     } catch (error) {
       console.error('Error analyzing content:', error);
       throw new Error('Failed to analyze content');
@@ -107,7 +108,7 @@ Return only a JSON object with the following structure exactly:
   static async analyzeUrl(url: string): Promise<AIAnalysis> {
     try {
       const content = await this.fetchUrlContent(url);
-      return this.analyzeContent(url, content);
+      return await this.analyzeContent(url, content);
     } catch (error) {
       console.error('Error in analyzeUrl:', error);
       throw new Error('Failed to analyze URL');
