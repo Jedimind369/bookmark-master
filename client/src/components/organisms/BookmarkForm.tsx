@@ -28,13 +28,14 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
         id: initialData?.id,
         title: formData.title,
         url: formData.url,
-        description: formData.description || '',
+        description: formData.description,
         tags,
         collections: initialData?.collections || [],
+        analysis: initialData?.analysis || null,
         dateModified: new Date().toISOString()
       };
 
-      await onSubmit(submitData);
+      const result = await onSubmit(submitData);
       
       if (initialData?.id) {
         try {
