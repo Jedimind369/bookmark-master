@@ -151,13 +151,15 @@ export const useBookmarkStore = create<BookmarkState>()(
         set((state) => {
           const newBookmarks = state.bookmarks.map((bookmark) =>
             bookmark.id === id
-              ? { ...bookmark, ...updatedBookmark }
+              ? { ...bookmark, ...updatedBookmark, dateModified: new Date().toISOString() }
               : bookmark
           );
-          return {
+          const newState = {
             bookmarks: newBookmarks,
             filteredBookmarks: newBookmarks,
           };
+          state.filterBookmarks();
+          return newState;
         }),
 
       deleteBookmark: (id) =>
