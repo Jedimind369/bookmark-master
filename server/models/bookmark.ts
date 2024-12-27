@@ -1,6 +1,7 @@
 import { db } from "@db";
 import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, isNull } from "drizzle-orm";
+import { AIService } from "../services/aiService";
 
 export class BookmarkModel {
   static async findAll() {
@@ -162,6 +163,60 @@ export class BookmarkModel {
     } catch (error) {
       console.error("Error bulk creating bookmarks:", error);
       throw new Error("Failed to bulk create bookmarks");
+    }
+  }
+
+  static async enrichBookmarkAnalysis(bookmark: SelectBookmark) {
+    try {
+      if (!bookmark.analysis) {
+        console.log(`Enriching analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
+        const analysis = await AIService.analyzeUrl(bookmark.url);
+
+        const [updated] = await db
+          .update(bookmarks)
+          .set({
+            analysis: {
+              summary: analysis.description,
+              credibilityScore: 1.0 // Default score, can be enhanced later
+            }
+          })
+          .where(eq(bookmarks.id, bookmark.id))
+          .returning();
+
+        return updated;
+      }
+      return bookmark;
+    } catch (error) {
+      console.error(`Failed to enrich bookmark ${bookmark.id}:`, error);
+      return bookmark;
+    }
+  }
+
+  static async enrichAllBookmarks() {
+    try {
+      const bookmarksToUpdate = await db
+        .select()
+        .from(bookmarks)
+        .where(isNull(bookmarks.analysis));
+
+      console.log(`Found ${bookmarksToUpdate.length} bookmarks to enrich with analysis`);
+
+      // Process in batches of 5 to avoid overloading
+      const batchSize = 5;
+      for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
+        const batch = bookmarksToUpdate.slice(i, i + batchSize);
+        await Promise.all(batch.map(bookmark => this.enrichBookmarkAnalysis(bookmark)));
+
+        // Add a delay between batches to prevent rate limiting
+        if (i + batchSize < bookmarksToUpdate.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Failed to enrich bookmarks:", error);
+      return false;
     }
   }
 }

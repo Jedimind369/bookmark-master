@@ -5,15 +5,6 @@ import { AIService } from "./services/aiService";
 import { insertBookmarkSchema } from "@db/schema";
 import { z } from "zod";
 
-// Schema for validating bookmark import data
-const importBookmarkSchema = z.object({
-  url: z.string().url(),
-  title: z.string(),
-  description: z.string().optional(),
-  tags: z.array(z.string()).default([]),
-  collections: z.array(z.string()).default([]),
-}).array();
-
 export function registerRoutes(app: Express): Server {
   // AI Analysis endpoint
   app.post("/api/analyze-url", async (req, res) => {
@@ -37,6 +28,15 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/bookmarks", async (req, res) => {
     try {
       const bookmarks = await BookmarkModel.findAll();
+
+      // Start background enrichment if there are bookmarks without analysis
+      const needsEnrichment = bookmarks.some(b => !b.analysis);
+      if (needsEnrichment) {
+        BookmarkModel.enrichAllBookmarks().catch(error => {
+          console.error("Background enrichment failed:", error);
+        });
+      }
+
       res.json(bookmarks);
     } catch (error) {
       console.error("Failed to fetch bookmarks:", error);
@@ -135,6 +135,25 @@ export function registerRoutes(app: Express): Server {
         });
       }
       res.status(500).json({ message: "Failed to import bookmarks" });
+    }
+  });
+
+  // Endpoint to trigger background enrichment of bookmarks
+  app.post("/api/bookmarks/enrich", async (req, res) => {
+    try {
+      // Start the enrichment process
+      BookmarkModel.enrichAllBookmarks().catch(error => {
+        console.error("Background enrichment failed:", error);
+      });
+
+      // Respond immediately as this runs in the background
+      res.json({ 
+        message: "Started enriching bookmarks in the background",
+        status: "processing"
+      });
+    } catch (error) {
+      console.error("Failed to start bookmark enrichment:", error);
+      res.status(500).json({ message: "Failed to start bookmark enrichment" });
     }
   });
 
