@@ -38,7 +38,15 @@ export const BookmarkEnrichment = () => {
           if (!response.ok) throw new Error("Failed to get enrichment status");
 
           const status = await response.json();
-          setEnrichmentStatus(status);
+          setEnrichmentStatus(prev => {
+            // Stop polling if we've processed all items or haven't made progress in a while
+            if (status.processedCount === status.totalCount || 
+                (prev.processedCount === status.processedCount && prev.processedCount > 0)) {
+              clearInterval(pollInterval);
+              return { ...status, status: "completed" };
+            }
+            return status;
+          });
 
           if (status.status === "completed") {
             clearInterval(pollInterval);
@@ -54,7 +62,7 @@ export const BookmarkEnrichment = () => {
           clearInterval(pollInterval);
           setEnrichmentStatus(prev => ({ ...prev, status: "error" }));
         }
-      }, 2000);
+      }, 5000);
     }
 
     return () => {
