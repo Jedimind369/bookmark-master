@@ -19,7 +19,7 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
     tags: (initialData?.analysis?.tags || initialData?.tags || []).join(", "),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
     
@@ -31,7 +31,25 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       tags,
     };
 
+    // First submit the basic update
     onSubmit(submitData);
+
+    // Then trigger enrichment if this is an update
+    if (initialData?.id) {
+      try {
+        const response = await fetch('/api/bookmarks/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: [initialData.id] })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to enrich bookmark');
+        }
+      } catch (error) {
+        console.error('Error enriching bookmark:', error);
+      }
+    }
   };
 
   return (
