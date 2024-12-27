@@ -245,8 +245,8 @@ export class BookmarkModel {
     try {
       // Check if bookmark needs enrichment
       const needsEnrichment = !bookmark.analysis ||
-                          !bookmark.analysis.summary ||
-                          bookmark.analysis.summary.length < 100;
+                              !bookmark.analysis.summary ||
+                              bookmark.analysis.summary.length < 100;
 
       if (needsEnrichment) {
         console.log(`Enriching analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
@@ -269,6 +269,16 @@ export class BookmarkModel {
     } catch (error) {
       console.error(`Failed to enrich bookmark ${bookmark.id}:`, error);
       return bookmark;
+    }
+  }
+
+  static async purgeAll() {
+    try {
+      await db.delete(bookmarks);
+      return true;
+    } catch (error) {
+      console.error("Error purging bookmarks:", error);
+      throw new Error("Failed to purge bookmarks");
     }
   }
 }

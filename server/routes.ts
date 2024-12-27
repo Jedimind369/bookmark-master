@@ -5,7 +5,6 @@ import { AIService } from "./services/aiService";
 import { insertBookmarkSchema } from "@db/schema";
 import { parseHtmlBookmarks } from "./utils/bookmarkParser";
 import { z } from "zod";
-import * as express from 'express';
 
 export function registerRoutes(app: Express): Server {
   // AI Analysis endpoint
@@ -39,7 +38,9 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/bookmarks", async (req, res) => {
     try {
-      const validatedData = await insertBookmarkSchema.omit({ id: true, dateAdded: true, userId: true }).parseAsync(req.body);
+      const validatedData = await insertBookmarkSchema
+        .omit({ id: true, dateAdded: true, userId: true })
+        .parseAsync(req.body);
       const bookmark = await BookmarkModel.create(validatedData);
       res.status(201).json(bookmark);
     } catch (error) {
@@ -59,7 +60,7 @@ export function registerRoutes(app: Express): Server {
     try {
       console.log(`Received ${req.body.length} bookmarks for import`);
 
-      // Create a modified schema for import that handles string dates
+      // Create a schema for import validation
       const importBookmarkSchema = z.object({
         url: z.string().url(),
         title: z.string(),
@@ -76,7 +77,7 @@ export function registerRoutes(app: Express): Server {
       const normalizedBookmarks = bookmarksData.map(bookmark => ({
         url: bookmark.url,
         title: bookmark.title,
-        description: bookmark.description || null,
+        description: bookmark.description ?? null,
         tags: bookmark.tags,
         collections: bookmark.collections
       }));
@@ -159,6 +160,20 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Failed to start bookmark enrichment:", error);
       res.status(500).json({ message: "Failed to start bookmark enrichment" });
+    }
+  });
+
+  // Purge all bookmarks endpoint
+  app.delete("/api/bookmarks/purge", async (req, res) => {
+    try {
+      await BookmarkModel.purgeAll();
+      res.json({ 
+        message: "Successfully purged all bookmarks",
+        success: true
+      });
+    } catch (error) {
+      console.error("Failed to purge bookmarks:", error);
+      res.status(500).json({ message: "Failed to purge bookmarks" });
     }
   });
 

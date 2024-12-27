@@ -31,11 +31,8 @@ export function parseHtmlBookmarks(html: string): ParsedBookmark[] {
             new URL(url);
 
             // Get the folder path (collections)
-            const parentFolders = item.closest('dl')?.
-              querySelectorAll(':scope > dt > h3')?.
-              textContent?.split('>')?.
-              map(folder => folder.trim())?.
-              filter(Boolean) || [];
+            const folderElements = Array.from(item.closest('dl')?.querySelectorAll(':scope > dt > h3') || []);
+            const parentFolders = folderElements.map(el => el.textContent?.trim() || '').filter(Boolean);
 
             bookmarks.push({
               url,
