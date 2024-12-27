@@ -149,11 +149,37 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get enrichment status endpoint
+  app.get("/api/bookmarks/enrich/status", async (req, res) => {
+    try {
+      const total = await BookmarkModel.getEnrichmentCount();
+      const processed = await BookmarkModel.getProcessedCount();
+
+      res.json({
+        processedCount: processed,
+        totalCount: total,
+        status: processed === total ? "completed" : "processing",
+        message: `Enriched ${processed} of ${total} bookmarks`
+      });
+    } catch (error) {
+      console.error("Failed to get enrichment status:", error);
+      res.status(500).json({ message: "Failed to get enrichment status" });
+    }
+  });
+
   // Endpoint to manually enrich bookmarks with comprehensive analysis
   app.post("/api/bookmarks/enrich", async (req, res) => {
     try {
       // Get count of bookmarks that need enrichment
       const count = await BookmarkModel.getEnrichmentCount();
+
+      if (count === 0) {
+        return res.json({
+          message: "No bookmarks require enrichment",
+          count: 0,
+          status: "completed"
+        });
+      }
 
       // Start the enrichment process
       BookmarkModel.enrichAllBookmarks().catch(error => {

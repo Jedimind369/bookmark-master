@@ -211,13 +211,29 @@ export class BookmarkModel {
     }
   }
 
+  static async getProcessedCount() {
+    try {
+      const results = await db
+        .select()
+        .from(bookmarks)
+        .where(
+          sql`analysis IS NOT NULL AND LENGTH(COALESCE(analysis->>'summary', '')) >= 100`
+        );
+
+      return results.length;
+    } catch (error) {
+      console.error("Error getting processed count:", error);
+      return 0;
+    }
+  }
+
   static async enrichAllBookmarks() {
     try {
       const bookmarksToUpdate = await db
         .select()
         .from(bookmarks)
         .where(
-          sql`analysis IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100`
+          sql`analysis IS NULL OR LENGTH(COALESCE(analysis->>'summary', '')) < 100`
         );
 
       console.log(`Found ${bookmarksToUpdate.length} bookmarks to enrich with analysis`);
