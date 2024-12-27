@@ -309,6 +309,8 @@ export class BookmarkModel {
                 summary: analysis.description,
                 credibilityScore: 1.0,
                 tags: analysis.tags,
+                isLandingPage: analysis.isLandingPage,
+                mainTopic: analysis.mainTopic,
                 lastUpdated: new Date().toISOString(),
                 status: 'success' as const
               }

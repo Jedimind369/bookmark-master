@@ -267,11 +267,11 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: "You are a website analyzer. Analyze the pages and provide a concise summary of the website's purpose and key features. Keep responses brief but informative."
+            content: "You are a website analyzer specializing in identifying landing pages and general websites. Provide detailed analysis of content focus and target audience."
           },
           {
             role: "user",
-            content: `Analyze these pages from ${startUrl} and provide insights:
+            content: `Analyze these pages from ${startUrl} and determine if it's a landing page or general website:
 
 ${pages.map(page => `
 URL: ${page.url}
@@ -282,14 +282,18 @@ Type: ${page.type || 'webpage'}
 
 Return a JSON object with:
 - title: Clear, concise website purpose (max 60 chars)
-- description: Website's purpose and target audience (max 200 chars)
-- tags: 3-5 relevant tags for purpose and features
+- description: If landing page, specific focus and call-to-action. If general site, overview of main topics and purpose. (max 200 chars)
+- tags: 3-5 relevant tags for content type, purpose, and target audience
+- isLandingPage: boolean indicating if this is a focused landing page
+- mainTopic: primary topic or purpose if landing page, "general" if multi-topic site
 
 Use this structure:
 {
   "title": string,
   "description": string,
-  "tags": string[]
+  "tags": string[],
+  "isLandingPage": boolean,
+  "mainTopic": string
 }`
           },
         ],
