@@ -9,7 +9,7 @@ export class BookmarkModel {
       const results = await db
         .select()
         .from(bookmarks)
-        .orderBy(desc(bookmarks.dateAdded));
+        .orderBy(desc(bookmarks.dateModified), desc(bookmarks.dateAdded));
 
       return results.map(bookmark => ({
         ...bookmark,
@@ -46,17 +46,15 @@ export class BookmarkModel {
 
   private static async getOrCreateDefaultUser() {
     try {
-      // Try to find default user
       const defaultUserResult = await db.select().from(users).where(eq(users.username, 'default_user')).limit(1);
 
       if (defaultUserResult.length > 0) {
         return defaultUserResult[0];
       }
 
-      // Create default user if not found
       const [defaultUser] = await db.insert(users).values({
         username: 'default_user',
-        password: 'not_used', // We don't use password auth for default user
+        password: 'not_used',
       }).returning();
 
       return defaultUser;
@@ -75,6 +73,7 @@ export class BookmarkModel {
         userId: defaultUser.id,
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : [],
+        dateModified: new Date()
       };
 
       const [bookmark] = await db
@@ -111,12 +110,9 @@ export class BookmarkModel {
       };
 
       const normalizedData = {
-        ...existing,
-        title: data.title,
-        url: data.url,
-        description: data.description,
-        tags: Array.isArray(data.tags) ? data.tags : [],
-        collections: Array.isArray(data.collections) ? data.collections : [],
+        ...data,
+        tags: Array.isArray(data.tags) ? data.tags : existing.tags,
+        collections: Array.isArray(data.collections) ? data.collections : existing.collections,
         dateModified: new Date(),
         analysis: data.analysis || existing.analysis,
         update_history: [...(existing.update_history || []), updateRecord]
@@ -317,7 +313,8 @@ export class BookmarkModel {
           analysis: {
             status: 'processing' as AnalysisStatus,
             lastUpdated: new Date().toISOString()
-          }
+          },
+          dateModified: new Date()
         })
         .where(eq(bookmarks.id, bookmark.id));
 
@@ -335,7 +332,10 @@ export class BookmarkModel {
               status: 'success' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
               tags: analysis.tags,
-            }
+              title: analysis.title,
+              mainTopic: analysis.mainTopic
+            },
+            dateModified: new Date()
           })
           .where(eq(bookmarks.id, bookmark.id))
           .returning();
@@ -376,7 +376,8 @@ export class BookmarkModel {
               lastUpdated: new Date().toISOString(),
               error: error instanceof Error ? error.message : 'Unknown error',
               retryable
-            }
+            },
+            dateModified: new Date()
           })
           .where(eq(bookmarks.id, bookmark.id))
           .returning();
@@ -397,14 +398,15 @@ export class BookmarkModel {
               lastUpdated: new Date().toISOString(),
               error: error instanceof Error ? error.message : 'Unknown error',
               retryable: true
-            }
+            },
+            dateModified: new Date()
           })
           .where(eq(bookmarks.id, bookmark.id))
           .returning();
         return updated;
       } catch (dbError) {
         console.error(`[Enrichment] Failed to update error status for bookmark ${bookmark.id}:`, dbError);
-        return bookmark;
+        throw error;
       }
     }
   }

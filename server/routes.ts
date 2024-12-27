@@ -42,8 +42,21 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Bookmark not found" });
       }
 
+      console.log(`[Analysis] Starting reanalysis for bookmark ${id}`);
       const result = await BookmarkModel.enrichBookmarkAnalysis(bookmark);
-      res.json(result);
+
+      if (!result) {
+        throw new Error("Failed to reanalyze bookmark");
+      }
+
+      // Get the updated bookmark after analysis
+      const updatedBookmark = await BookmarkModel.findById(id);
+      if (!updatedBookmark) {
+        throw new Error("Failed to fetch updated bookmark");
+      }
+
+      console.log(`[Analysis] Completed reanalysis for bookmark ${id}`);
+      res.json(updatedBookmark);
     } catch (error) {
       console.error("Error reanalyzing bookmark:", error);
       res.status(500).json({ 
