@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { BookmarkCard } from "../molecules/BookmarkCard";
+import { fetchBookmarks } from "@/lib/api";
 import { LoadingSpinner } from "../atoms/LoadingSpinner";
 import { Bookmark } from "@/types/bookmark";
 import { AlertCircle } from "lucide-react";
