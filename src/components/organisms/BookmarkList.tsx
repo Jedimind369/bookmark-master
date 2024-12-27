@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+
+import { useBookmarkStore } from "@/store/bookmarkStore";
 import { BookmarkCard } from "../molecules/BookmarkCard";
 import { LoadingSpinner } from "../atoms/LoadingSpinner";
-import { Bookmark } from "@/types/bookmark";
-import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface BookmarkListProps {
   onEdit: (bookmark: Bookmark) => void;
@@ -11,9 +11,7 @@ interface BookmarkListProps {
 }
 
 export const BookmarkList = ({ onEdit, onDelete }: BookmarkListProps) => {
-  const { data: bookmarks, isLoading, error } = useQuery<Bookmark[]>({
-    queryKey: ['/api/bookmarks'],
-  });
+  const { filteredBookmarks, isLoading, error } = useBookmarkStore();
 
   if (isLoading) {
     return (
@@ -35,7 +33,7 @@ export const BookmarkList = ({ onEdit, onDelete }: BookmarkListProps) => {
     );
   }
 
-  if (!bookmarks?.length) {
+  if (!filteredBookmarks?.length) {
     return (
       <div className="text-center p-8 text-muted-foreground">
         No bookmarks found. Add your first bookmark to get started!
@@ -45,7 +43,7 @@ export const BookmarkList = ({ onEdit, onDelete }: BookmarkListProps) => {
 
   return (
     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      {bookmarks.map((bookmark) => (
+      {filteredBookmarks.map((bookmark) => (
         <BookmarkCard
           key={bookmark.id}
           bookmark={bookmark}
