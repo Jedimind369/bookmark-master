@@ -27,15 +27,7 @@ export const BookmarkEnrichment = () => {
   const { data: enrichmentCount = 0, error: countError } = useQuery({
     queryKey: ["/api/bookmarks/enrich/count"],
     refetchInterval: enrichmentStatus.status === "processing" ? 2000 : false,
-    retry: false,
-    onError: (error: Error) => {
-      console.error("[Enrichment] Error fetching count:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to get enrichment count"
-      });
-    }
+    retry: false
   });
 
   // Set up polling when enrichment is in progress
@@ -45,7 +37,14 @@ export const BookmarkEnrichment = () => {
     const pollStatus = async () => {
       try {
         console.log("[Enrichment] Polling status...");
-        const response = await fetch("/api/bookmarks/enrich/status");
+        const response = await fetch("/api/bookmarks/enrich/status", {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          credentials: 'same-origin'
+        });
 
         if (!response.ok) {
           throw new Error(`Status check failed: ${response.status}`);
@@ -105,7 +104,12 @@ export const BookmarkEnrichment = () => {
     mutationFn: async () => {
       console.log("[Enrichment] Starting enrichment process");
       const response = await fetch("/api/bookmarks/enrich", {
-        method: "POST"
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'same-origin'
       });
 
       if (!response.ok) {
