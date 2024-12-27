@@ -92,11 +92,12 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
 
       const submitData = {
-        ...initialData, // Preserve existing data
+        ...initialData, // Preserve existing data like id and analysis
         title: formData.title,
         url: formData.url,
         description: formData.description,
         tags,
+        dateModified: new Date().toISOString()
       };
 
       console.log('Submitting bookmark data:', submitData);
@@ -107,12 +108,6 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
 
       await onSubmit(submitData);
 
-      toast({
-        title: "Success",
-        description: `Bookmark ${initialData ? 'updated' : 'created'} successfully`
-      });
-
-      onCancel();
     } catch (error) {
       console.error('Submission error:', error);
       const message = error instanceof Error ? error.message : 'Failed to save bookmark';
