@@ -101,19 +101,20 @@ export const Home = () => {
     mutationFn: async (data: UpdateBookmarkDto) => {
       console.log(`[Update] Updating bookmark ${data.id}:`, data);
 
-      // Convert dates to ISO strings if they exist
-      const normalizedData = {
+      // Prepare the data for submission
+      const submitData = {
         ...data,
-        dateModified: new Date(), // Send as Date object
+        dateModified: new Date(),
         tags: Array.isArray(data.tags) ? data.tags : [],
-        collections: Array.isArray(data.collections) ? data.collections : [],
+        collections: Array.isArray(data.collections) ? data.collections : []
       };
 
-      // First update the bookmark data
+      console.log(`[Update] Submitting data:`, submitData);
+
       const response = await fetch(`/api/bookmarks/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(normalizedData),
+        body: JSON.stringify(submitData),
       });
 
       if (!response.ok) {
@@ -121,29 +122,18 @@ export const Home = () => {
         throw new Error(errorText || "Failed to update bookmark");
       }
 
-      const updatedBookmark = await response.json();
-
-      // Then trigger a reanalysis
-      console.log(`[Update] Refreshing analysis for bookmark ${data.id}`);
-      const reanalyzeResponse = await fetch(`/api/bookmarks/${data.id}/analyze`, {
-        method: "POST",
-      });
-
-      if (!reanalyzeResponse.ok) {
-        throw new Error("Failed to refresh bookmark analysis after update");
-      }
-
-      return await reanalyzeResponse.json();
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       toast({
         title: "Success",
-        description: "Bookmark updated and analysis refreshed",
+        description: "Bookmark updated successfully",
       });
       handleCloseForm();
     },
     onError: (error) => {
+      console.error("[Update] Error:", error);
       toast({
         variant: "destructive",
         title: "Error",
