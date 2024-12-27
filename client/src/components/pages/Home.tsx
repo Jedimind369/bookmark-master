@@ -24,49 +24,29 @@ export const Home = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const refreshMutation = useMutation({
-    mutationFn: async (bookmark: Bookmark) => {
-      console.log(`[Refresh] Refreshing analysis for bookmark ${bookmark.id}`);
-      const response = await fetch(`/api/bookmarks/${bookmark.id}/analyze`, {
-        method: "POST",
+  const purgeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/bookmarks/purge", {
+        method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to refresh bookmark analysis");
+      if (!response.ok) throw new Error("Failed to purge bookmarks");
       return response.json();
     },
-    onMutate: (bookmark) => {
-      const previousBookmarks = queryClient.getQueryData(["/api/bookmarks"]);
-      queryClient.setQueryData(["/api/bookmarks"], (old: Bookmark[] | undefined) => {
-        if (!old) return old;
-        return old.map(b => b.id === bookmark.id ? {
-          ...b,
-          analysis: { ...b.analysis, status: 'processing' }
-        } : b);
-      });
-      return { previousBookmarks };
-    },
-    onSuccess: (updatedBookmark) => {
-      queryClient.setQueryData(["/api/bookmarks"], (old: Bookmark[] | undefined) => {
-        if (!old) return [updatedBookmark];
-        return old.map(b => b.id === updatedBookmark.id ? updatedBookmark : b);
-      });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       toast({
         title: "Success",
-        description: "Bookmark analysis refreshed",
+        description: "All bookmarks have been purged",
       });
+      setIsPurgeDialogOpen(false);
     },
-    onError: (error, _, context) => {
-      if (context?.previousBookmarks) {
-        queryClient.setQueryData(["/api/bookmarks"], context.previousBookmarks);
-      }
+    onError: (error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to refresh bookmark analysis",
+        description: error instanceof Error ? error.message : "Failed to purge bookmarks",
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-    }
   });
 
   const createMutation = useMutation({
@@ -101,12 +81,13 @@ export const Home = () => {
     mutationFn: async (data: UpdateBookmarkDto) => {
       console.log(`[Update] Updating bookmark ${data.id}:`, data);
 
-      // Prepare the data for submission, ensuring dateModified is a string
+      // Prepare the data for submission, ensuring proper date handling
       const submitData = {
         ...data,
         dateModified: new Date().toISOString(),
         tags: Array.isArray(data.tags) ? data.tags : [],
-        collections: Array.isArray(data.collections) ? data.collections : []
+        collections: Array.isArray(data.collections) ? data.collections : [],
+        updateHistory: data.updateHistory || []
       };
 
       console.log(`[Update] Submitting data:`, submitData);
@@ -144,7 +125,6 @@ export const Home = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      console.log(`[Delete] Deleting bookmark ${id}`);
       const response = await fetch(`/api/bookmarks/${id}`, {
         method: "DELETE",
       });
@@ -194,6 +174,10 @@ export const Home = () => {
     }
   };
 
+  const handlePurge = () => {
+    purgeMutation.mutate();
+  };
+
   const handleRefresh = (bookmark: Bookmark) => {
     console.log(`[Refresh] Triggering refresh for bookmark ${bookmark.id}`);
     refreshMutation.mutate(bookmark);
@@ -206,6 +190,14 @@ export const Home = () => {
         <div className="flex gap-4">
           <BookmarkEnrichment />
           <BookmarkImport />
+          <Button
+            variant="outline"
+            onClick={() => setIsPurgeDialogOpen(true)}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Purge All
+          </Button>
           <Button onClick={() => setIsFormOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Bookmark
@@ -219,12 +211,41 @@ export const Home = () => {
         onRefresh={handleRefresh}
       />
 
+      <Dialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Purge</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete all bookmarks? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsPurgeDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handlePurge}
+              disabled={purgeMutation.isPending}
+            >
+              {purgeMutation.isPending ? "Purging..." : "Purge All"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
               {selectedBookmark ? "Edit Bookmark" : "Add New Bookmark"}
             </DialogTitle>
+            <DialogDescription>
+              {selectedBookmark ? "Update the bookmark details below." : "Add a new bookmark by entering the details below."}
+            </DialogDescription>
           </DialogHeader>
           <BookmarkForm
             initialData={selectedBookmark || undefined}
