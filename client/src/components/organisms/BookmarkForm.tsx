@@ -24,62 +24,58 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const analyzeUrl = async (url: string) => {
-    try {
-      console.log('Starting URL analysis:', url);
-      setAnalyzing(true);
-      setError(null);
-
-      const response = await fetch('/api/bookmarks/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
-
-      console.log('Analysis response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to analyze URL');
-      }
-
-      const analysis = await response.json();
-      console.log('Analysis result:', analysis);
-
-      // Update form with analysis results
-      setFormData(prev => ({
-        ...prev,
-        title: prev.title || analysis.title || '',
-        description: prev.description || analysis.description || '',
-        tags: prev.tags || (analysis.tags ? analysis.tags.join(", ") : '')
-      }));
-
-      toast({
-        title: "Analysis Complete",
-        description: "URL has been analyzed successfully"
-      });
-
-    } catch (error) {
-      console.error('Analysis error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to analyze URL';
-      setError(message);
-      toast({
-        variant: "destructive",
-        title: "Analysis Error",
-        description: message
-      });
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   const handleUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
     setFormData(prev => ({ ...prev, url }));
 
     // If this is a new bookmark and we have a valid URL, trigger analysis
     if (!initialData?.id && url && url.startsWith('http')) {
-      await analyzeUrl(url);
+      try {
+        console.log('Starting URL analysis:', url);
+        setAnalyzing(true);
+        setError(null);
+
+        const response = await fetch('/api/bookmarks/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        console.log('Analysis response status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to analyze URL');
+        }
+
+        const analysis = await response.json();
+        console.log('Analysis result:', analysis);
+
+        // Update form with analysis results
+        setFormData(prev => ({
+          ...prev,
+          title: prev.title || analysis.title || '',
+          description: prev.description || analysis.description || '',
+          tags: prev.tags || (analysis.tags ? analysis.tags.join(", ") : '')
+        }));
+
+        toast({
+          title: "Analysis Complete",
+          description: "URL has been analyzed successfully"
+        });
+
+      } catch (error) {
+        console.error('Analysis error:', error);
+        const message = error instanceof Error ? error.message : 'Failed to analyze URL';
+        setError(message);
+        toast({
+          variant: "destructive",
+          title: "Analysis Error",
+          description: message
+        });
+      } finally {
+        setAnalyzing(false);
+      }
     }
   };
 
@@ -92,12 +88,12 @@ export const BookmarkForm = ({ initialData, onSubmit, onCancel }: BookmarkFormPr
       const tags = formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
 
       const submitData = {
-        ...initialData, // Preserve existing data like id and analysis
+        ...initialData, 
         title: formData.title,
         url: formData.url,
         description: formData.description,
         tags,
-        dateModified: new Date().toISOString()
+        dateModified: new Date().toISOString() 
       };
 
       console.log('Submitting bookmark data:', submitData);

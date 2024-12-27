@@ -95,9 +95,9 @@ export class BookmarkModel {
         throw new Error(`Bookmark with id ${id} not found`);
       }
 
-      // Convert dateModified to a proper Date object if it's a string
-      const dateModified = data.dateModified instanceof Date 
-        ? data.dateModified 
+      // Ensure dateModified is properly converted to a Date object
+      const dateModified = typeof data.dateModified === 'string' 
+        ? new Date(data.dateModified)
         : new Date();
 
       const normalizedData = {
