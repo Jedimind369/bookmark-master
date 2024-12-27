@@ -30,11 +30,10 @@ export const BookmarkEnrichment = () => {
       const response = await fetch("/api/bookmarks/enrich/count");
       if (!response.ok) throw new Error("Failed to get enrichment count");
       return response.json();
-    },
-    refetchInterval: 5000,
+    }
   });
 
-  // Set up polling when enrichment is in progress
+  // Poll status when enrichment is in progress
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
 
@@ -42,26 +41,27 @@ export const BookmarkEnrichment = () => {
       try {
         const response = await fetch("/api/bookmarks/enrich/status");
         if (!response.ok) throw new Error("Failed to get enrichment status");
-
         const status = await response.json();
-        const isComplete = status.processedCount === status.totalCount;
         
-        setEnrichmentStatus(prev => ({
-          ...status,
-          status: isComplete ? "completed" : "processing",
-          message: isComplete 
-            ? "All bookmarks have been analyzed!"
-            : `Analyzing bookmark ${status.processedCount + 1} of ${status.totalCount}...`
-        }));
-
-        if (isComplete) {
-          clearInterval(pollInterval);
-          queryClient.invalidateQueries({ queryKey: ["enrichmentCount"] });
-          queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-          toast({
-            title: "Success",
-            description: "All bookmarks have been enriched with AI analysis",
+        if (status.totalCount > 0) {
+          const isComplete = status.processedCount === status.totalCount;
+          setEnrichmentStatus({
+            ...status,
+            status: isComplete ? "completed" : "processing",
+            message: isComplete 
+              ? "All bookmarks have been analyzed!"
+              : `Analyzing bookmark ${status.processedCount + 1} of ${status.totalCount}...`
           });
+
+          if (isComplete) {
+            clearInterval(pollInterval);
+            queryClient.invalidateQueries({ queryKey: ["enrichmentCount"] });
+            queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+            toast({
+              title: "Success",
+              description: "All bookmarks have been enriched with AI analysis",
+            });
+          }
         }
       } catch (error) {
         console.error("[Enrichment] Error polling status:", error);
@@ -76,7 +76,7 @@ export const BookmarkEnrichment = () => {
     };
 
     if (enrichmentStatus.status === "processing") {
-      pollStatus(); // Poll immediately
+      pollStatus();
       pollInterval = setInterval(pollStatus, 2000);
     }
 
@@ -90,12 +90,10 @@ export const BookmarkEnrichment = () => {
       const response = await fetch("/api/bookmarks/enrich", {
         method: "POST",
       });
-
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message);
       }
-
       return response.json();
     },
     onSuccess: (data) => {
