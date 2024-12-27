@@ -7,6 +7,19 @@ import { parseHtmlBookmarks } from "./utils/bookmarkParser";
 import { z } from "zod";
 
 export function registerRoutes(app: Express): Server {
+  // Purge all bookmarks
+  app.delete("/api/bookmarks/purge", async (req, res) => {
+    try {
+      const result = await BookmarkModel.purgeAll();
+      res.json({ success: true, message: "All bookmarks purged successfully" });
+    } catch (error) {
+      console.error("Error purging bookmarks:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to purge bookmarks" 
+      });
+    }
+  });
+
   // AI Analysis endpoint
   app.post("/api/bookmarks/analyze", async (req, res) => {
     try {

@@ -81,13 +81,15 @@ export const Home = () => {
     mutationFn: async (data: UpdateBookmarkDto) => {
       console.log(`[Update] Updating bookmark ${data.id}:`, data);
 
-      // Prepare the data for submission, ensuring proper date handling
+      // Simplify the data structure for update
       const submitData = {
-        ...data,
-        dateModified: new Date().toISOString(),
+        id: data.id,
+        url: data.url,
+        title: data.title,
+        description: data.description,
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : [],
-        updateHistory: data.updateHistory || []
+        dateModified: new Date().toISOString()
       };
 
       console.log(`[Update] Submitting data:`, submitData);

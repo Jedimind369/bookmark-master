@@ -95,29 +95,13 @@ export class BookmarkModel {
         throw new Error(`Bookmark with id ${id} not found`);
       }
 
-      // Ensure we have a valid Date object for dateModified
-      let dateModified: Date;
-      try {
-        dateModified = typeof data.dateModified === 'string' ? new Date(data.dateModified) : new Date();
-      } catch (error) {
-        console.error('Error parsing dateModified:', error);
-        dateModified = new Date(); // Fallback to current date
-      }
-
+      // Simplify the update data structure
       const normalizedData = {
         ...data,
         tags: Array.isArray(data.tags) ? data.tags : existing.tags,
         collections: Array.isArray(data.collections) ? data.collections : existing.collections,
-        dateModified,
-        analysis: data.analysis || existing.analysis,
-        updateHistory: [
-          ...(existing.updateHistory || []),
-          {
-            timestamp: new Date().toISOString(),
-            changes: data,
-            previousState: { ...existing }
-          }
-        ]
+        dateModified: new Date(),
+        analysis: data.analysis || existing.analysis
       };
 
       console.log('[Update] Normalized data:', normalizedData);
