@@ -183,6 +183,37 @@ export class BookmarkModel {
     }
   }
 
+  static async enrichAllBookmarks() {
+    try {
+      const bookmarksToUpdate = await db
+        .select()
+        .from(bookmarks)
+        .where(
+          sql`(analysis IS NULL) OR 
+              (analysis->>'description' IS NULL OR LENGTH(COALESCE(analysis->>'description', '')) < 100)`
+        );
+
+      console.log(`Found ${bookmarksToUpdate.length} bookmarks to enrich with analysis`);
+
+      // Process in batches of 5 to avoid overloading
+      const batchSize = 5;
+      for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
+        const batch = bookmarksToUpdate.slice(i, i + batchSize);
+        await Promise.all(batch.map(bookmark => this.enrichBookmarkAnalysis(bookmark)));
+
+        // Add a delay between batches to prevent rate limiting
+        if (i + batchSize < bookmarksToUpdate.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Failed to enrich bookmarks:", error);
+      return false;
+    }
+  }
+
   static async enrichBookmarkAnalysis(bookmark: SelectBookmark) {
     try {
       // Check if bookmark needs enrichment
@@ -211,34 +242,6 @@ export class BookmarkModel {
     } catch (error) {
       console.error(`Failed to enrich bookmark ${bookmark.id}:`, error);
       return bookmark;
-    }
-  }
-
-  static async enrichAllBookmarks() {
-    try {
-      const bookmarksToUpdate = await db
-        .select()
-        .from(bookmarks)
-        .where(isNull(bookmarks.analysis));
-
-      console.log(`Found ${bookmarksToUpdate.length} bookmarks to enrich with analysis`);
-
-      // Process in batches of 5 to avoid overloading
-      const batchSize = 5;
-      for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
-        const batch = bookmarksToUpdate.slice(i, i + batchSize);
-        await Promise.all(batch.map(bookmark => this.enrichBookmarkAnalysis(bookmark)));
-
-        // Add a delay between batches to prevent rate limiting
-        if (i + batchSize < bookmarksToUpdate.length) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Failed to enrich bookmarks:", error);
-      return false;
     }
   }
 }
