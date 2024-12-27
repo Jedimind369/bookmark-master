@@ -217,7 +217,11 @@ export class BookmarkModel {
         .select()
         .from(bookmarks)
         .where(
-          sql`analysis IS NOT NULL AND LENGTH(COALESCE(analysis->>'summary', '')) >= 100`
+          sql`analysis IS NOT NULL AND (
+            LENGTH(COALESCE(analysis->>'summary', '')) >= 100 
+            OR analysis->>'summary' = 'Failed to analyze this URL'
+            OR analysis->>'summary' = 'Error processing bookmark'
+          )`
         );
 
       return results.length;
@@ -242,7 +246,12 @@ export class BookmarkModel {
       const batchSize = 5;
       for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
         const batch = bookmarksToUpdate.slice(i, i + batchSize);
-        await Promise.all(batch.map(bookmark => this.enrichBookmarkAnalysis(bookmark)));
+        try {
+          await Promise.all(batch.map(bookmark => this.enrichBookmarkAnalysis(bookmark)));
+        } catch (error) {
+          console.error(`Error processing batch starting at index ${i}:`, error);
+          // Continue with next batch even if current batch fails
+        }
 
         // Add a delay between batches to prevent rate limiting
         if (i + batchSize < bookmarksToUpdate.length) {
@@ -289,8 +298,7 @@ export class BookmarkModel {
             .set({
               analysis: {
                 summary: "Failed to analyze this URL",
-                credibilityScore: 0,
-                error: error instanceof Error ? error.message : 'Unknown error'
+                credibilityScore: 0
               }
             })
             .where(eq(bookmarks.id, bookmark.id))
@@ -301,7 +309,23 @@ export class BookmarkModel {
       return bookmark;
     } catch (error) {
       console.error(`Failed to process bookmark ${bookmark.id}:`, error);
-      return bookmark; // Return original bookmark on error to continue processing others
+      // Mark the bookmark as processed with error to prevent retrying
+      try {
+        const [updated] = await db
+          .update(bookmarks)
+          .set({
+            analysis: {
+              summary: "Error processing bookmark",
+              credibilityScore: 0
+            }
+          })
+          .where(eq(bookmarks.id, bookmark.id))
+          .returning();
+        return updated;
+      } catch (dbError) {
+        console.error(`Failed to update error status for bookmark ${bookmark.id}:`, dbError);
+        return bookmark;
+      }
     }
   }
 
