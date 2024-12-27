@@ -11,8 +11,10 @@ interface BookmarkListProps {
 }
 
 export const BookmarkList = ({ onEdit, onDelete }: BookmarkListProps) => {
-  const { data: bookmarks, isLoading, error } = useQuery<Bookmark[]>({
+  const { data: bookmarks, isLoading, error } = useQuery({
     queryKey: ['/api/bookmarks'],
+    queryFn: fetchBookmarks, // Assuming fetchBookmarks function exists elsewhere
+    onSuccess: (data) => console.log('Received bookmarks:', data)
   });
 
   if (isLoading) {

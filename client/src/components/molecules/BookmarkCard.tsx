@@ -33,10 +33,10 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-          {bookmark.description}
+          {bookmark.analysis?.summary || bookmark.description || 'No description available'}
         </p>
         <div className="flex flex-wrap gap-2">
-          {bookmark.tags.map((tag) => (
+          {[...new Set([...(bookmark.tags || []), ...(bookmark.analysis?.tags || [])])].map((tag) => (
             <Tag key={tag} text={tag} />
           ))}
         </div>
