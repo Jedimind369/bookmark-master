@@ -38,6 +38,20 @@ export class AIService {
     }
   }
 
+  private static normalizeUrl(url: string): string {
+    try {
+      const parsedUrl = new URL(url);
+      // Remove trailing slashes and normalize to https if available
+      return parsedUrl.toString().replace(/\/$/, '');
+    } catch {
+      // If URL parsing fails, try prepending https://
+      if (!url.startsWith('http')) {
+        return this.normalizeUrl(`https://${url}`);
+      }
+      throw new Error('Invalid URL format');
+    }
+  }
+
   private static isSameOrigin(baseUrl: string, urlToCheck: string): boolean {
     try {
       const base = new URL(baseUrl);
@@ -50,7 +64,17 @@ export class AIService {
 
   private static async fetchPage(url: string): Promise<PageContent> {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)',
+          'Accept-Language': '*'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const html = await response.text();
       const $ = cheerio.load(html);
 
@@ -61,12 +85,21 @@ export class AIService {
       $('footer').remove();
       $('iframe').remove();
       $('noscript').remove();
+      $('header').remove();
+      $('.cookie-banner').remove();
+      $('.advertisement').remove();
+      $('.social-media').remove();
 
-      // Extract key content
-      const title = $('title').text().trim() || '';
-      const metaDescription = $('meta[name="description"]').attr('content')?.trim() || '';
-      const h1 = $('h1').first().text().trim();
-      const mainContent = $('main, article, #content, .content').text() || $('body').text();
+      // Extract key content with better fallbacks
+      const title = $('title').text().trim() || 
+                   $('meta[property="og:title"]').attr('content')?.trim() || 
+                   $('h1').first().text().trim() || '';
+
+      const metaDescription = $('meta[name="description"]').attr('content')?.trim() || 
+                             $('meta[property="og:description"]').attr('content')?.trim() || '';
+
+      const mainContent = $('main, article, #content, .content, [role="main"]').text() || 
+                         $('body').clone().children('nav,header,footer,aside').remove().end().text();
 
       // Extract navigation links for deeper crawling
       const links = $('a[href]')
@@ -86,12 +119,11 @@ export class AIService {
         url,
         title,
         description: metaDescription,
-        content: [
-          title,
-          h1,
-          metaDescription,
-          mainContent
-        ].filter(Boolean).join('\n\n'),
+        content: [title, metaDescription, mainContent]
+          .filter(Boolean)
+          .join('\n\n')
+          .replace(/\s+/g, ' ')
+          .trim(),
         links: Array.from(new Set(links))
       };
     } catch (error) {
@@ -117,17 +149,17 @@ export class AIService {
         pages.push(pageContent);
         this.visitedUrls.add(url);
 
-        // Add child pages to queue
         if (depth < this.MAX_DEPTH) {
-          for (const link of pageContent.links) {
-            if (!this.visitedUrls.has(link)) {
-              queue.push({ url: link, depth: depth + 1 });
-            }
+          const newLinks = pageContent.links
+            .filter(link => !this.visitedUrls.has(link))
+            .slice(0, 10); // Limit number of links per page
+
+          for (const link of newLinks) {
+            queue.push({ url: link, depth: depth + 1 });
           }
         }
 
-        // Add a small delay between requests
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Longer delay between requests
       } catch (error) {
         console.error(`Error crawling ${url}:`, error);
         continue;
@@ -145,7 +177,7 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: "You are a specialized website analyzer. Your task is to analyze multiple pages from a website and provide a comprehensive understanding of the website's true purpose, main features, and target audience. Provide all output in English, regardless of the original language.",
+            content: "You are a specialized website analyzer. Analyze multiple pages from a website and provide a comprehensive understanding of the website's true purpose, main features, and target audience. Provide output in English, even if the original content is in another language. Focus on understanding the website's core purpose and value proposition.",
           },
           {
             role: "user",
@@ -155,7 +187,7 @@ ${pages.map(page => `
 URL: ${page.url}
 Title: ${page.title}
 Description: ${page.description}
-Content: ${page.content.slice(0, 1000)}
+Content: ${page.content.slice(0, 1500)}
 ---`).join('\n')}
 
 Return a JSON object with:
@@ -165,9 +197,9 @@ Return a JSON object with:
 
 Use this exact JSON structure:
 {
-  "title": "string",
-  "description": "string",
-  "tags": ["string"]
+  "title": string,
+  "description": string,
+  "tags": string[]
 }`
           },
         ],
@@ -191,7 +223,7 @@ Use this exact JSON structure:
       return {
         title: analysis.title.slice(0, 60),
         description: analysis.description.slice(0, 300),
-        tags: analysis.tags.slice(0, 7).map(tag => tag.toLowerCase()),
+        tags: analysis.tags.slice(0, 7).map((tag: string) => tag.toLowerCase()),
       };
     } catch (error) {
       console.error('Error analyzing content:', error);
@@ -201,16 +233,20 @@ Use this exact JSON structure:
 
   static async analyzeUrl(url: string): Promise<AIAnalysis> {
     try {
-      if (!this.isValidUrl(url)) {
+      const normalizedUrl = this.normalizeUrl(url);
+      if (!this.isValidUrl(normalizedUrl)) {
         throw new Error('Invalid URL format');
       }
 
-      const pages = await this.crawlWebsite(url);
+      console.log(`Starting analysis of: ${normalizedUrl}`);
+      const pages = await this.crawlWebsite(normalizedUrl);
+
       if (pages.length === 0) {
         throw new Error('Failed to fetch any pages from the website');
       }
 
-      return await this.analyzeContent(url, pages);
+      console.log(`Successfully crawled ${pages.length} pages from ${normalizedUrl}`);
+      return await this.analyzeContent(normalizedUrl, pages);
     } catch (error) {
       console.error('Error in analyzeUrl:', error);
       throw new Error('Failed to analyze URL');
