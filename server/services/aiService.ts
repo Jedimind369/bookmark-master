@@ -283,16 +283,16 @@ Content: ${pageContent.content}`
         }]
       });
 
-      if (!response.content[0] || !response.content[0].text) {
-        throw new Error("Empty response from Claude");
+      const content = response.content[0];
+      if (!content || typeof content.text !== 'string') {
+        throw new Error("Invalid response from Claude");
       }
 
-      const result = response.content[0].text;
-      console.log(`[Analysis] Raw analysis result:`, result);
+      console.log(`[Analysis] Raw analysis result:`, content.text);
 
       let analysis: AIAnalysis;
       try {
-        analysis = JSON.parse(result);
+        analysis = JSON.parse(content.text);
       } catch (error) {
         throw new Error("Invalid JSON response from Claude");
       }
@@ -302,7 +302,7 @@ Content: ${pageContent.content}`
         ...analysis,
         title: (analysis.title || pageContent.title).slice(0, 60),
         description: (analysis.description || pageContent.description).slice(0, 160),
-        tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
+        tags: (analysis.tags || []).slice(0, 5).map(tag => tag.toLowerCase()),
         contentQuality: {
           relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
           informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
