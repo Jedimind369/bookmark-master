@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import * as cheerio from "cheerio";
 import fetch from "node-fetch";
+import fs from "fs/promises";
+import path from "path";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is not set");
@@ -82,14 +84,132 @@ export class AIService {
     }
   }
 
-  private static isSameOrigin(baseUrl: string, urlToCheck: string): boolean {
+  private static async checkLocalContent(url: string): Promise<PageContent | null> {
     try {
-      const base = new URL(baseUrl);
-      const check = new URL(urlToCheck);
-      return base.origin === check.origin;
-    } catch {
-      return false;
+      // Convert URL to filename
+      const urlObj = new URL(url);
+      const baseFilename = urlObj.hostname + urlObj.pathname.replace(/\//g, '_');
+
+      // Check for markdown content
+      const mdPath = path.join('attached_assets', `${baseFilename}.md`);
+      const imgPath = path.join('attached_assets', `${baseFilename}.png`);
+
+      try {
+        const [mdContent, screenshot] = await Promise.all([
+          fs.readFile(mdPath, 'utf-8'),
+          fs.readFile(imgPath, 'base64')
+        ]);
+
+        // Parse the markdown content
+        const lines = mdContent.split('\n');
+        const title = lines.find(line => line.startsWith('# '))?.slice(2) || 
+                     lines[0].replace('URL: ', '') || 
+                     'Untitled Page';
+
+        // Extract description from content
+        let description = '';
+        const contentStart = lines.findIndex(line => line && !line.startsWith('#') && !line.startsWith('URL:'));
+        if (contentStart >= 0) {
+          description = lines[contentStart].trim();
+        }
+
+        // Extract links
+        const links = lines
+          .filter(line => line.includes(']('))
+          .map(line => {
+            const match = line.match(/\[.*?\]\((.*?)\)/);
+            return match ? match[1] : null;
+          })
+          .filter((link): link is string => !!link);
+
+        return {
+          url,
+          title,
+          description,
+          content: mdContent,
+          links,
+          type: 'webpage',
+          screenshot,
+          metadata: {
+            wordCount: mdContent.split(/\s+/).length
+          }
+        };
+      } catch (error) {
+        console.log('[Analysis] No local content found:', error);
+        return null;
+      }
+    } catch (error) {
+      console.error('[Analysis] Error checking local content:', error);
+      return null;
     }
+  }
+
+  static async analyzeUrl(url: string): Promise<AIAnalysis> {
+    try {
+      const normalizedUrl = this.normalizeUrl(url);
+      if (!this.isValidUrl(normalizedUrl)) {
+        throw new Error('Invalid URL format');
+      }
+
+      console.log(`[Analysis] Starting analysis of: ${normalizedUrl}`);
+
+      // First check for local content
+      const localContent = await this.checkLocalContent(normalizedUrl);
+      if (localContent) {
+        console.log('[Analysis] Using local content for analysis');
+        return this.analyzeWithRetry(normalizedUrl, [localContent]);
+      }
+
+      // If no local content, try web crawling
+      const pages = await this.crawlWebsite(normalizedUrl);
+      console.log(`[Analysis] Crawled ${pages.length} pages from ${normalizedUrl}`);
+
+      if (!pages.length) {
+        // Create fallback analysis from URL
+        const urlParts = new URL(normalizedUrl);
+        return {
+          title: urlParts.hostname,
+          description: `Website at ${urlParts.hostname}${urlParts.pathname} - Currently unavailable or restricted access`,
+          tags: ['archived', 'unavailable'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
+      }
+
+      return await this.analyzeWithRetry(normalizedUrl, pages);
+    } catch (error) {
+      console.error('[Analysis] Error in analyzeUrl:', error);
+
+      // Create meaningful fallback analysis
+      try {
+        const urlParts = new URL(url);
+        return {
+          title: urlParts.hostname,
+          description: `Website at ${urlParts.hostname} - ${error instanceof Error ? error.message : 'Access error'}`,
+          tags: ['error', 'unavailable'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
+      } catch {
+        return {
+          title: 'Invalid URL',
+          description: 'The provided URL could not be processed',
+          tags: ['error', 'invalid'],
+          isLandingPage: false,
+          mainTopic: 'unknown'
+        };
+      }
+    }
+  }
+
+  private static readonly MAX_PAGES = 3;
+  private static readonly MAX_DEPTH = 1;
+  private static readonly MAX_RETRIES = 3;
+  private static readonly RETRY_DELAY = 2000; // 2 seconds
+  private static visitedUrls = new Set<string>();
+
+  private static async delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private static getContentType(url: string, $: cheerio.CheerioAPI): 'webpage' | 'video' | 'article' | 'product' {
@@ -507,53 +627,13 @@ Return a JSON object with:
     }
   }
 
-  static async analyzeUrl(url: string): Promise<AIAnalysis> {
+  private static isSameOrigin(baseUrl: string, urlToCheck: string): boolean {
     try {
-      const normalizedUrl = this.normalizeUrl(url);
-      if (!this.isValidUrl(normalizedUrl)) {
-        throw new Error('Invalid URL format');
-      }
-
-      console.log(`[Analysis] Starting analysis of: ${normalizedUrl}`);
-      const pages = await this.crawlWebsite(normalizedUrl);
-
-      console.log(`[Analysis] Crawled ${pages.length} pages from ${normalizedUrl}`);
-
-      if (!pages.length) {
-        // Create fallback analysis from URL
-        const urlParts = new URL(normalizedUrl);
-        return {
-          title: urlParts.hostname,
-          description: `Website at ${urlParts.hostname}${urlParts.pathname} - Currently unavailable or restricted access`,
-          tags: ['archived', 'unavailable'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
-        };
-      }
-
-      return await this.analyzeWithRetry(normalizedUrl, pages);
-    } catch (error) {
-      console.error('[Analysis] Error in analyzeUrl:', error);
-
-      // Create meaningful fallback analysis
-      try {
-        const urlParts = new URL(url);
-        return {
-          title: urlParts.hostname,
-          description: `Website at ${urlParts.hostname} - ${error instanceof Error ? error.message : 'Access error'}`,
-          tags: ['error', 'unavailable'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
-        };
-      } catch {
-        return {
-          title: 'Invalid URL',
-          description: 'The provided URL could not be processed',
-          tags: ['error', 'invalid'],
-          isLandingPage: false,
-          mainTopic: 'unknown'
-        };
-      }
+      const base = new URL(baseUrl);
+      const check = new URL(urlToCheck);
+      return base.origin === check.origin;
+    } catch {
+      return false;
     }
   }
 }
