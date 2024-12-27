@@ -109,8 +109,8 @@ export class AIService {
                    'Untitled Page';
 
       const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
-                            $('meta[name="description"]').attr('content')?.trim() ||
-                            '';
+                           $('meta[name="description"]').attr('content')?.trim() ||
+                           '';
 
       // Identify main content area
       const contentSelectors = [
@@ -208,23 +208,25 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: `You are an expert website analyzer. Analyze the content and provide a comprehensive analysis focused on the main purpose and value of the page.`
+            content: `You are an expert content analyzer. Your task is to analyze web content and provide detailed, accurate analysis focusing on the main purpose and value of the page. Always return a complete analysis with all requested fields.`
           },
           {
             role: "user",
-            content: `Analyze this page content:
+            content: `Analyze this web content:
 
 URL: ${pageContent.url}
 Title: ${pageContent.title}
 Type: ${pageContent.type}
 Content: ${pageContent.content}
 
-Return a JSON object with:
-- title: Clear, concise website purpose (max 60 chars)
-- description: Detailed analysis based on content type (max 200 chars)
-- tags: 3-5 relevant tags for content type, purpose, and target audience
-- isLandingPage: boolean indicating if this is a focused landing page
-- mainTopic: primary topic or purpose`
+Return a JSON object with these fields:
+{
+  "title": "Clear, concise title (max 60 chars)",
+  "description": "Detailed summary of the content (max 200 chars)",
+  "tags": ["3-5 relevant tags"],
+  "isLandingPage": boolean,
+  "mainTopic": "primary topic or purpose"
+}`
           },
         ],
         temperature: 0.3,
@@ -236,6 +238,7 @@ Return a JSON object with:
         throw new Error("No response from OpenAI");
       }
 
+      console.log(`[Analysis] Raw analysis result:`, result);
       const analysis = JSON.parse(result);
 
       return {
