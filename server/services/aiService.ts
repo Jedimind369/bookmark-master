@@ -48,12 +48,17 @@ export class AIService {
 
   private static normalizeUrl(url: string): string {
     try {
+      // Handle case where URL starts with http:// by upgrading to https://
+      if (url.startsWith('http://')) {
+        url = 'https://' + url.slice(7);
+      }
+      // Add https:// if no protocol is present
+      if (!url.startsWith('http')) {
+        url = 'https://' + url;
+      }
       const parsedUrl = new URL(url);
       return parsedUrl.toString().replace(/\/$/, '');
-    } catch {
-      if (!url.startsWith('http')) {
-        return this.normalizeUrl(`https://${url}`);
-      }
+    } catch (error) {
       throw new Error('Invalid URL format');
     }
   }
