@@ -6,6 +6,7 @@ if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is not set");
 }
 
+// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -25,8 +26,8 @@ interface PageContent {
 }
 
 export class AIService {
-  private static readonly MAX_PAGES = 5;
-  private static readonly MAX_DEPTH = 2;
+  private static readonly MAX_PAGES = 3; // Reduced from 5 to optimize for mini model
+  private static readonly MAX_DEPTH = 1; // Reduced from 2 to optimize for mini model
   private static visitedUrls = new Set<string>();
 
   private static isValidUrl(urlString: string): boolean {
@@ -41,10 +42,8 @@ export class AIService {
   private static normalizeUrl(url: string): string {
     try {
       const parsedUrl = new URL(url);
-      // Remove trailing slashes and normalize to https if available
       return parsedUrl.toString().replace(/\/$/, '');
     } catch {
-      // If URL parsing fails, try prepending https://
       if (!url.startsWith('http')) {
         return this.normalizeUrl(`https://${url}`);
       }
@@ -123,7 +122,8 @@ export class AIService {
           .filter(Boolean)
           .join('\n\n')
           .replace(/\s+/g, ' ')
-          .trim(),
+          .trim()
+          .slice(0, 1000), // Reduced content length for mini model
         links: Array.from(new Set(links))
       };
     } catch (error) {
@@ -152,14 +152,14 @@ export class AIService {
         if (depth < this.MAX_DEPTH) {
           const newLinks = pageContent.links
             .filter(link => !this.visitedUrls.has(link))
-            .slice(0, 10); // Limit number of links per page
+            .slice(0, 5); // Reduced from 10 for mini model
 
           for (const link of newLinks) {
             queue.push({ url: link, depth: depth + 1 });
           }
         }
 
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Longer delay between requests
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
         console.error(`Error crawling ${url}:`, error);
         continue;
@@ -172,30 +172,29 @@ export class AIService {
   private static async analyzeContent(startUrl: string, pages: PageContent[]): Promise<AIAnalysis> {
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o", // Using the newer GPT-4o model
         response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
-            content: "You are a specialized website analyzer. Analyze multiple pages from a website and provide a comprehensive understanding of the website's true purpose, main features, and target audience. Provide output in English, even if the original content is in another language. Focus on understanding the website's core purpose and value proposition.",
+            content: "You are a website analyzer. Analyze the pages and provide a concise summary of the website's purpose and key features. Keep responses brief but informative."
           },
           {
             role: "user",
-            content: `Analyze these pages from the website ${startUrl} and provide a comprehensive understanding:
+            content: `Analyze these pages from ${startUrl} and provide insights:
 
 ${pages.map(page => `
 URL: ${page.url}
 Title: ${page.title}
-Description: ${page.description}
-Content: ${page.content.slice(0, 1500)}
+Content: ${page.content.slice(0, 500)}
 ---`).join('\n')}
 
 Return a JSON object with:
-- title: A clear, concise title that describes the website's main purpose (max 60 chars)
-- description: A comprehensive summary of the website's purpose, features, and target audience (max 300 chars)
-- tags: 5-7 relevant tags, including purpose, industry, target audience, and key features
+- title: Clear, concise website purpose (max 60 chars)
+- description: Website's purpose and target audience (max 200 chars)
+- tags: 3-5 relevant tags for purpose and features
 
-Use this exact JSON structure:
+Use this structure:
 {
   "title": string,
   "description": string,
@@ -204,7 +203,7 @@ Use this exact JSON structure:
           },
         ],
         temperature: 0.3,
-        max_tokens: 1000,
+        max_tokens: 500,
       });
 
       const result = response.choices[0]?.message?.content;
@@ -214,7 +213,6 @@ Use this exact JSON structure:
 
       const analysis = JSON.parse(result);
 
-      // Validate and clean up the response
       if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
         console.error('Invalid OpenAI response format:', result);
         throw new Error("Invalid response format");
@@ -222,8 +220,8 @@ Use this exact JSON structure:
 
       return {
         title: analysis.title.slice(0, 60),
-        description: analysis.description.slice(0, 300),
-        tags: analysis.tags.slice(0, 7).map((tag: string) => tag.toLowerCase()),
+        description: analysis.description.slice(0, 200),
+        tags: analysis.tags.slice(0, 5).map((tag: string) => tag.toLowerCase()),
       };
     } catch (error) {
       console.error('Error analyzing content:', error);
