@@ -43,6 +43,8 @@ export const BookmarkEnrichment = () => {
             if (status.processedCount === status.totalCount || 
                 (prev.processedCount === status.processedCount && prev.processedCount > 0)) {
               clearInterval(pollInterval);
+              // Force refetch bookmarks to get updated data
+              queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
               return { ...status, status: "completed" };
             }
             return status;
@@ -50,6 +52,8 @@ export const BookmarkEnrichment = () => {
 
           if (status.status === "completed") {
             clearInterval(pollInterval);
+            // Force refetch bookmarks to get updated data
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
             queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
             queryClient.invalidateQueries({ queryKey: ["/api/bookmarks/enrich/count"] });
             toast({
