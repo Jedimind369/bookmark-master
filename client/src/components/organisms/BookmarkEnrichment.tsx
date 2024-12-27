@@ -33,7 +33,7 @@ export const BookmarkEnrichment = () => {
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
 
-    if (enrichmentStatus.status === "processing") {
+    if (enrichmentStatus.status === "processing" || enrichmentStatus.status === "completed") {
       pollInterval = setInterval(async () => {
         try {
           const response = await fetch("/api/bookmarks/enrich/status");
@@ -104,9 +104,11 @@ export const BookmarkEnrichment = () => {
             <Progress value={progress} className="w-[200px]" />
             <span className="text-sm text-muted-foreground">
               {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} enriched
-              {enrichmentStatus.status === "completed" && " (Completed)"}
+              {enrichmentStatus.status === "completed" ? " (Completed)" : ""}
             </span>
-            {enrichmentStatus.status === "processing" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {enrichmentStatus.status === "processing" && enrichmentStatus.processedCount < enrichmentStatus.totalCount && 
+              <Loader2 className="h-4 w-4 animate-spin" />
+            }
           </AlertDescription>
         </Alert>
       );
