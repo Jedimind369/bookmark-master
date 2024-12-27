@@ -12,13 +12,20 @@ export function registerRoutes(app: Express): Server {
     try {
       const { url } = req.body;
       if (!url) {
-        return res.status(400).json({ error: 'URL is required' });
+        return res.status(400).json({ message: 'URL is required' });
       }
+
+      console.log(`[Analysis] Analyzing URL: ${url}`);
       const analysis = await AIService.analyzeUrl(url);
+      console.log(`[Analysis] Analysis complete:`, analysis);
+
       res.json(analysis);
     } catch (error) {
-      console.error('Error analyzing URL:', error);
-      res.status(500).json({ error: 'Failed to analyze URL' });
+      console.error('[Analysis] Error analyzing URL:', error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : 'Failed to analyze URL',
+        error: true 
+      });
     }
   });
 
@@ -39,7 +46,7 @@ export function registerRoutes(app: Express): Server {
       console.log("[Enrichment] Starting enrichment process");
       const result = await BookmarkModel.enrichAllBookmarks();
       if (result) {
-        res.json({ message: "Enrichment process started successfully" });
+        res.json({ message: "Enrichment process started successfully", count: result });
       } else {
         res.status(500).json({ message: "Failed to start enrichment process" });
       }
@@ -66,7 +73,18 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Rest of your routes...
+  // Create new bookmark
+  app.post("/api/bookmarks", async (req, res) => {
+    try {
+      const result = await BookmarkModel.create(req.body);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating bookmark:", error);
+      res.status(500).json({ message: "Failed to create bookmark" });
+    }
+  });
+
+  // Get all bookmarks
   app.get("/api/bookmarks", async (req, res) => {
     try {
       const bookmarks = await BookmarkModel.findAll();
@@ -76,8 +94,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Failed to fetch bookmarks" });
     }
   });
-
-  // Add other existing routes here...
 
   const httpServer = createServer(app);
   return httpServer;
