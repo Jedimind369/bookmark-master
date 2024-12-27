@@ -96,7 +96,7 @@ export const BookmarkEnrichment = () => {
   });
 
   const getProgressStatus = () => {
-    if (enrichmentStatus.status === "processing") {
+    if (enrichmentStatus.status === "processing" || enrichmentStatus.status === "completed") {
       const progress = Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100);
       return (
         <Alert>
@@ -105,7 +105,7 @@ export const BookmarkEnrichment = () => {
             <span className="text-sm text-muted-foreground">
               {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} enriched
             </span>
-            <Loader2 className="h-4 w-4 animate-spin" />
+            {enrichmentStatus.status === "processing" && <Loader2 className="h-4 w-4 animate-spin" />}
           </AlertDescription>
         </Alert>
       );
