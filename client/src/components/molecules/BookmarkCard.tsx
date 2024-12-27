@@ -49,9 +49,11 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete, onRefresh }: Bookmark
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-          {bookmark.analysis?.summary || bookmark.description || 'No description available'}
-        </p>
+        <div className="text-sm text-muted-foreground">
+          {bookmark.description && !bookmark.description.includes('Failed to fetch') 
+            ? bookmark.description 
+            : 'Unable to fetch details at this time'}
+        </div>
         <div className="flex flex-wrap gap-2">
           {combinedTags.map((tag) => (
             <Tag key={tag} text={tag} />
