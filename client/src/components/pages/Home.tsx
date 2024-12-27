@@ -34,7 +34,6 @@ export const Home = () => {
       return response.json();
     },
     onMutate: (bookmark) => {
-      // Optimistically update the UI
       const previousBookmarks = queryClient.getQueryData(["/api/bookmarks"]);
       queryClient.setQueryData(["/api/bookmarks"], (old: Bookmark[] | undefined) => {
         if (!old) return old;
@@ -56,7 +55,6 @@ export const Home = () => {
       });
     },
     onError: (error, _, context) => {
-      // Revert to the previous state on failure
       if (context?.previousBookmarks) {
         queryClient.setQueryData(["/api/bookmarks"], context.previousBookmarks);
       }
@@ -69,31 +67,6 @@ export const Home = () => {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
     }
-  });
-
-  const purgeMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/bookmarks/purge", {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to purge bookmarks");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      toast({
-        title: "Success",
-        description: "All bookmarks have been purged",
-      });
-      setIsPurgeDialogOpen(false);
-    },
-    onError: () => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to purge bookmarks",
-      });
-    },
   });
 
   const createMutation = useMutation({
@@ -115,11 +88,11 @@ export const Home = () => {
       });
       handleCloseForm();
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create bookmark",
+        description: error instanceof Error ? error.message : "Failed to create bookmark",
       });
     },
   });
@@ -128,13 +101,26 @@ export const Home = () => {
     mutationFn: async (data: UpdateBookmarkDto) => {
       console.log(`[Update] Updating bookmark ${data.id}:`, data);
 
+      // Convert dates to ISO strings if they exist
+      const normalizedData = {
+        ...data,
+        dateModified: new Date(), // Send as Date object
+        tags: Array.isArray(data.tags) ? data.tags : [],
+        collections: Array.isArray(data.collections) ? data.collections : [],
+      };
+
       // First update the bookmark data
       const response = await fetch(`/api/bookmarks/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(normalizedData),
       });
-      if (!response.ok) throw new Error("Failed to update bookmark");
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update bookmark");
+      }
+
       const updatedBookmark = await response.json();
 
       // Then trigger a reanalysis
@@ -157,11 +143,11 @@ export const Home = () => {
       });
       handleCloseForm();
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update bookmark",
+        description: error instanceof Error ? error.message : "Failed to update bookmark",
       });
     },
   });
@@ -181,11 +167,11 @@ export const Home = () => {
         description: "Bookmark deleted successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to delete bookmark",
+        description: error instanceof Error ? error.message : "Failed to delete bookmark",
       });
     },
   });
@@ -204,10 +190,7 @@ export const Home = () => {
     try {
       console.log('[Submit] Handling form submission:', data);
       if (data.id) {
-        await updateMutation.mutateAsync({
-          id: data.id,
-          ...data,
-        } as UpdateBookmarkDto);
+        await updateMutation.mutateAsync(data as UpdateBookmarkDto);
       } else {
         await createMutation.mutateAsync(data as CreateBookmarkDto);
       }
@@ -219,10 +202,6 @@ export const Home = () => {
         description: error instanceof Error ? error.message : "Failed to save bookmark",
       });
     }
-  };
-
-  const handlePurge = () => {
-    purgeMutation.mutate();
   };
 
   const handleRefresh = (bookmark: Bookmark) => {
@@ -237,14 +216,6 @@ export const Home = () => {
         <div className="flex gap-4">
           <BookmarkEnrichment />
           <BookmarkImport />
-          <Button
-            variant="outline"
-            onClick={() => setIsPurgeDialogOpen(true)}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Purge All
-          </Button>
           <Button onClick={() => setIsFormOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Bookmark
@@ -257,32 +228,6 @@ export const Home = () => {
         onDelete={(id) => deleteMutation.mutate(id)}
         onRefresh={handleRefresh}
       />
-
-      <Dialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Purge</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete all bookmarks? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsPurgeDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handlePurge}
-              disabled={purgeMutation.isPending}
-            >
-              {purgeMutation.isPending ? "Purging..." : "Purge All"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[600px]">
