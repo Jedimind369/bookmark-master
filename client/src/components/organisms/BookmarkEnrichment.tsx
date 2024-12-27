@@ -1,11 +1,11 @@
 
 import { useState, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Wand2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Wand2, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface EnrichmentStatus {
   processedCount: number;
@@ -52,6 +52,7 @@ export const BookmarkEnrichment = () => {
         } catch (error) {
           console.error("Error polling enrichment status:", error);
           clearInterval(pollInterval);
+          setEnrichmentStatus(prev => ({ ...prev, status: "error" }));
         }
       }, 2000);
     }
@@ -93,17 +94,29 @@ export const BookmarkEnrichment = () => {
   });
 
   const getProgressStatus = () => {
+    if (enrichmentStatus.status === "error") {
+      return (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Failed to process bookmarks. Please try again.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
     if (enrichmentStatus.status === "processing" || enrichmentStatus.status === "completed") {
       const progress = Math.round((enrichmentStatus.processedCount / enrichmentStatus.totalCount) * 100);
+      const isComplete = enrichmentStatus.status === "completed" || enrichmentStatus.processedCount >= enrichmentStatus.totalCount;
+      
       return (
         <Alert>
           <AlertDescription className="flex items-center gap-4">
             <Progress value={progress} className="w-[200px]" />
             <span className="text-sm text-muted-foreground">
               {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} enriched
-              {enrichmentStatus.status === "completed" ? " (Completed)" : ""}
+              {isComplete ? " (Completed)" : ""}
             </span>
-            {enrichmentStatus.status === "processing" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
           </AlertDescription>
         </Alert>
       );
