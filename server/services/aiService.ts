@@ -16,38 +16,128 @@ export interface AIAnalysis {
   tags: string[];
 }
 
+interface PageContent {
+  url: string;
+  title: string;
+  description: string;
+  content: string;
+  links: string[];
+}
+
 export class AIService {
-  static async fetchUrlContent(url: string): Promise<string> {
+  private static readonly MAX_PAGES = 5;
+  private static readonly MAX_DEPTH = 2;
+  private static visitedUrls = new Set<string>();
+
+  private static isValidUrl(urlString: string): boolean {
+    try {
+      const url = new URL(urlString);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  private static isSameOrigin(baseUrl: string, urlToCheck: string): boolean {
+    try {
+      const base = new URL(baseUrl);
+      const check = new URL(urlToCheck);
+      return base.origin === check.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  private static async fetchPage(url: string): Promise<PageContent> {
     try {
       const response = await fetch(url);
       const html = await response.text();
       const $ = cheerio.load(html);
 
-      // Remove scripts, styles, and other non-content elements
+      // Remove non-content elements
       $('script').remove();
       $('style').remove();
       $('nav').remove();
       $('footer').remove();
+      $('iframe').remove();
+      $('noscript').remove();
 
-      // Get the main content
-      const title = $('title').text() || '';
-      const description = $('meta[name="description"]').attr('content') || '';
+      // Extract key content
+      const title = $('title').text().trim() || '';
+      const metaDescription = $('meta[name="description"]').attr('content')?.trim() || '';
+      const h1 = $('h1').first().text().trim();
       const mainContent = $('main, article, #content, .content').text() || $('body').text();
 
-      // Combine and clean the text
-      const content = `${title}\n${description}\n${mainContent}`
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 2000); // Allow slightly more content for better analysis
+      // Extract navigation links for deeper crawling
+      const links = $('a[href]')
+        .map((_, el) => $(el).attr('href'))
+        .get()
+        .filter(href => href && !href.startsWith('#') && !href.startsWith('javascript:'))
+        .map(href => {
+          try {
+            return new URL(href, url).toString();
+          } catch {
+            return null;
+          }
+        })
+        .filter((url): url is string => url !== null && this.isSameOrigin(url, url));
 
-      return content;
+      return {
+        url,
+        title,
+        description: metaDescription,
+        content: [
+          title,
+          h1,
+          metaDescription,
+          mainContent
+        ].filter(Boolean).join('\n\n'),
+        links: Array.from(new Set(links))
+      };
     } catch (error) {
-      console.error('Error fetching URL content:', error);
-      throw new Error('Failed to fetch URL content');
+      console.error(`Error fetching ${url}:`, error);
+      throw new Error(`Failed to fetch page: ${url}`);
     }
   }
 
-  static async analyzeContent(url: string, content: string): Promise<AIAnalysis> {
+  private static async crawlWebsite(startUrl: string): Promise<PageContent[]> {
+    const pages: PageContent[] = [];
+    const queue: { url: string; depth: number }[] = [{ url: startUrl, depth: 0 }];
+    this.visitedUrls.clear();
+
+    while (queue.length > 0 && pages.length < this.MAX_PAGES) {
+      const { url, depth } = queue.shift()!;
+
+      if (this.visitedUrls.has(url) || depth > this.MAX_DEPTH) {
+        continue;
+      }
+
+      try {
+        const pageContent = await this.fetchPage(url);
+        pages.push(pageContent);
+        this.visitedUrls.add(url);
+
+        // Add child pages to queue
+        if (depth < this.MAX_DEPTH) {
+          for (const link of pageContent.links) {
+            if (!this.visitedUrls.has(link)) {
+              queue.push({ url: link, depth: depth + 1 });
+            }
+          }
+        }
+
+        // Add a small delay between requests
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Error crawling ${url}:`, error);
+        continue;
+      }
+    }
+
+    return pages;
+  }
+
+  private static async analyzeContent(startUrl: string, pages: PageContent[]): Promise<AIAnalysis> {
     try {
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -55,19 +145,23 @@ export class AIService {
         messages: [
           {
             role: "system",
-            content: "You are a specialized content analyzer. Your task is to analyze web content in any language and provide metadata in English. Focus on extracting the core meaning and themes, regardless of the original language.",
+            content: "You are a specialized website analyzer. Your task is to analyze multiple pages from a website and provide a comprehensive understanding of the website's true purpose, main features, and target audience. Provide all output in English, regardless of the original language.",
           },
           {
             role: "user",
-            content: `Analyze this webpage content and translate/summarize into English:
+            content: `Analyze these pages from the website ${startUrl} and provide a comprehensive understanding:
 
-Content from URL ${url}:
-${content}
+${pages.map(page => `
+URL: ${page.url}
+Title: ${page.title}
+Description: ${page.description}
+Content: ${page.content.slice(0, 1000)}
+---`).join('\n')}
 
 Return a JSON object with:
-- title: A clear, concise English title (max 60 chars)
-- description: A brief English summary (max 150 chars)
-- tags: 3-5 relevant English tags, starting with the main category
+- title: A clear, concise title that describes the website's main purpose (max 60 chars)
+- description: A comprehensive summary of the website's purpose, features, and target audience (max 300 chars)
+- tags: 5-7 relevant tags, including purpose, industry, target audience, and key features
 
 Use this exact JSON structure:
 {
@@ -77,8 +171,8 @@ Use this exact JSON structure:
 }`
           },
         ],
-        temperature: 0.3, // Lower temperature for more consistent output
-        max_tokens: 500,
+        temperature: 0.3,
+        max_tokens: 1000,
       });
 
       const result = response.choices[0]?.message?.content;
@@ -96,8 +190,8 @@ Use this exact JSON structure:
 
       return {
         title: analysis.title.slice(0, 60),
-        description: analysis.description.slice(0, 150),
-        tags: analysis.tags.slice(0, 5).map(tag => tag.toLowerCase()),
+        description: analysis.description.slice(0, 300),
+        tags: analysis.tags.slice(0, 7).map(tag => tag.toLowerCase()),
       };
     } catch (error) {
       console.error('Error analyzing content:', error);
@@ -107,8 +201,16 @@ Use this exact JSON structure:
 
   static async analyzeUrl(url: string): Promise<AIAnalysis> {
     try {
-      const content = await this.fetchUrlContent(url);
-      return await this.analyzeContent(url, content);
+      if (!this.isValidUrl(url)) {
+        throw new Error('Invalid URL format');
+      }
+
+      const pages = await this.crawlWebsite(url);
+      if (pages.length === 0) {
+        throw new Error('Failed to fetch any pages from the website');
+      }
+
+      return await this.analyzeContent(url, pages);
     } catch (error) {
       console.error('Error in analyzeUrl:', error);
       throw new Error('Failed to analyze URL');
