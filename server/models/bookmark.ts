@@ -70,4 +70,39 @@ export class BookmarkModel {
       throw error;
     }
   }
+
+  static async bulkCreate(data: Array<Omit<InsertBookmark, "id" | "dateAdded">>) {
+    try {
+      const now = new Date();
+      const bookmarksToInsert = data.map(bookmark => ({
+        ...bookmark,
+        dateAdded: now,
+        tags: bookmark.tags || [],
+        collections: bookmark.collections || [],
+      }));
+
+      // Use batch size of 1000 for optimal performance
+      const batchSize = 1000;
+      const results = [];
+
+      for (let i = 0; i < bookmarksToInsert.length; i += batchSize) {
+        const batch = bookmarksToInsert.slice(i, i + batchSize);
+        const inserted = await db
+          .insert(bookmarks)
+          .values(batch)
+          .returning();
+        results.push(...inserted);
+
+        // Add a small delay between batches to prevent overwhelming the database
+        if (i + batchSize < bookmarksToInsert.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      return results;
+    } catch (error) {
+      console.error("Error bulk creating bookmarks:", error);
+      throw error;
+    }
+  }
 }

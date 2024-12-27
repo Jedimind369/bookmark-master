@@ -2,6 +2,16 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { BookmarkModel } from "./models/bookmark";
 import { insertBookmarkSchema } from "@db/schema";
+import { z } from "zod";
+
+// Schema for validating bookmark import data
+const importBookmarkSchema = z.object({
+  url: z.string().url(),
+  title: z.string(),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  collections: z.array(z.string()).optional(),
+}).array();
 
 export function registerRoutes(app: Express): Server {
   // Bookmark routes
@@ -60,6 +70,38 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Failed to delete bookmark:", error);
       res.status(500).json({ message: "Failed to delete bookmark" });
+    }
+  });
+
+  // Bulk import endpoint
+  app.post("/api/bookmarks/import", async (req, res) => {
+    try {
+      // Validate the incoming data
+      const bookmarks = importBookmarkSchema.parse(req.body);
+
+      // Check if the request is too large
+      if (bookmarks.length > 15000) {
+        return res.status(400).json({
+          message: "Import size too large. Maximum 15,000 bookmarks allowed per import."
+        });
+      }
+
+      // Process the import
+      const imported = await BookmarkModel.bulkCreate(bookmarks);
+
+      res.status(201).json({
+        message: `Successfully imported ${imported.length} bookmarks`,
+        count: imported.length
+      });
+    } catch (error) {
+      console.error("Failed to import bookmarks:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid bookmark data format",
+          errors: error.errors
+        });
+      }
+      res.status(500).json({ message: "Failed to import bookmarks" });
     }
   });
 
