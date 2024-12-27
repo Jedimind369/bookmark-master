@@ -18,19 +18,12 @@ export const bookmarks = pgTable("bookmarks", {
   description: text("description"),
   tags: jsonb("tags").$type<string[]>().default([]),
   collections: jsonb("collections").$type<string[]>().default([]),
-  userId: serial("user_id").references(() => users.id),
   dateAdded: timestamp("date_added").defaultNow(),
   dateModified: timestamp("date_modified"),
-  updateHistory: jsonb("update_history").$type<Array<{
-    timestamp: string;
-    changes: Record<string, any>;
-    previousState: Record<string, any>;
-  }>>().default([]),
   analysis: jsonb("analysis").$type<{
-    summary?: string;
-    credibilityScore?: number;
     status?: AnalysisStatus;
     lastUpdated?: string;
+    summary?: string;
     error?: string;
     retryable?: boolean;
     tags?: string[];

@@ -6,12 +6,14 @@ import { Toaster } from "@/components/ui/toaster";
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Switch>
-        <Route path="/" component={Home} />
-      </Switch>
-      <Toaster />
-    </QueryClientProvider>
+    <div className="min-h-screen bg-background">
+      <QueryClientProvider client={queryClient}>
+        <Switch>
+          <Route path="/" component={Home} />
+        </Switch>
+        <Toaster />
+      </QueryClientProvider>
+    </div>
   );
 }
 

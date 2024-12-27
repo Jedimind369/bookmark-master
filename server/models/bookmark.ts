@@ -310,18 +310,15 @@ export class BookmarkModel {
         const [updated] = await db
           .update(bookmarks)
           .set({
-            title: analysis.title || bookmark.title, // Use analyzed title if available
-            description: analysis.description || bookmark.description, // Use analyzed description if available
-            tags: analysis.tags || bookmark.tags || [], // Merge or use analyzed tags
+            title: analysis.title || bookmark.title,
+            description: analysis.description || bookmark.description,
+            tags: analysis.tags || bookmark.tags || [],
             analysis: {
               status: 'success' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
               summary: analysis.description,
               tags: analysis.tags,
-              title: analysis.title,
-              mainTopic: analysis.mainTopic,
-              isLandingPage: analysis.isLandingPage,
-              metadata: analysis.metadata
+              retryable: false
             },
             dateModified: new Date()
           })
