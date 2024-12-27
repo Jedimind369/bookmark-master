@@ -212,8 +212,8 @@ export class BookmarkModel {
         .from(bookmarks)
         .where(
           sql`analysis IS NULL OR 
-              analysis->>'status' IS NULL OR 
-              analysis->>'status' NOT IN ('success', 'error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')`
+              (analysis->>'status')::text IS NULL OR 
+              (analysis->>'status')::text = 'processing'`
         );
 
       return results.length;
@@ -247,8 +247,8 @@ export class BookmarkModel {
         .from(bookmarks)
         .where(
           sql`analysis IS NULL OR 
-              analysis->>'status' IS NULL OR 
-              analysis->>'status' NOT IN ('success', 'error', 'invalid_url', 'rate_limited', 'unreachable', 'system_error')`
+              (analysis->>'status')::text IS NULL OR 
+              (analysis->>'status')::text = 'processing'`
         );
 
       console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
