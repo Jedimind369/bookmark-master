@@ -170,168 +170,175 @@ export class AIService {
       // Take screenshot using puppeteer
       const puppeteer = await import('puppeteer');
       const browser = await puppeteer.launch({ 
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
         headless: 'new',
-        defaultViewport: {
-          width: 1920,
-          height: 1080
-        }
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
       });
 
-      const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-
-      // Set viewport for better screenshots
-      await page.setViewport({
-        width: 1920,
-        height: 1080,
-        deviceScaleFactor: 1,
-      });
-
-      // Navigate with timeout and error handling
       try {
-        await Promise.race([
-          page.goto(url, { 
-            waitUntil: ['networkidle0', 'domcontentloaded'],
-            timeout: 30000
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Navigation timeout')), 30000)
-          )
-        ]);
-      } catch (error) {
-        await browser.close();
-        throw new Error('unreachable');
-      }
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
-      // Wait for content to load
-      await page.evaluate(() => new Promise(resolve => {
-        let totalHeight = 0;
-        const distance = 100;
-        const timer = setInterval(() => {
-          const scrollHeight = document.body.scrollHeight;
-          window.scrollBy(0, distance);
-          totalHeight += distance;
-          if(totalHeight >= scrollHeight) {
-            clearInterval(timer);
-            resolve(true);
+        // Set viewport for better screenshots
+        await page.setViewport({
+          width: 1920,
+          height: 1080,
+          deviceScaleFactor: 1,
+        });
+
+        // Navigate with timeout and error handling
+        try {
+          const response = await Promise.race([
+            page.goto(url, { 
+              waitUntil: ['networkidle0', 'domcontentloaded'],
+              timeout: 30000
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Navigation timeout')), 30000)
+            )
+          ]);
+
+          if (!response) {
+            throw new Error('unreachable');
           }
-        }, 100);
-      }));
 
-      // Scroll back to top
-      await page.evaluate(() => window.scrollTo(0, 0));
-
-      // Take full page screenshot
-      const screenshot = await page.screenshot({ 
-        encoding: 'base64',
-        fullPage: true,
-        type: 'jpeg',
-        quality: 80
-      });
-
-      // Get HTML content
-      const html = await page.content();
-      await browser.close();
-
-      clearTimeout(timeoutId);
-
-      const $ = cheerio.load(html);
-
-      // Remove non-content elements
-      $('script').remove();
-      $('style').remove();
-      $('nav').remove();
-      $('footer').remove();
-      $('iframe').remove();
-      $('noscript').remove();
-      $('header').remove();
-      $('.cookie-banner').remove();
-      $('.advertisement').remove();
-      $('.social-media').remove();
-      $('[class*="cookie"]').remove();
-      $('[class*="banner"]').remove();
-      $('[class*="popup"]').remove();
-      $('[class*="modal"]').remove();
-      $('[role="complementary"]').remove();
-      $('[role="banner"]').remove();
-
-      // Extract key content with better fallbacks
-      const title = $('meta[property="og:title"]').attr('content')?.trim() ||
-                   $('title').text().trim() ||
-                   $('h1').first().text().trim() ||
-                   'Untitled Page';
-
-      const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
-                            $('meta[name="description"]').attr('content')?.trim() ||
-                            '';
-
-      // Identify main content area
-      const contentSelectors = [
-        'article',
-        '[role="main"]',
-        'main',
-        '#content',
-        '.content',
-        '.post-content',
-        '.article-content'
-      ];
-
-      let mainContent = '';
-      for (const selector of contentSelectors) {
-        const element = $(selector).first();
-        if (element.length) {
-          mainContent = element.text().trim();
-          break;
+          // Handle HTTP errors
+          if (response.status() >= 400) {
+            throw new Error(`HTTP ${response.status()}: ${response.statusText()}`);
+          }
+        } catch (error) {
+          throw new Error('unreachable');
         }
-      }
 
-      // Fallback to body if no main content found
-      if (!mainContent) {
-        mainContent = $('body').clone()
-          .children('nav,header,footer,aside')
-          .remove()
-          .end()
-          .text()
-          .trim();
-      }
+        // Wait for content to load
+        await page.evaluate(() => new Promise(resolve => {
+          let totalHeight = 0;
+          const distance = 100;
+          const timer = setInterval(() => {
+            const scrollHeight = document.body.scrollHeight;
+            window.scrollBy(0, distance);
+            totalHeight += distance;
+            if(totalHeight >= scrollHeight) {
+              clearInterval(timer);
+              resolve(true);
+            }
+          }, 100);
+        }));
 
-      // Extract navigation links for deeper crawling
-      const links = $('a[href]')
-        .map((_, el) => $(el).attr('href'))
-        .get()
-        .filter(href => href && !href.startsWith('#') && !href.startsWith('javascript:'))
-        .map(href => {
-          try {
-            return new URL(href, url).toString();
-          } catch {
-            return null;
+        // Scroll back to top
+        await page.scrollTo(0, 0);
+
+        // Take full page screenshot
+        const screenshot = await page.screenshot({ 
+          encoding: 'base64',
+          fullPage: true,
+          type: 'jpeg',
+          quality: 80
+        });
+
+        // Get HTML content
+        const html = await page.content();
+        clearTimeout(timeoutId);
+
+        const $ = cheerio.load(html);
+
+        // Remove non-content elements
+        $('script').remove();
+        $('style').remove();
+        $('nav').remove();
+        $('footer').remove();
+        $('iframe').remove();
+        $('noscript').remove();
+        $('header').remove();
+        $('.cookie-banner').remove();
+        $('.advertisement').remove();
+        $('.social-media').remove();
+        $('[class*="cookie"]').remove();
+        $('[class*="banner"]').remove();
+        $('[class*="popup"]').remove();
+        $('[class*="modal"]').remove();
+        $('[role="complementary"]').remove();
+        $('[role="banner"]').remove();
+
+        // Extract key content with better fallbacks
+        const title = $('meta[property="og:title"]').attr('content')?.trim() ||
+                     $('title').text().trim() ||
+                     $('h1').first().text().trim() ||
+                     'Untitled Page';
+
+        const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
+                              $('meta[name="description"]').attr('content')?.trim() ||
+                              '';
+
+        // Identify main content area
+        const contentSelectors = [
+          'article',
+          '[role="main"]',
+          'main',
+          '#content',
+          '.content',
+          '.post-content',
+          '.article-content'
+        ];
+
+        let mainContent = '';
+        for (const selector of contentSelectors) {
+          const element = $(selector).first();
+          if (element.length) {
+            mainContent = element.text().trim();
+            break;
           }
-        })
-        .filter((url): url is string => url !== null && this.isSameOrigin(url, url));
+        }
 
-      const contentType = this.getContentType(url, $);
-      const metadata = this.extractMetadata($);
+        // Fallback to body if no main content found
+        if (!mainContent) {
+          mainContent = $('body').clone()
+            .children('nav,header,footer,aside')
+            .remove()
+            .end()
+            .text()
+            .trim();
+        }
 
-      return {
-        url,
-        title,
-        description: metaDescription,
-        content: [title, metaDescription, mainContent]
-          .filter(Boolean)
-          .join('\n\n')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 2000),
-        links: Array.from(new Set(links)),
-        type: contentType,
-        screenshot: screenshot.toString(),
-        metadata
-      };
+        // Extract navigation links for deeper crawling
+        const links = $('a[href]')
+          .map((_, el) => $(el).attr('href'))
+          .get()
+          .filter(href => href && !href.startsWith('#') && !href.startsWith('javascript:'))
+          .map(href => {
+            try {
+              return new URL(href, url).toString();
+            } catch {
+              return null;
+            }
+          })
+          .filter((url): url is string => url !== null && this.isSameOrigin(url, url));
+
+        const contentType = this.getContentType(url, $);
+        const metadata = this.extractMetadata($);
+
+        return {
+          url,
+          title,
+          description: metaDescription,
+          content: [title, metaDescription, mainContent]
+            .filter(Boolean)
+            .join('\n\n')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 2000),
+          links: Array.from(new Set(links)),
+          type: contentType,
+          screenshot: screenshot.toString(),
+          metadata
+        };
+      } finally {
+        await browser.close();
+      }
     } catch (error) {
       console.error(`[Analysis] Error fetching ${url}:`, error);
 
-      // Don't retry DNS failures or unreachable sites
+      // Don't retry certain errors
       if (error instanceof Error && 
           (error.message === 'unreachable' || 
            (error as any).code === 'ENOTFOUND')) {
