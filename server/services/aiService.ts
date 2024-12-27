@@ -100,15 +100,18 @@ export class AIService {
         return this.handleVideoContent(url);
       }
 
+      const isHttps = url.startsWith('https://');
+      const agent = isHttps 
+        ? new (await import('node:https')).Agent({ rejectUnauthorized: false })
+        : new (await import('node:http')).Agent();
+
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)',
           'Accept-Language': '*'
         },
         signal: controller.signal,
-        agent: new (await import('node:https')).Agent({
-          rejectUnauthorized: false
-        })
+        agent
       });
 
       clearTimeout(timeoutId);
