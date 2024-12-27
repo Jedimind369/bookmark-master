@@ -46,12 +46,11 @@ export const BookmarkEnrichment = () => {
               queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
               return { ...status, status: "completed" };
             }
-            return status;
+            return { ...status, status: "processing" };
           });
 
           if (status.status === "completed") {
             clearInterval(pollInterval);
-            // Force refetch bookmarks to get updated data
             queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
             toast({
               title: "Success",
@@ -63,7 +62,7 @@ export const BookmarkEnrichment = () => {
           clearInterval(pollInterval);
           setEnrichmentStatus(prev => ({ ...prev, status: "error" }));
         }
-      }, 5000);
+      }, 2000); // Poll more frequently for smoother updates
     }
 
     return () => {
@@ -91,6 +90,10 @@ export const BookmarkEnrichment = () => {
         status: "processing",
         message: `Starting enrichment of ${data.count} bookmarks...`
       });
+      toast({
+        title: "Enrichment Started",
+        description: `Starting analysis of ${data.count} bookmarks...`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -105,7 +108,7 @@ export const BookmarkEnrichment = () => {
   const getProgressStatus = () => {
     if (enrichmentStatus.status === "error") {
       return (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="mt-4">
           <AlertDescription>
             Failed to process bookmarks. Please try again.
           </AlertDescription>
@@ -120,22 +123,30 @@ export const BookmarkEnrichment = () => {
                         progress >= 100;
 
       return (
-        <Alert>
+        <Alert className="mt-4">
           <AlertDescription className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Processed {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} bookmarks
-                {isComplete ? " (Completed)" : ""}
+              <div className="text-base font-medium text-primary">
+                {isComplete ? "Analysis Complete!" : "Analyzing Bookmarks..."}
               </div>
-              <div className="text-sm font-medium">
+              <div className="text-base font-medium">
                 {progress}%
               </div>
             </div>
-            <Progress value={progress} className="h-2" />
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
-              {enrichmentStatus.message || 
-                (isComplete ? "Analysis complete!" : "Analyzing bookmarks...")}
+            <Progress 
+              value={progress} 
+              className="h-3 transition-all" 
+            />
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
+                <span>
+                  Processed {enrichmentStatus.processedCount} of {enrichmentStatus.totalCount} bookmarks
+                </span>
+              </div>
+              <div className="text-xs">
+                {enrichmentStatus.message}
+              </div>
             </div>
           </AlertDescription>
         </Alert>
@@ -145,14 +156,24 @@ export const BookmarkEnrichment = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <Button 
-        variant="outline" 
+        variant={enrichmentStatus.status === "processing" ? "secondary" : "outline"}
         onClick={() => enrichMutation.mutate()}
         disabled={enrichMutation.isPending || enrichmentStatus.status === "processing" || enrichmentCount === 0}
+        className="relative"
       >
-        <Wand2 className="h-4 w-4 mr-2" />
-        Enrich Bookmarks {enrichmentCount ? `(${enrichmentCount})` : ''}
+        {enrichmentStatus.status === "processing" ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <Wand2 className="h-4 w-4 mr-2" />
+            Enrich Bookmarks {enrichmentCount ? `(${enrichmentCount})` : ''}
+          </>
+        )}
       </Button>
       {getProgressStatus()}
     </div>
