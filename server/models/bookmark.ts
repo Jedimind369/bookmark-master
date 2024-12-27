@@ -1,6 +1,6 @@
 import { db } from "@db";
 import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
-import { eq, sql, isNull } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
 export class BookmarkModel {
@@ -278,12 +278,16 @@ export class BookmarkModel {
         try {
           const analysis = await AIService.analyzeUrl(bookmark.url);
 
+          // Store successful analysis
           const [updated] = await db
             .update(bookmarks)
             .set({
               analysis: {
                 summary: analysis.description,
-                credibilityScore: 1.0 // Default score, can be enhanced later
+                credibilityScore: 1.0,
+                tags: analysis.tags,
+                lastUpdated: new Date().toISOString(),
+                status: 'success' as const
               }
             })
             .where(eq(bookmarks.id, bookmark.id))
@@ -292,31 +296,62 @@ export class BookmarkModel {
           return updated;
         } catch (error) {
           console.error(`Failed to analyze URL for bookmark ${bookmark.id}:`, error);
-          // Update the bookmark with error status but don't fail the whole process
+
+          // Categorize the error and store it appropriately
+          let errorSummary = "Failed to analyze this URL";
+          let errorStatus: 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error' = 'error';
+          let retryable = true;
+
+          if (error instanceof Error) {
+            if (error.message.includes('Invalid URL')) {
+              errorSummary = "Invalid URL format";
+              errorStatus = 'invalid_url';
+              retryable = false;
+            } else if (error.message.includes('rate limit')) {
+              errorSummary = "Rate limit exceeded";
+              errorStatus = 'rate_limited';
+              retryable = true;
+            } else if (error.message.includes('unreachable')) {
+              errorSummary = "Website unreachable";
+              errorStatus = 'unreachable';
+              retryable = true;
+            }
+          }
+
+          // Store error information
           const [updated] = await db
             .update(bookmarks)
             .set({
               analysis: {
-                summary: "Failed to analyze this URL",
-                credibilityScore: 0
+                summary: errorSummary,
+                credibilityScore: 0,
+                lastUpdated: new Date().toISOString(),
+                status: errorStatus,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                retryable
               }
             })
             .where(eq(bookmarks.id, bookmark.id))
             .returning();
+
           return updated;
         }
       }
       return bookmark;
     } catch (error) {
       console.error(`Failed to process bookmark ${bookmark.id}:`, error);
-      // Mark the bookmark as processed with error to prevent retrying
+      // Mark the bookmark as processed with error
       try {
         const [updated] = await db
           .update(bookmarks)
           .set({
             analysis: {
               summary: "Error processing bookmark",
-              credibilityScore: 0
+              credibilityScore: 0,
+              lastUpdated: new Date().toISOString(),
+              status: 'system_error' as const,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              retryable: true
             }
           })
           .where(eq(bookmarks.id, bookmark.id))

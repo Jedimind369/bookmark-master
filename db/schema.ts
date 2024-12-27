@@ -19,6 +19,11 @@ export const bookmarks = pgTable("bookmarks", {
   analysis: jsonb("analysis").$type<{
     summary?: string;
     credibilityScore?: number;
+    status?: 'success' | 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error';
+    lastUpdated?: string;
+    error?: string;
+    retryable?: boolean;
+    tags?: string[];
   }>(),
 });
 

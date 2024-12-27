@@ -23,12 +23,19 @@ interface PageContent {
   description: string;
   content: string;
   links: string[];
+  type?: 'webpage' | 'video' | 'article';
 }
 
 export class AIService {
-  private static readonly MAX_PAGES = 3; // Reduced from 5 to optimize for mini model
-  private static readonly MAX_DEPTH = 1; // Reduced from 2 to optimize for mini model
+  private static readonly MAX_PAGES = 3;
+  private static readonly MAX_DEPTH = 1;
+  private static readonly MAX_RETRIES = 3;
+  private static readonly RETRY_DELAY = 2000; // 2 seconds
   private static visitedUrls = new Set<string>();
+
+  private static async delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 
   private static isValidUrl(urlString: string): boolean {
     try {
@@ -61,14 +68,42 @@ export class AIService {
     }
   }
 
-  private static async fetchPage(url: string): Promise<PageContent> {
+  private static getContentType(url: string): 'webpage' | 'video' | 'article' {
+    const urlObj = new URL(url);
+    if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+      return 'video';
+    }
+    // Add more video platforms as needed
+    if (urlObj.hostname.includes('vimeo.com') || urlObj.hostname.includes('dailymotion.com')) {
+      return 'video';
+    }
+    // Check for common article/blog platforms
+    if (urlObj.hostname.includes('medium.com') || urlObj.hostname.includes('wordpress.com')) {
+      return 'article';
+    }
+    return 'webpage';
+  }
+
+  private static async fetchWithRetry(url: string, retries = 0): Promise<PageContent> {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const contentType = this.getContentType(url);
+      if (contentType === 'video') {
+        clearTimeout(timeoutId);
+        return this.handleVideoContent(url);
+      }
+
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)',
           'Accept-Language': '*'
-        }
+        },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -92,10 +127,11 @@ export class AIService {
       // Extract key content with better fallbacks
       const title = $('title').text().trim() || 
                    $('meta[property="og:title"]').attr('content')?.trim() || 
-                   $('h1').first().text().trim() || '';
+                   $('h1').first().text().trim() || 
+                   'Untitled Page';
 
       const metaDescription = $('meta[name="description"]').attr('content')?.trim() || 
-                             $('meta[property="og:description"]').attr('content')?.trim() || '';
+                            $('meta[property="og:description"]').attr('content')?.trim() || '';
 
       const mainContent = $('main, article, #content, .content, [role="main"]').text() || 
                          $('body').clone().children('nav,header,footer,aside').remove().end().text();
@@ -123,13 +159,43 @@ export class AIService {
           .join('\n\n')
           .replace(/\s+/g, ' ')
           .trim()
-          .slice(0, 1000), // Reduced content length for mini model
-        links: Array.from(new Set(links))
+          .slice(0, 1000),
+        links: Array.from(new Set(links)),
+        type: contentType
       };
     } catch (error) {
-      console.error(`Error fetching ${url}:`, error);
-      throw new Error(`Failed to fetch page: ${url}`);
+      if (retries < this.MAX_RETRIES) {
+        console.warn(`Retry ${retries + 1} for ${url}:`, error);
+        await this.delay(this.RETRY_DELAY * Math.pow(2, retries));
+        return this.fetchWithRetry(url, retries + 1);
+      }
+      throw new Error(`Failed to fetch page after ${this.MAX_RETRIES} retries: ${url}`);
     }
+  }
+
+  private static async handleVideoContent(url: string): Promise<PageContent> {
+    // Extract video ID and basic info from URL
+    const urlObj = new URL(url);
+    let videoId = '';
+    let platform = '';
+
+    if (urlObj.hostname.includes('youtube.com')) {
+      videoId = urlObj.searchParams.get('v') || '';
+      platform = 'YouTube';
+    } else if (urlObj.hostname === 'youtu.be') {
+      videoId = urlObj.pathname.slice(1);
+      platform = 'YouTube';
+    }
+    // Add more video platforms as needed
+
+    return {
+      url,
+      title: `${platform} Video`,
+      description: `A video hosted on ${platform}`,
+      content: `This is a ${platform} video with ID: ${videoId}`,
+      links: [],
+      type: 'video'
+    };
   }
 
   private static async crawlWebsite(startUrl: string): Promise<PageContent[]> {
@@ -145,21 +211,21 @@ export class AIService {
       }
 
       try {
-        const pageContent = await this.fetchPage(url);
+        const pageContent = await this.fetchWithRetry(url);
         pages.push(pageContent);
         this.visitedUrls.add(url);
 
         if (depth < this.MAX_DEPTH) {
           const newLinks = pageContent.links
             .filter(link => !this.visitedUrls.has(link))
-            .slice(0, 5); // Reduced from 10 for mini model
+            .slice(0, 5);
 
           for (const link of newLinks) {
             queue.push({ url: link, depth: depth + 1 });
           }
         }
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await this.delay(1000); // Rate limiting
       } catch (error) {
         console.error(`Error crawling ${url}:`, error);
         continue;
@@ -169,10 +235,10 @@ export class AIService {
     return pages;
   }
 
-  private static async analyzeContent(startUrl: string, pages: PageContent[]): Promise<AIAnalysis> {
+  private static async analyzeWithRetry(startUrl: string, pages: PageContent[], retries = 0): Promise<AIAnalysis> {
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o", // Using the newer GPT-4o model
+        model: "gpt-4o",
         response_format: { type: "json_object" },
         messages: [
           {
@@ -187,6 +253,7 @@ ${pages.map(page => `
 URL: ${page.url}
 Title: ${page.title}
 Content: ${page.content.slice(0, 500)}
+Type: ${page.type || 'webpage'}
 ---`).join('\n')}
 
 Return a JSON object with:
@@ -214,8 +281,7 @@ Use this structure:
       const analysis = JSON.parse(result);
 
       if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
-        console.error('Invalid OpenAI response format:', result);
-        throw new Error("Invalid response format");
+        throw new Error("Invalid response format from OpenAI");
       }
 
       return {
@@ -224,8 +290,13 @@ Use this structure:
         tags: analysis.tags.slice(0, 5).map((tag: string) => tag.toLowerCase()),
       };
     } catch (error) {
-      console.error('Error analyzing content:', error);
-      throw new Error('Failed to analyze content');
+      if (retries < this.MAX_RETRIES && 
+          (error instanceof Error && error.message.includes('rate limit'))) {
+        console.warn(`Retry ${retries + 1} for analysis:`, error);
+        await this.delay(this.RETRY_DELAY * Math.pow(2, retries));
+        return this.analyzeWithRetry(startUrl, pages, retries + 1);
+      }
+      throw error;
     }
   }
 
@@ -244,10 +315,21 @@ Use this structure:
       }
 
       console.log(`Successfully crawled ${pages.length} pages from ${normalizedUrl}`);
-      return await this.analyzeContent(normalizedUrl, pages);
+      return await this.analyzeWithRetry(normalizedUrl, pages);
     } catch (error) {
       console.error('Error in analyzeUrl:', error);
-      throw new Error('Failed to analyze URL');
+
+      // Return a structured error response that can be stored in the database
+      if (error instanceof Error) {
+        if (error.message.includes('Invalid URL')) {
+          throw new Error('Invalid URL format: Please provide a valid http:// or https:// URL');
+        } else if (error.message.includes('rate limit')) {
+          throw new Error('Service temporarily unavailable: Rate limit exceeded, please try again later');
+        } else if (error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
+          throw new Error('Website unreachable: The URL provided could not be accessed');
+        }
+      }
+      throw new Error('Analysis failed: Unable to process the website content');
     }
   }
 }
