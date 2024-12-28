@@ -294,10 +294,25 @@ export class AIService {
           : url.split('/').pop();
 
         // Get video details from YouTube API
+        // Configure YouTube API with quotas and restrictions
+        const youtube = google.youtube({
+          version: 'v3',
+          auth: process.env.YOUTUBE_API_KEY,
+          quotaUser: 'bookmark-analyzer', // Identifies your application
+          userIp: req?.ip, // Optional IP-based quota
+          // Restrict API key usage
+          headers: {
+            'Referer': 'https://replit.com',
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+
         const videoData = await youtube.videos.list({
-          key: process.env.YOUTUBE_API_KEY,
           part: ['snippet', 'statistics', 'contentDetails'],
-          id: [videoId]
+          id: [videoId],
+          // Add quota limits
+          maxResults: 1,
+          fields: 'items(snippet,statistics,contentDetails)'
         });
 
         const video = videoData.data.items?.[0];
