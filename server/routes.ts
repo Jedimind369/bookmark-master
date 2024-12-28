@@ -271,14 +271,22 @@ export function registerRoutes(app: Express): Server {
     try {
       const bookmarks = await BookmarkModel.findAll();
       const total = bookmarks.length;
+      const processed = bookmarks.filter(b => b.analysis?.status === 'success').length;
       const healthy = bookmarks.filter(b => 
         b.analysis?.status === 'success' && 
         b.analysis?.contentQuality?.overallScore >= 0.6
       ).length;
+      const failed = bookmarks.filter(b => b.analysis?.status === 'error').length;
+      const unanalyzed = bookmarks.filter(b => !b.analysis).length;
+      const lowQuality = processed - healthy;
       
       res.json({
         total,
         healthy,
+        processed,
+        failed,
+        unanalyzed,
+        lowQuality,
         percentage: total > 0 ? Math.round((healthy / total) * 100) : 0
       });
     } catch (error) {

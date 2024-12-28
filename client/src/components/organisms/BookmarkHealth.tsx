@@ -19,11 +19,30 @@ export const BookmarkHealth = () => {
         <CardTitle className="text-sm font-medium">Bookmark Health</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col gap-2">
-          <Progress value={health?.percentage || 0} className="h-2" />
-          <p className="text-xs text-muted-foreground">
-            {health?.healthy || 0} of {health?.total || 0} bookmarks are healthy ({health?.percentage || 0}%)
-          </p>
+        <div className="flex flex-col gap-4">
+          <div>
+            <Progress value={health?.percentage || 0} className="h-2" />
+            <p className="text-xs text-muted-foreground mt-1">
+              {health?.healthy || 0} of {health?.total || 0} bookmarks are healthy ({health?.percentage || 0}%)
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p>Processing Status:</p>
+              <ul className="text-xs text-muted-foreground">
+                <li>✓ Processed: {health?.processed || 0}</li>
+                <li>⚠ Failed: {health?.failed || 0}</li>
+                <li>⏳ Unanalyzed: {health?.unanalyzed || 0}</li>
+              </ul>
+            </div>
+            <div>
+              <p>Quality Status:</p>
+              <ul className="text-xs text-muted-foreground">
+                <li>✓ High Quality: {health?.healthy || 0}</li>
+                <li>⚠ Low Quality: {health?.lowQuality || 0}</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

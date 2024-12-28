@@ -214,15 +214,27 @@ export const Home = () => {
 
   return (
     <div className="container mx-auto py-8 px-4">
-      <div className="flex justify-between items-center mb-8">
-        <div className="space-y-4">
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Bookmarks</h1>
-          <BookmarkHealth />
+          <div className="flex gap-4">
+            <BookmarkEnrichment />
+            <BookmarkImport />
+            <Button
+              variant="outline"
+              onClick={() => setIsPurgeDialogOpen(true)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Purge All
+            </Button>
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Bookmark
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Bookmark
-        </Button>
+        <BookmarkHealth />
       </div>
 
       <BookmarkList
