@@ -316,11 +316,12 @@ Content: ${pageContent.content.slice(0, 2000)}`
         }]
       });
 
-      if (!response.content[0] || typeof response.content[0].text !== 'string') {
+      // Access content directly from the response
+      const analysisText = response.content[0].text;
+
+      if (!analysisText) {
         throw new Error('Invalid response from AI analysis');
       }
-
-      const analysisText = response.content[0].text.trim();
 
       // Save AI response for debugging
       await this.saveDebugInfo(normalizedUrl, { response: analysisText }, 'ai_response');
@@ -332,7 +333,7 @@ Content: ${pageContent.content.slice(0, 2000)}`
         return {
           title: (analysis.title || pageContent.title).slice(0, 60),
           description: (analysis.description || pageContent.description).slice(0, 160),
-          tags: (analysis.tags || []).slice(0, 5).map(tag => tag.toLowerCase()),
+          tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
           contentQuality: {
             relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
             informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
