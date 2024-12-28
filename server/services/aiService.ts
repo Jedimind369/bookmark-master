@@ -316,8 +316,8 @@ Content: ${pageContent.content.slice(0, 2000)}`
         }]
       });
 
-      // Access content directly from the response
-      const analysisText = response.content[0].text;
+      // Get the content from the response
+      const analysisText = response.messages[0].content;
 
       if (!analysisText) {
         throw new Error('Invalid response from AI analysis');
