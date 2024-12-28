@@ -322,7 +322,7 @@ export class AIService {
           const duration = video.contentDetails?.duration || 'unknown';
           const keywords = video.snippet?.tags || [];
 
-        // Combine transcript with metadata for analysis
+          // Combine transcript with metadata for analysis
         const analysisContent = [
           rawDescription,
           transcriptContent?.slice(0, 1000), // First 1000 chars of transcript
