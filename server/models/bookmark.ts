@@ -207,14 +207,15 @@ export class BookmarkModel {
 
   static async getEnrichmentCount() {
     try {
-      // Get count of bookmarks that need enrichment (no analysis or processing status)
+      // Get count of bookmarks that need enrichment (no analysis, processing, or error status)
       const results = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(bookmarks)
         .where(
           or(
             isNull(bookmarks.analysis),
-            eq(sql`${bookmarks.analysis}->>'status'`, 'processing')
+            eq(sql`${bookmarks.analysis}->>'status'`, 'processing'),
+            eq(sql`${bookmarks.analysis}->>'status'`, 'error')
           )
         );
 
