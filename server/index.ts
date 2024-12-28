@@ -1,20 +1,34 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { testDatabaseConnection, initializeDatabase } from "@db";
 
 // Verify required environment variables
 const requiredEnvVars = ['ANTHROPIC_API_KEY', 'DATABASE_URL'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
-    console.error(`Missing required environment variable: ${envVar}`);
-    process.exit(1);
+    throw new Error(`${envVar} environment variable is not set`);
   }
 }
 
 const app = express();
 
 // Configure express with increased limits for large files
+app.use((req, res, next) => {
+  if (req.headers['content-type']?.includes('text/html')) {
+    express.text({
+      type: 'text/html',
+      limit: '50mb',
+      verify: (req, res, buf) => {
+        if (buf.length > 50 * 1024 * 1024) { // 50MB limit
+          throw new Error('File size too large. Maximum size is 50MB.');
+        }
+      }
+    })(req, res, next);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json({
   limit: '50mb',
   verify: (req, res, buf) => {
@@ -25,6 +39,17 @@ app.use(express.json({
 }));
 
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+
+// Error handling middleware for payload size
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof Error && err.message.includes('File size too large')) {
+    return res.status(413).json({ message: err.message });
+  }
+  if (err instanceof SyntaxError && err.message.includes('entity too large')) {
+    return res.status(413).json({ message: 'File size too large. Maximum size is 50MB.' });
+  }
+  next(err);
+});
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -43,9 +68,13 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        const responseSummary = JSON.stringify(capturedJsonResponse);
-        logLine += ` :: ${responseSummary.length > 100 ? responseSummary.slice(0, 97) + '...' : responseSummary}`;
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
+
+      if (logLine.length > 80) {
+        logLine = logLine.slice(0, 79) + "…";
+      }
+
       log(logLine);
     }
   });
@@ -53,38 +82,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// Global error handling middleware with better logging
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("[Server] Error:", {
-    message: err.message,
-    stack: err.stack,
-    code: err.code,
-    status: err.status || err.statusCode
-  });
-
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-
-  res.status(status).json({ 
-    message,
-    error: app.get('env') === 'development' ? err.stack : undefined
-  });
-});
-
-// Server initialization with proper error handling
 (async () => {
   try {
-    console.log("[Server] Starting server initialization...");
-
-    // Test database connection first
-    await testDatabaseConnection();
-    console.log("[Server] Database connection successful");
-
-    // Initialize database tables
-    await initializeDatabase();
-    console.log("[Server] Database initialization complete");
-
+    console.log("Starting server initialization...");
     const server = registerRoutes(app);
+
+    // Global error handling middleware
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      console.error("Server error:", err);
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      res.status(status).json({ message });
+    });
 
     // Setup development environment
     if (app.get("env") === "development") {
@@ -93,30 +103,13 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       serveStatic(app);
     }
 
-    // Try multiple ports if default port is in use
-    const tryPort = (port: number): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        server.listen(port, "0.0.0.0")
-          .once('listening', () => {
-            log(`[Server] Running at http://0.0.0.0:${port}`);
-            resolve();
-          })
-          .once('error', (err: NodeJS.ErrnoException) => {
-            if (err.code === 'EADDRINUSE') {
-              console.log(`[Server] Port ${port} in use, trying next port...`);
-              tryPort(port + 1).then(resolve).catch(reject);
-            } else {
-              reject(err);
-            }
-          });
-      });
-    };
-
-    // Start with port 5000 and try subsequent ports if needed
-    await tryPort(5000);
-
+    // Start the server
+    const PORT = 5000;
+    server.listen(PORT, "0.0.0.0", () => {
+      log(`Server running at http://0.0.0.0:${PORT}`);
+    });
   } catch (error) {
-    console.error("[Server] Failed to start server:", error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 })();

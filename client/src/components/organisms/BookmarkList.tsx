@@ -1,30 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { BookmarkCard } from "../molecules/BookmarkCard";
+import { fetchBookmarks } from "@/lib/api";
 import { LoadingSpinner } from "../atoms/LoadingSpinner";
 import { Bookmark } from "@/types/bookmark";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface BookmarkListProps {
-  isLoading?: boolean;
-  isAddingBookmark?: boolean;
-  onAddBookmark?: () => void;
-  onCancelAdd?: () => void;
+  onEdit: (bookmark: Bookmark) => void;
+  onDelete: (id: number) => void;
+  onRefresh: (bookmark: Bookmark) => void;
 }
 
-export const BookmarkList = ({ 
-  isLoading,
-  isAddingBookmark,
-  onAddBookmark,
-  onCancelAdd 
-}: BookmarkListProps) => {
-  const { data: bookmarks = [], isLoading: isLoadingQuery, error } = useQuery<Bookmark[]>({
+export const BookmarkList = ({ onEdit, onDelete, onRefresh }: BookmarkListProps) => {
+  const { data: bookmarks, isLoading, error } = useQuery({
     queryKey: ['/api/bookmarks'],
+    queryFn: fetchBookmarks
   });
 
-  if (isLoading || isLoadingQuery) {
+  if (isLoading) {
     return (
-      <div className="p-8 flex justify-center">
+      <div className="p-8">
         <LoadingSpinner />
       </div>
     );
@@ -42,26 +38,24 @@ export const BookmarkList = ({
     );
   }
 
-  if (!bookmarks?.length && !isAddingBookmark) {
+  if (!bookmarks?.length) {
     return (
       <div className="text-center p-8 text-muted-foreground">
-        <p className="mb-4">No bookmarks found. Add your first bookmark to get started!</p>
-        {onAddBookmark && (
-          <button
-            onClick={onAddBookmark}
-            className="text-primary hover:underline"
-          >
-            Add Bookmark
-          </button>
-        )}
+        No bookmarks found. Add your first bookmark to get started!
       </div>
     );
   }
 
-  // Sort bookmarks by date added
+  // Sort bookmarks by quality score and date
   const sortedBookmarks = [...bookmarks].sort((a, b) => {
-    const dateA = new Date(a.dateAdded).getTime();
-    const dateB = new Date(b.dateAdded).getTime();
+    const scoreA = a.analysis?.contentQuality?.overallScore || 0;
+    const scoreB = b.analysis?.contentQuality?.overallScore || 0;
+    if (scoreA !== scoreB) {
+      return scoreB - scoreA; // Higher scores first
+    }
+    // If scores are equal, sort by date
+    const dateA = new Date(a.dateModified || a.dateAdded || 0).getTime();
+    const dateB = new Date(b.dateModified || b.dateAdded || 0).getTime();
     return dateB - dateA;
   });
 
@@ -71,8 +65,9 @@ export const BookmarkList = ({
         <BookmarkCard
           key={bookmark.id}
           bookmark={bookmark}
-          onEdit={() => {}} // Will implement these handlers later
-          onDelete={() => {}}
+          onEdit={onEdit}
+          onDelete={() => onDelete(bookmark.id)}
+          onRefresh={onRefresh}
         />
       ))}
     </div>

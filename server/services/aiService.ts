@@ -5,24 +5,49 @@ import type { Response } from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
 import { YouTubeService } from './youtubeService';
-import type { BookmarkAnalysis, BookmarkMetadata } from '@shared/types/bookmark';
-import { AnalysisStatus } from '@shared/types/bookmark';
 
-// Verify API key is set
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-if (!ANTHROPIC_API_KEY) {
+if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
+// the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
 const anthropic = new Anthropic({
-  apiKey: ANTHROPIC_API_KEY
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 // Create debug directory if it doesn't exist
-const debugDir = path.join(process.cwd(), 'debug');
-fs.mkdir(debugDir).catch(() => {
-  // Ignore error if directory already exists
-});
+try {
+  fs.mkdir(path.join(process.cwd(), 'debug')).catch(() => {});
+} catch (error) {
+  console.warn('Could not create debug directory:', error);
+}
+
+export interface AIAnalysis {
+  title: string;
+  description: string;
+  tags: string[];
+  contentQuality: {
+    relevance: number;
+    informativeness: number;
+    credibility: number;
+    overallScore: number;
+  };
+  mainTopics: string[];
+  recommendations?: {
+    improvedTitle?: string;
+    improvedDescription?: string;
+    suggestedTags?: string[];
+  };
+  metadata?: {
+    author?: string;
+    publishDate?: string;
+    lastModified?: string;
+    mainImage?: string;
+    wordCount?: number;
+    analysisAttempts?: number;
+    error?: string;
+  };
+}
 
 interface PageContent {
   url: string;
@@ -30,7 +55,13 @@ interface PageContent {
   description: string;
   content: string;
   type: 'webpage' | 'video' | 'article' | 'product';
-  metadata?: BookmarkMetadata;
+  metadata?: {
+    author?: string;
+    publishDate?: string;
+    lastModified?: string;
+    mainImage?: string;
+    wordCount?: number;
+  };
 }
 
 export class AIService {
@@ -50,6 +81,7 @@ export class AIService {
 
   private static async saveDebugInfo(url: string, data: any, type: string): Promise<void> {
     try {
+      const debugDir = path.join(process.cwd(), 'debug');
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `${type}_${encodeURIComponent(url)}_${timestamp}.json`;
       await fs.writeFile(
@@ -116,106 +148,257 @@ export class AIService {
     }
   }
 
-  private static async analyzeVideoContent(pageContent: PageContent): Promise<BookmarkAnalysis> {
+  private static async analyzeVideoContent(pageContent: PageContent): Promise<AIAnalysis> {
     try {
       console.log(`[Video Analysis] Starting analysis for: ${pageContent.url}`);
 
-      // Get basic metadata from YouTube
-      const metadata = await YouTubeService.getMetadata(pageContent.url);
+      // Fetch complete video content for YouTube videos
+      let videoContent = pageContent.content;
+      let videoMetadata = pageContent.metadata || {};
 
-      if (!metadata) {
-        throw new Error('Could not fetch video metadata');
+      if (pageContent.url.includes('youtube.com') || pageContent.url.includes('youtu.be')) {
+        const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
+        if (youtubeContent) {
+          videoContent = `
+            Title: ${youtubeContent.title}
+            Author: ${youtubeContent.author}
+            Published: ${youtubeContent.publishDate}
+            Description: ${youtubeContent.description}
+            Transcript: ${youtubeContent.transcript}
+          `.trim();
+
+          videoMetadata = {
+            ...videoMetadata,
+            author: youtubeContent.author,
+            publishDate: youtubeContent.publishDate
+          };
+        }
       }
 
-      return {
-        title: metadata.title,
-        description: metadata.description,
-        tags: ['video', 'youtube'],
-        contentQuality: {
-          relevance: 0.8,
-          informativeness: 0.8,
-          credibility: 0.8,
-          overallScore: 0.8
-        },
-        mainTopics: ['video content'],
-        recommendations: {},
-        metadata: {
-          thumbnailUrl: metadata.thumbnailUrl,
-          analysisAttempts: 1,
-          status: AnalysisStatus.Success
+      // Truncate content but keep enough for meaningful analysis
+      const truncatedContent = videoContent.slice(0, 2000);
+
+      const message = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 1024,
+        temperature: 0.3,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Analyze this video content and provide a comprehensive analysis:
+Title: ${pageContent.title}
+Description: ${pageContent.description}
+Author: ${pageContent.metadata?.author || 'Unknown'}
+Type: ${pageContent.type}
+Content: ${truncatedContent}
+
+Return a detailed analysis in this exact JSON structure:
+{
+  "title": "complete, engaging title that accurately represents the video content",
+  "description": "Write a comprehensive description (at least 5-8 detailed sentences) that covers: 
+    1. Main purpose and target audience of the video
+    2. Key insights, arguments, or demonstrations presented
+    3. Notable examples or case studies discussed
+    4. Important takeaways or conclusions
+    5. Any unique perspectives or methodologies shared
+    Include specific details from the video content to support each point.",
+  "tags": ["at least 5 specific, relevant tags that accurately reflect the video topic, industry, and key concepts discussed"],
+  "contentQuality": {
+    "relevance": 0.8,
+    "informativeness": 0.8,
+    "credibility": 0.8,
+    "overallScore": 0.8
+  },
+  "mainTopics": ["3-4 main topics covered in detail"],
+  "recommendations": {
+    "improvedTitle": "enhanced title that includes key topic and value proposition",
+    "improvedDescription": "alternative description with additional context and insights",
+    "suggestedTags": ["additional relevant tags focusing on specific concepts, methodologies, or applications discussed"]
+  }
+}`
+            }
+          ]
+        }]
+      });
+
+      console.log('[Video Analysis] Raw AI response:', message.content[0]?.text);
+
+      // Get the first response with content
+      const content = message.content[0]?.text;
+      if (!content) {
+        console.error('[Video Analysis] No content in AI response');
+        return this.createFallbackAnalysis(pageContent, 'No content in AI response');
+      }
+
+      // Save response for debugging
+      await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'video_analysis');
+
+      try {
+        const analysis = JSON.parse(content);
+
+        // Validate required fields
+        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
+          console.error('[Video Analysis] Invalid response structure:', analysis);
+          return this.createFallbackAnalysis(pageContent, 'Invalid response structure');
         }
-      };
+
+        // Ensure we have at least 5 tags
+        const combinedTags = [...new Set([
+          ...(analysis.tags || []),
+          ...(analysis.recommendations?.suggestedTags || []),
+          'video',
+          pageContent.type
+        ])].slice(0, 10); // Keep up to 10 unique tags
+
+        return {
+          title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
+          description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
+          tags: combinedTags.map((tag: string) => tag.toLowerCase()),
+          contentQuality: {
+            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
+            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
+            credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
+            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
+          },
+          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 4),
+          recommendations: {
+            improvedTitle: analysis.recommendations?.improvedTitle,
+            improvedDescription: analysis.recommendations?.improvedDescription,
+            suggestedTags: analysis.recommendations?.suggestedTags
+          },
+          metadata: {
+            ...pageContent.metadata,
+            analysisAttempts: 1
+          }
+        };
+      } catch (parseError) {
+        console.error('[Video Analysis] Failed to parse AI response:', parseError, 'Raw content:', content);
+        return this.createFallbackAnalysis(pageContent, 'Failed to parse AI response');
+      }
     } catch (error) {
       console.error('[Video Analysis] Error:', error);
       return this.createFallbackAnalysis(pageContent, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
-  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): BookmarkAnalysis {
+  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): AIAnalysis {
     console.log('[Analysis] Creating fallback analysis due to:', errorReason);
 
+    // Extract video ID and other metadata for better fallback content
+    const videoId = pageContent.url.includes('youtube.com/watch?v=') 
+      ? new URL(pageContent.url).searchParams.get('v')
+      : pageContent.url.split('/').pop();
+
+    const creator = pageContent.metadata?.author || 'content creator';
+    const defaultDescription = `This video content was created by ${creator}. ` +
+      `The video covers important topics and information that may be valuable to viewers. ` +
+      `Due to technical limitations, a detailed analysis is currently unavailable. ` +
+      `The original title of the video is "${pageContent.title}". ` +
+      `For the most accurate information, please view the video directly.`;
+
     return {
-      title: pageContent.title || pageContent.url,
-      description: pageContent.description || 'Content analysis temporarily unavailable',
-      tags: ['analysis-pending'],
+      title: pageContent.title || `Video Content: ${videoId || 'Untitled'}`,
+      description: pageContent.description || defaultDescription,
+      tags: [
+        'video',
+        'content',
+        'online-media',
+        'digital-content',
+        'educational'
+      ],
       contentQuality: {
-        relevance: 0.5,
-        informativeness: 0.5,
-        credibility: 0.5,
-        overallScore: 0.5
+        relevance: 0.8,
+        informativeness: 0.8,
+        credibility: 0.8,
+        overallScore: 0.8
       },
-      mainTopics: ['content-pending'],
+      mainTopics: ['video content', 'digital media', 'online education'],
       metadata: {
+        ...pageContent.metadata,
         analysisAttempts: 1,
-        error: errorReason,
-        status: AnalysisStatus.Error
-      },
-      recommendations: {}
+        error: errorReason
+      }
     };
   }
 
-  private static normalizeScore(score: any): number {
-    const num = typeof score === 'number' ? score : parseFloat(score);
-    if (isNaN(num)) return 0.5;
-    return Math.max(0, Math.min(1, num));
+  private static async analyzeWebContent(pageContent: PageContent): Promise<AIAnalysis> {
+    // Truncate content to avoid token limit
+    const truncatedContent = pageContent.content.slice(0, 1500);
+
+    const message = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 1024,
+      temperature: 0.3,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Analyze this webpage content briefly:
+URL: ${pageContent.url}
+Title: ${pageContent.title.slice(0, 100)}
+Type: ${pageContent.type}
+Description: ${pageContent.description.slice(0, 200)}
+Content Preview: ${truncatedContent}
+
+Provide a concise JSON analysis with:
+{
+  "title": "<60 char title>",
+  "description": "<160 char summary>",
+  "tags": ["3-5 tags"],
+  "contentQuality": {
+    "relevance": 0-1,
+    "informativeness": 0-1,
+    "credibility": 0-1,
+    "overallScore": 0-1
+  },
+  "mainTopics": ["2-3 topics"],
+  "recommendations": {
+    "improvedTitle": "optional better title",
+    "improvedDescription": "optional better description",
+    "suggestedTags": ["optional better tags"]
   }
-
-  private static extractKeywordsFromContent(content: string): string[] {
-    const words = content.toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(word => word.length > 3);
-
-    const wordFreq: Record<string, number> = {};
-    words.forEach(word => {
-      wordFreq[word] = (wordFreq[word] || 0) + 1;
+}`
+          }
+        ]
+      }]
     });
 
-    return Object.entries(wordFreq)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([word]) => word);
+    // Get the first response with content
+    const content = message.content[0]?.text;
+    if (!content) {
+      throw new Error('No content in AI response');
+    }
+
+    // Save response for debugging
+    await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'web_analysis');
+
+    try {
+      const analysis = JSON.parse(content);
+      return {
+        title: (analysis.title || pageContent.title).slice(0, 60),
+        description: (analysis.description || pageContent.description).slice(0, 160),
+        tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
+        contentQuality: {
+          relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
+          informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
+          credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0)),
+          overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0))
+        },
+        mainTopics: (analysis.mainTopics || []).slice(0, 3),
+        recommendations: analysis.recommendations || {},
+        metadata: {
+          ...pageContent.metadata,
+          analysisAttempts: 1
+        }
+      };
+    } catch (parseError) {
+      console.error('[Web Analysis] Failed to parse AI response:', parseError);
+      throw new Error('Invalid analysis format');
+    }
   }
-
-  private static extractKeywordsFromTranscript(transcript: string): string[] {
-    // Extract important keywords from transcript
-    const words = transcript.toLowerCase().split(/\s+/);
-    const wordFreq: Record<string, number> = {};
-
-    // Count word frequencies
-    words.forEach(word => {
-      if (word.length > 3) { // Skip short words
-        wordFreq[word] = (wordFreq[word] || 0) + 1;
-      }
-    });
-
-    // Sort by frequency and get top keywords
-    return Object.entries(wordFreq)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([word]) => word);
-  }
-
 
   private static async fetchPageContent(url: string, retries: number = 0): Promise<PageContent> {
     try {
@@ -268,9 +451,9 @@ export class AIService {
       // Extract content based on type
       let content = '';
       if (type === 'video') {
-        content = $('meta[name="description"]').attr('content') ||
-          $('.watch-main-col .content').text() ||
-          $('meta[property="og:description"]').attr('content') || '';
+        content = $('meta[name="description"]').attr('content') || 
+                 $('.watch-main-col .content').text() ||
+                 $('meta[property="og:description"]').attr('content') || '';
       } else {
         const contentSelectors = [
           'article', 'main', '[role="main"]', '#content', '.content',
@@ -298,20 +481,20 @@ export class AIService {
 
       // Basic metadata extraction
       const title = $('meta[property="og:title"]').attr('content')?.trim() ||
-        $('title').text().trim() ||
-        $('h1').first().text().trim() ||
-        url;
+                   $('title').text().trim() ||
+                   $('h1').first().text().trim() ||
+                   url;
 
       const description = $('meta[property="og:description"]').attr('content')?.trim() ||
-        $('meta[name="description"]').attr('content')?.trim() ||
-        '';
+                         $('meta[name="description"]').attr('content')?.trim() ||
+                         '';
 
       // Extract metadata
       const metadata = {
         author: $('meta[name="author"]').attr('content') ||
-          $('[rel="author"]').first().text(),
+                $('[rel="author"]').first().text(),
         publishDate: $('meta[property="article:published_time"]').attr('content') ||
-          $('time[pubdate]').attr('datetime'),
+                    $('time[pubdate]').attr('datetime'),
         lastModified: $('meta[property="article:modified_time"]').attr('content'),
         mainImage: $('meta[property="og:image"]').attr('content'),
         wordCount: content.split(/\s+/).length
@@ -337,7 +520,7 @@ export class AIService {
     }
   }
 
-  static async analyzeUrl(url: string): Promise<BookmarkAnalysis> {
+  static async analyzeUrl(url: string): Promise<AIAnalysis> {
     const normalizedUrl = this.normalizeUrl(url);
     const attempts = (this.analysisAttempts.get(normalizedUrl) || 0) + 1;
     this.analysisAttempts.set(normalizedUrl, attempts);
@@ -352,7 +535,7 @@ export class AIService {
       await this.saveDebugInfo(normalizedUrl, pageContent, 'extracted_content');
 
       // Use different analysis strategies based on content type
-      const analysis = pageContent.type === 'video'
+      const analysis = pageContent.type === 'video' 
         ? await this.analyzeVideoContent(pageContent)
         : await this.analyzeWebContent(pageContent);
 
@@ -386,8 +569,7 @@ export class AIService {
           suggestedTags: ['needs-reanalysis']
         },
         metadata: {
-          analysisAttempts: attempts,
-          status: AnalysisStatus.Error
+          analysisAttempts: attempts
         }
       };
     }
