@@ -33,18 +33,23 @@ export class YouTubeService {
       const html = await response.text();
       const $ = load(html);
 
-      // Extract transcript from captions
+      // First try to get the transcript from captions
       const transcriptElements = $('[class*="caption-window"]');
-      if (transcriptElements.length === 0) {
-        return '';
+      if (transcriptElements.length > 0) {
+        const transcriptParts: string[] = [];
+        transcriptElements.each((_, element) => {
+          transcriptParts.push($(element).text().trim());
+        });
+        return transcriptParts.join(' ');
       }
 
-      const transcriptParts: string[] = [];
-      transcriptElements.each((_, element) => {
-        transcriptParts.push($(element).text().trim());
-      });
+      // If no captions, try to get auto-generated transcript
+      const transcriptText = $('[class*="transcript-text"]').text().trim();
+      if (transcriptText) {
+        return transcriptText;
+      }
 
-      return transcriptParts.join(' ');
+      return '';
     } catch (error) {
       console.error('Error fetching transcript:', error);
       return '';
@@ -53,19 +58,40 @@ export class YouTubeService {
 
   private static async fetchVideoDetails(videoId: string): Promise<Partial<VideoDetails>> {
     try {
+      // First try to get data using API
       const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
       const html = await response.text();
       const $ = load(html);
 
+      // Extract full description from meta tags and description element
+      let description = '';
+      const metaDescription = $('meta[property="og:description"]').attr('content') || '';
+      const fullDescription = $('.ytd-video-description-text').text().trim() || 
+                            $('#description-text').text().trim() || 
+                            $('.description').text().trim();
+
+      // Combine descriptions, preferring the longer one
+      description = fullDescription.length > metaDescription.length ? fullDescription : metaDescription;
+
+      // Get other metadata
       const title = $('meta[property="og:title"]').attr('content') || '';
-      const description = $('meta[property="og:description"]').attr('content') || '';
       const author = $('link[itemprop="name"]').attr('content') || 
                     $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
       const publishDate = $('meta[itemprop="datePublished"]').attr('content') || '';
 
+      // If description is still empty or too short, try additional selectors
+      if (description.length < 100) {
+        const additionalDescription = $('#eow-description').text().trim() || 
+                                    $('.watch-description-text').text().trim() || 
+                                    $('[itemprop="description"]').text().trim();
+        if (additionalDescription.length > description.length) {
+          description = additionalDescription;
+        }
+      }
+
       return {
         title,
-        description,
+        description: description || 'No description available',
         author,
         publishDate
       };

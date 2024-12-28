@@ -6,21 +6,22 @@ import fs from 'fs/promises';
 import path from 'path';
 import { YouTubeService } from './youtubeService';
 
-if (!process.env.ANTHROPIC_API_KEY) {
+// Verify API key is set
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+if (!ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
 // the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: ANTHROPIC_API_KEY
 });
 
 // Create debug directory if it doesn't exist
-try {
-  fs.mkdir(path.join(process.cwd(), 'debug')).catch(() => {});
-} catch (error) {
-  console.warn('Could not create debug directory:', error);
-}
+const debugDir = path.join(process.cwd(), 'debug');
+fs.mkdir(debugDir).catch(() => {
+  // Ignore error if directory already exists
+});
 
 export interface AIAnalysis {
   title: string;
@@ -81,7 +82,6 @@ export class AIService {
 
   private static async saveDebugInfo(url: string, data: any, type: string): Promise<void> {
     try {
-      const debugDir = path.join(process.cwd(), 'debug');
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `${type}_${encodeURIComponent(url)}_${timestamp}.json`;
       await fs.writeFile(
@@ -160,12 +160,12 @@ export class AIService {
         const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
         if (youtubeContent) {
           videoContent = `
-            Title: ${youtubeContent.title}
-            Author: ${youtubeContent.author}
-            Published: ${youtubeContent.publishDate}
-            Description: ${youtubeContent.description}
-            Transcript: ${youtubeContent.transcript}
-          `.trim();
+Title: ${youtubeContent.title}
+Author: ${youtubeContent.author}
+Published: ${youtubeContent.publishDate}
+Description: ${youtubeContent.description}
+Transcript: ${youtubeContent.transcript}
+`.trim();
 
           videoMetadata = {
             ...videoMetadata,
@@ -175,24 +175,18 @@ export class AIService {
         }
       }
 
-      // Truncate content but keep enough for meaningful analysis
-      const truncatedContent = videoContent.slice(0, 2000);
-
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
         max_tokens: 1024,
         temperature: 0.3,
         messages: [{
           role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analyze this video content and provide a comprehensive analysis:
+          content: `Analyze this video content and provide a comprehensive analysis:
 Title: ${pageContent.title}
 Description: ${pageContent.description}
 Author: ${pageContent.metadata?.author || 'Unknown'}
 Type: ${pageContent.type}
-Content: ${truncatedContent}
+Full Content: ${videoContent}
 
 Return a detailed analysis in this exact JSON structure:
 {
@@ -218,18 +212,13 @@ Return a detailed analysis in this exact JSON structure:
     "suggestedTags": ["additional relevant tags focusing on specific concepts, methodologies, or applications discussed"]
   }
 }`
-            }
-          ]
         }]
       });
 
-      console.log('[Video Analysis] Raw AI response:', message.content[0]?.text);
-
-      // Get the first response with content
+      // Get the first message content
       const content = message.content[0]?.text;
       if (!content) {
-        console.error('[Video Analysis] No content in AI response');
-        return this.createFallbackAnalysis(pageContent, 'No content in AI response');
+        throw new Error('No content in AI response');
       }
 
       // Save response for debugging
@@ -240,22 +229,21 @@ Return a detailed analysis in this exact JSON structure:
 
         // Validate required fields
         if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
-          console.error('[Video Analysis] Invalid response structure:', analysis);
-          return this.createFallbackAnalysis(pageContent, 'Invalid response structure');
+          throw new Error('Invalid response structure');
         }
 
         // Ensure we have at least 5 tags
-        const combinedTags = [...new Set([
+        const combinedTags = Array.from(new Set([
           ...(analysis.tags || []),
           ...(analysis.recommendations?.suggestedTags || []),
           'video',
           pageContent.type
-        ])].slice(0, 10); // Keep up to 10 unique tags
+        ])).slice(0, 10); // Keep up to 10 unique tags
 
         return {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
           description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
-          tags: combinedTags.map((tag: string) => tag.toLowerCase()),
+          tags: combinedTags.map(tag => tag.toLowerCase()),
           contentQuality: {
             relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
             informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
@@ -269,7 +257,7 @@ Return a detailed analysis in this exact JSON structure:
             suggestedTags: analysis.recommendations?.suggestedTags
           },
           metadata: {
-            ...pageContent.metadata,
+            ...videoMetadata,
             analysisAttempts: 1
           }
         };
@@ -287,7 +275,7 @@ Return a detailed analysis in this exact JSON structure:
     console.log('[Analysis] Creating fallback analysis due to:', errorReason);
 
     // Extract video ID and other metadata for better fallback content
-    const videoId = pageContent.url.includes('youtube.com/watch?v=') 
+    const videoId = pageContent.url.includes('youtube.com/watch?v=')
       ? new URL(pageContent.url).searchParams.get('v')
       : pageContent.url.split('/').pop();
 
@@ -333,10 +321,7 @@ Return a detailed analysis in this exact JSON structure:
       temperature: 0.3,
       messages: [{
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: `Analyze this webpage content briefly:
+        content: `Analyze this webpage content briefly:
 URL: ${pageContent.url}
 Title: ${pageContent.title.slice(0, 100)}
 Type: ${pageContent.type}
@@ -361,8 +346,6 @@ Provide a concise JSON analysis with:
     "suggestedTags": ["optional better tags"]
   }
 }`
-          }
-        ]
       }]
     });
 
@@ -451,9 +434,9 @@ Provide a concise JSON analysis with:
       // Extract content based on type
       let content = '';
       if (type === 'video') {
-        content = $('meta[name="description"]').attr('content') || 
-                 $('.watch-main-col .content').text() ||
-                 $('meta[property="og:description"]').attr('content') || '';
+        content = $('meta[name="description"]').attr('content') ||
+          $('.watch-main-col .content').text() ||
+          $('meta[property="og:description"]').attr('content') || '';
       } else {
         const contentSelectors = [
           'article', 'main', '[role="main"]', '#content', '.content',
@@ -481,20 +464,20 @@ Provide a concise JSON analysis with:
 
       // Basic metadata extraction
       const title = $('meta[property="og:title"]').attr('content')?.trim() ||
-                   $('title').text().trim() ||
-                   $('h1').first().text().trim() ||
-                   url;
+        $('title').text().trim() ||
+        $('h1').first().text().trim() ||
+        url;
 
       const description = $('meta[property="og:description"]').attr('content')?.trim() ||
-                         $('meta[name="description"]').attr('content')?.trim() ||
-                         '';
+        $('meta[name="description"]').attr('content')?.trim() ||
+        '';
 
       // Extract metadata
       const metadata = {
         author: $('meta[name="author"]').attr('content') ||
-                $('[rel="author"]').first().text(),
+          $('[rel="author"]').first().text(),
         publishDate: $('meta[property="article:published_time"]').attr('content') ||
-                    $('time[pubdate]').attr('datetime'),
+          $('time[pubdate]').attr('datetime'),
         lastModified: $('meta[property="article:modified_time"]').attr('content'),
         mainImage: $('meta[property="og:image"]').attr('content'),
         wordCount: content.split(/\s+/).length
@@ -535,7 +518,7 @@ Provide a concise JSON analysis with:
       await this.saveDebugInfo(normalizedUrl, pageContent, 'extracted_content');
 
       // Use different analysis strategies based on content type
-      const analysis = pageContent.type === 'video' 
+      const analysis = pageContent.type === 'video'
         ? await this.analyzeVideoContent(pageContent)
         : await this.analyzeWebContent(pageContent);
 

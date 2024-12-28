@@ -1,34 +1,20 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { testDatabaseConnection } from "@db";
 
 // Verify required environment variables
 const requiredEnvVars = ['ANTHROPIC_API_KEY', 'DATABASE_URL'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
-    throw new Error(`${envVar} environment variable is not set`);
+    console.error(`Missing required environment variable: ${envVar}`);
+    process.exit(1);
   }
 }
 
 const app = express();
 
 // Configure express with increased limits for large files
-app.use((req, res, next) => {
-  if (req.headers['content-type']?.includes('text/html')) {
-    express.text({
-      type: 'text/html',
-      limit: '50mb',
-      verify: (req, res, buf) => {
-        if (buf.length > 50 * 1024 * 1024) { // 50MB limit
-          throw new Error('File size too large. Maximum size is 50MB.');
-        }
-      }
-    })(req, res, next);
-  } else {
-    next();
-  }
-});
-
 app.use(express.json({
   limit: '50mb',
   verify: (req, res, buf) => {
@@ -39,17 +25,6 @@ app.use(express.json({
 }));
 
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
-
-// Error handling middleware for payload size
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  if (err instanceof Error && err.message.includes('File size too large')) {
-    return res.status(413).json({ message: err.message });
-  }
-  if (err instanceof SyntaxError && err.message.includes('entity too large')) {
-    return res.status(413).json({ message: 'File size too large. Maximum size is 50MB.' });
-  }
-  next(err);
-});
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -82,19 +57,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Global error handling middleware
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("Server error:", err);
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+});
+
 (async () => {
   try {
     console.log("Starting server initialization...");
+
+    // Test database connection first
+    const dbConnected = await testDatabaseConnection();
+    if (!dbConnected) {
+      throw new Error("Failed to connect to database");
+    }
+    console.log("Database connection successful");
+
     const server = registerRoutes(app);
-
-    // Global error handling middleware
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error("Server error:", err);
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-
-      res.status(status).json({ message });
-    });
 
     // Setup development environment
     if (app.get("env") === "development") {
