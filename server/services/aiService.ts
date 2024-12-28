@@ -109,12 +109,23 @@ export class AIService {
     try {
       console.log(`[Analysis] Attempting to fetch ${url} (attempt ${retries + 1})`);
 
+      // Configure browser-like headers
+      const headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      };
+
       // Try multiple proxies in case one fails
       const proxyUrls = [
         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
         url // Direct fetch as last resort
       ];
+
+      let captchaDetected = false;
 
       let lastError: Error | null = null;
       for (const proxyUrl of proxyUrls) {
@@ -141,6 +152,42 @@ export class AIService {
           }
 
           const $ = cheerio.load(html);
+
+          // Check for CAPTCHA
+          const captchaIndicators = [
+            'captcha',
+            'robot check',
+            'verify human',
+            'security check',
+            'please verify',
+            'bot check'
+          ];
+
+          const pageText = $('body').text().toLowerCase();
+          captchaDetected = captchaIndicators.some(indicator => 
+            pageText.includes(indicator.toLowerCase())
+          );
+
+          if (captchaDetected) {
+            console.log(`[Analysis] CAPTCHA detected on ${url}`);
+            // Try to get metadata from alternative sources
+            const ogTitle = $('meta[property="og:title"]').attr('content');
+            const ogDesc = $('meta[property="og:description"]').attr('content');
+            
+            if (ogTitle || ogDesc) {
+              return {
+                url,
+                title: ogTitle || url,
+                description: ogDesc || 'Content temporarily unavailable due to CAPTCHA',
+                content: ogDesc || '',
+                type: 'webpage',
+                metadata: {
+                  wordCount: 0
+                }
+              };
+            }
+            throw new Error('CAPTCHA verification required');
+          }
 
           // Remove non-content elements
           $('script, style, nav, footer, iframe, noscript').remove();
