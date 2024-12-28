@@ -290,20 +290,48 @@ export class AIService {
           ? new URL(url).searchParams.get('v')
           : url.split('/').pop();
 
-        // Extract video description from meta tags and page content
+        // Extract transcript
+        const transcriptContent = $('[class*="transcript-container"]').text().trim() ||
+                                $('[class*="caption-window"]').text().trim() ||
+                                $('.ytd-transcript-renderer').text().trim();
+
+        // Extract video description and metadata
         const rawDescription = pageContent.description || 
                              $('meta[name="description"]').attr('content') || 
                              $('meta[property="og:description"]').attr('content');
 
-        // Extract keywords
+        // Extract keywords and video info
         const keywords = $('meta[name="keywords"]').attr('content')?.split(',').map(k => k.trim()) || [];
+        const duration = $('meta[itemprop="duration"]').attr('content');
+        const viewCount = $('meta[itemprop="interactionCount"]').attr('content');
+
+        // Combine transcript with metadata for analysis
+        const analysisContent = [
+          rawDescription,
+          transcriptContent?.slice(0, 1000), // First 1000 chars of transcript
+          `Video duration: ${duration || 'unknown'}`,
+          `Views: ${viewCount || 'unknown'}`
+        ].filter(Boolean).join('\n\n');
+
+        // Send combined content for AI analysis
+        const response = await anthropic.messages.create({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 1024,
+          temperature: 0.3,
+          messages: [{
+            role: "user",
+            content: `Analyze this YouTube video content and create a detailed 5-sentence description:\n\n${analysisContent}`
+          }]
+        });
+
+        const enhancedDescription = response.messages[0].content || rawDescription;
         
-        const fullDescription = [
+        const fullDescription = enhancedDescription || [
           rawDescription || 'A YouTube video providing valuable content',
           `Created by ${pageContent.metadata?.author || 'unknown creator'}`,
-          `This video covers topics including: ${keywords.slice(0, 3).join(', ')}`,
-          `The content is professionally curated and edited for viewer engagement`,
-          `Viewers will gain insights into ${keywords.slice(-2).join(' and ')}`
+          `Video transcript analysis: ${transcriptContent?.slice(0, 100)}...`,
+          `Duration: ${duration || 'unknown'}, Views: ${viewCount || 'unknown'}`,
+          `Topics covered: ${keywords.slice(0, 3).join(', ')}`
         ].filter(s => s && !s.includes('undefined')).join('. ') + '.';
 
         return {
