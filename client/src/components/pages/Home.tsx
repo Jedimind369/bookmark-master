@@ -17,15 +17,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Bookmark, CreateBookmarkDto, UpdateBookmarkDto } from "@/types/bookmark";
 import { useToast } from "@/hooks/use-toast";
 
-// Placeholder for BookmarkHealth component (needs to be implemented separately)
-const BookmarkHealth = () => {
-  return (
-    <div>
-      <p>Bookmark Health Status: (Implementation needed)</p>
-      {/* Add logic to fetch and display health status here */}
-    </div>
-  );
-};
+import { BookmarkHealth } from "../organisms/BookmarkHealth";
 
 
 export const Home = () => {
