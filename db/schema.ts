@@ -1,9 +1,7 @@
 import { pgTable, text, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
-
-// Define the analysis status type
-export type AnalysisStatus = 'success' | 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error' | 'processing';
+import type { AnalysisStatus, ContentQuality, VideoContent, BookmarkAnalysis } from "@shared/types/bookmark";
 
 export const bookmarks = pgTable("bookmarks", {
   id: serial("id").primaryKey(),
@@ -14,35 +12,7 @@ export const bookmarks = pgTable("bookmarks", {
   collections: jsonb("collections").$type<string[]>().default([]),
   dateAdded: timestamp("date_added").defaultNow(),
   dateModified: timestamp("date_modified"),
-  analysis: jsonb("analysis").$type<{
-    status?: AnalysisStatus;
-    lastUpdated?: string;
-    summary?: string;
-    error?: string;
-    retryable?: boolean;
-    tags?: string[];
-    contentQuality?: {
-      relevance: number;
-      informativeness: number;
-      credibility: number;
-      overallScore: number;
-    };
-    mainTopics?: string[];
-    videoContent?: {
-      transcript?: string;
-      author?: string;
-      publishDate?: string;
-      viewCount?: number;
-      duration?: string;
-      category?: string;
-    };
-    recommendations?: {
-      improvedTitle?: string;
-      improvedDescription?: string;
-      suggestedTags?: string[];
-    };
-    transcriptHighlights?: string[];
-  }>(),
+  analysis: jsonb("analysis").$type<BookmarkAnalysis>(),
   updateHistory: jsonb("update_history").$type<Array<{
     timestamp: string;
     status: AnalysisStatus;

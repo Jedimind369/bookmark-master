@@ -125,6 +125,7 @@ export class AIService {
       let videoContent = pageContent.content;
       let videoMetadata = pageContent.metadata || {};
       let transcriptText = '';
+      let fullDescription = '';
 
       // Extract the actual video ID from the URL
       const videoUrlMatch = pageContent.url.match(/(?:youtube\.com\/watch\?v=|youtu.be\/)([^&]+)/);
@@ -134,11 +135,12 @@ export class AIService {
         const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
         if (youtubeContent) {
           transcriptText = youtubeContent.transcript || '';
+          fullDescription = youtubeContent.description || '';
           videoContent = `
 Title: ${youtubeContent.title}
 Creator: ${youtubeContent.author}
 Published: ${youtubeContent.publishDate}
-Full Description: ${youtubeContent.description}
+Full Description: ${fullDescription}
 
 Complete Transcript:
 ${transcriptText}
@@ -166,7 +168,7 @@ Additional Context:
         temperature: 0.3,
         messages: [{
           role: "user",
-          content: `As an expert video content analyst, analyze this YouTube video content with its complete transcript and description to provide comprehensive insights. Extract maximum value from all available information.
+          content: `As an expert video content analyst, analyze this YouTube video content with its complete transcript and description to provide comprehensive insights. Extract maximum value from all available information, including the full video description and transcript.
 
 Content Type: YouTube Video
 URL: ${pageContent.url}
@@ -177,15 +179,16 @@ Create a thorough analysis in valid JSON format with this structure:
 {
   "title": "A compelling, SEO-optimized title that captures the main value proposition (60-100 chars)",
   "description": "A comprehensive analysis that MUST include:
-    - Detailed summary of the video's main content
-    - Key points and insights from the transcript
+    - Complete summary of the video's content using both description and transcript
+    - Detailed analysis of key points and insights
     - Core message and key takeaways
-    - Main arguments with supporting evidence
+    - Main arguments with supporting evidence from transcript
     - Target audience and relevance
     - Industry context and trends discussed
     - Actionable insights and practical applications
-    - Notable quotes or timestamps",
-  "tags": ["15-20 relevant tags covering topic, industry, content type, key concepts, and transcript-derived keywords"],
+    - Notable quotes or timestamps from transcript
+    - Additional context from video description",
+  "tags": ["15-20 relevant tags covering topic, industry, content type, key concepts, transcript-derived keywords"],
   "contentQuality": {
     "relevance": "Score 0-1 based on topic relevance and audience value",
     "informativeness": "Score 0-1 based on depth and actionable insights",

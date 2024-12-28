@@ -1,30 +1,28 @@
-export interface Bookmark {
-  id: number;
-  url: string;
-  title: string;
-  description?: string;
-  tags: string[];
-  collections: string[];
-  userId: number;
-  dateAdded: Date;
-  analysis?: {
-    title?: string;
-    summary?: string;
-    credibilityScore?: number;
-    tags?: string[];
-    status?: string;
-    lastUpdated?: string;
-  }
+import type { 
+  AnalysisStatus, 
+  ContentQuality, 
+  VideoContent, 
+  BookmarkAnalysis,
+  Bookmark as SharedBookmark,
+  CreateBookmarkDto as SharedCreateBookmarkDto,
+  UpdateBookmarkDto as SharedUpdateBookmarkDto
+} from '@shared/types/bookmark';
+
+// Extend the shared types with client-specific fields
+export interface Bookmark extends Omit<SharedBookmark, 'id'> {
+  id: number; // Client uses number for IDs while shared uses string
 }
 
-export interface CreateBookmarkDto {
-  url: string;
-  title: string;
-  description?: string;
-  tags?: string[];
-  collections?: string[];
-}
+export interface CreateBookmarkDto extends SharedCreateBookmarkDto {}
 
-export interface UpdateBookmarkDto extends Partial<CreateBookmarkDto> {
+export interface UpdateBookmarkDto extends Omit<SharedUpdateBookmarkDto, 'id'> {
   id: number;
 }
+
+// Re-export shared types for convenience
+export type {
+  AnalysisStatus,
+  ContentQuality,
+  VideoContent,
+  BookmarkAnalysis
+};
