@@ -287,7 +287,6 @@ export class AIService {
       if (url.includes('youtube.com') || url.includes('youtu.be')) {
         console.log('[Analysis] Detected YouTube URL, using YouTube API');
         const { google } = require('googleapis');
-        const youtube = google.youtube('v3');
 
         const videoId = url.includes('youtube.com/watch?v=') 
           ? new URL(url).searchParams.get('v')
