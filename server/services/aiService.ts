@@ -177,11 +177,11 @@ Full Transcript: ${youtubeContent.transcript}
 
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1500,
+        max_tokens: 4000, //Increased max_tokens
         temperature: 0.3,
         messages: [{
           role: "user",
-          content: `Analyze this video content and provide a comprehensive analysis. Pay special attention to the transcript and description to extract maximum value:
+          content: `Analyze this video content in extreme detail. Extract maximum value from the transcript and description to create a comprehensive analysis:
 
 Title: ${pageContent.title}
 Description: ${pageContent.description}
@@ -189,34 +189,35 @@ Author: ${pageContent.metadata?.author || 'Unknown'}
 Type: ${pageContent.type}
 Full Content: ${videoContent}
 
+Your task is to provide an extremely detailed analysis that captures the depth and nuance of the video content.
 Return a detailed analysis in this exact JSON structure:
 {
   "title": "Write a complete, engaging title (60-100 characters) that accurately represents the video content and includes key topics",
-  "description": "Write a comprehensive description (MINIMUM 5 detailed paragraphs) that MUST cover: 
+  "description": "Write a comprehensive, multi-paragraph description (MINIMUM 5 detailed paragraphs) that MUST include:
     1. Overview: Main purpose, target audience, and context of the video
-    2. Key Points: Major arguments, demonstrations, or insights presented
-    3. Supporting Details: Specific examples, case studies, or data discussed
-    4. Methodology/Approach: How the content is presented and structured
-    5. Value Proposition: Why this content is valuable and key takeaways
-    Include specific quotes or examples from the video transcript when possible.",
-  "tags": ["AT LEAST 8-10 specific, relevant tags that accurately reflect:
-    - Main topic and subtopics
+    2. Key Arguments: Present the main arguments, claims, or demonstrations in detail
+    3. Supporting Evidence: Document specific examples, case studies, statistics, or data discussed
+    4. Analysis: Evaluate the quality and credibility of the content
+    5. Value Proposition: Explain why this content is valuable and what viewers will learn
+    Include exact quotes from the transcript when possible to support key points",
+  "tags": ["10-15 specific, relevant tags that accurately capture:
+    - Main topic and all subtopics
     - Content type and format
     - Industry or field
-    - Technical terms or methodologies
+    - Technical terms and methodologies
     - Target audience
-    - Related concepts"],
+    - Related concepts and themes"],
   "contentQuality": {
-    "relevance": 0.8,
-    "informativeness": 0.8,
-    "credibility": 0.8,
-    "overallScore": 0.8
+    "relevance": "Score 0-1 based on topic relevance and audience fit",
+    "informativeness": "Score 0-1 based on depth and usefulness of information",
+    "credibility": "Score 0-1 based on evidence and expertise shown",
+    "overallScore": "Average of the above scores"
   },
-  "mainTopics": ["4-5 main topics covered in detail"],
+  "mainTopics": ["4-6 main topics covered in detail"],
   "recommendations": {
-    "improvedTitle": "enhanced title that includes key topic and value proposition",
-    "improvedDescription": "alternative description focusing on unique insights and practical applications",
-    "suggestedTags": ["additional relevant tags focusing on specific concepts, methodologies, or applications discussed"]
+    "improvedTitle": "Enhanced title emphasizing value proposition",
+    "improvedDescription": "Alternative description focusing on unique insights and practical applications",
+    "suggestedTags": ["5-7 additional tags focusing on specific concepts and applications"]
   }
 }`
         }]
@@ -234,18 +235,19 @@ Return a detailed analysis in this exact JSON structure:
       try {
         const analysis = JSON.parse(content);
 
-        // Validate required fields
-        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
+        // Validate and enhance the analysis
+        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
           throw new Error('Invalid response structure');
         }
 
-        // Ensure we have at least 5 tags
+        // Combine and deduplicate tags
         const combinedTags = Array.from(new Set([
           ...(analysis.tags || []),
           ...(analysis.recommendations?.suggestedTags || []),
           'video',
-          pageContent.type
-        ])).slice(0, 10); // Keep up to 10 unique tags
+          pageContent.type,
+          ...this.extractKeywordsFromTranscript(videoContent)
+        ])).slice(0, 15); // Keep up to 15 unique tags
 
         return {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
@@ -257,7 +259,7 @@ Return a detailed analysis in this exact JSON structure:
             credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
             overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
           },
-          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 4),
+          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 6),
           recommendations: {
             improvedTitle: analysis.recommendations?.improvedTitle,
             improvedDescription: analysis.recommendations?.improvedDescription,
@@ -276,6 +278,25 @@ Return a detailed analysis in this exact JSON structure:
       console.error('[Video Analysis] Error:', error);
       return this.createFallbackAnalysis(pageContent, error instanceof Error ? error.message : 'Unknown error');
     }
+  }
+
+  private static extractKeywordsFromTranscript(transcript: string): string[] {
+    // Extract important keywords from transcript
+    const words = transcript.toLowerCase().split(/\s+/);
+    const wordFreq: Record<string, number> = {};
+
+    // Count word frequencies
+    words.forEach(word => {
+      if (word.length > 3) { // Skip short words
+        wordFreq[word] = (wordFreq[word] || 0) + 1;
+      }
+    });
+
+    // Sort by frequency and get top keywords
+    return Object.entries(wordFreq)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([word]) => word);
   }
 
   private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): AIAnalysis {

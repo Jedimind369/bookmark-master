@@ -85,11 +85,28 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       serveStatic(app);
     }
 
-    // Start the server
-    const PORT = 5000;
-    server.listen(PORT, "0.0.0.0", () => {
-      log(`Server running at http://0.0.0.0:${PORT}`);
-    });
+    // Try multiple ports if default port is in use
+    const tryPort = (port: number): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        server.listen(port, "0.0.0.0")
+          .once('listening', () => {
+            log(`Server running at http://0.0.0.0:${port}`);
+            resolve();
+          })
+          .once('error', (err: NodeJS.ErrnoException) => {
+            if (err.code === 'EADDRINUSE') {
+              console.log(`Port ${port} in use, trying next port...`);
+              tryPort(port + 1).then(resolve).catch(reject);
+            } else {
+              reject(err);
+            }
+          });
+      });
+    };
+
+    // Start with port 5000 and try subsequent ports if needed
+    await tryPort(5000);
+
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
