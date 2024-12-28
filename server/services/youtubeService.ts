@@ -75,7 +75,7 @@ export class YouTubeService {
     }
   }
 
-  static async getVideoContent(url: string): Promise<VideoDetails | null> {
+  public static async getVideoContent(url: string): Promise<VideoDetails | null> {
     try {
       console.log('[YouTube] Fetching content for:', url);
       const videoId = await this.getVideoId(url);

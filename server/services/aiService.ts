@@ -159,12 +159,13 @@ export class AIService {
       if (pageContent.url.includes('youtube.com') || pageContent.url.includes('youtu.be')) {
         const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
         if (youtubeContent) {
+          console.log('[Video Analysis] Successfully fetched YouTube content');
           videoContent = `
-            Title: ${youtubeContent.title}
-            Author: ${youtubeContent.author}
-            Published: ${youtubeContent.publishDate}
-            Description: ${youtubeContent.description}
-            Transcript: ${youtubeContent.transcript}
+Title: ${youtubeContent.title}
+Author: ${youtubeContent.author}
+Published: ${youtubeContent.publishDate}
+Description: ${youtubeContent.description}
+Transcript: ${youtubeContent.transcript}
           `.trim();
 
           videoMetadata = {
@@ -176,18 +177,16 @@ export class AIService {
       }
 
       // Truncate content but keep enough for meaningful analysis
-      const truncatedContent = videoContent.slice(0, 2000);
+      const truncatedContent = videoContent.slice(0, 4000); // Increased limit for better analysis
 
+      console.log('[Video Analysis] Creating AI analysis request');
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
         max_tokens: 1024,
         temperature: 0.3,
         messages: [{
           role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analyze this video content and provide a comprehensive analysis:
+          content: `Analyze this video content and provide a comprehensive analysis:
 Title: ${pageContent.title}
 Description: ${pageContent.description}
 Author: ${pageContent.metadata?.author || 'Unknown'}
@@ -218,25 +217,23 @@ Return a detailed analysis in this exact JSON structure:
     "suggestedTags": ["additional relevant tags focusing on specific concepts, methodologies, or applications discussed"]
   }
 }`
-            }
-          ]
         }]
       });
 
-      console.log('[Video Analysis] Raw AI response:', message.content[0]?.text);
-
-      // Get the first response with content
-      const content = message.content[0]?.text;
-      if (!content) {
-        console.error('[Video Analysis] No content in AI response');
-        return this.createFallbackAnalysis(pageContent, 'No content in AI response');
+      const content = message.content[0];
+      if (!content || typeof content !== 'object' || !('text' in content)) {
+        console.error('[Video Analysis] Invalid AI response structure');
+        return this.createFallbackAnalysis(pageContent, 'Invalid AI response structure');
       }
 
+      const responseText = content.text;
+      console.log('[Video Analysis] Raw AI response:', responseText);
+
       // Save response for debugging
-      await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'video_analysis');
+      await this.saveDebugInfo(pageContent.url, { aiResponse: responseText }, 'video_analysis');
 
       try {
-        const analysis = JSON.parse(content);
+        const analysis = JSON.parse(responseText);
 
         // Validate required fields
         if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
@@ -245,17 +242,17 @@ Return a detailed analysis in this exact JSON structure:
         }
 
         // Ensure we have at least 5 tags
-        const combinedTags = [...new Set([
+        const combinedTags = Array.from(new Set([
           ...(analysis.tags || []),
           ...(analysis.recommendations?.suggestedTags || []),
           'video',
           pageContent.type
-        ])].slice(0, 10); // Keep up to 10 unique tags
+        ])).slice(0, 10); // Keep up to 10 unique tags
 
         return {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
           description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
-          tags: combinedTags.map((tag: string) => tag.toLowerCase()),
+          tags: combinedTags.map(tag => tag.toLowerCase()),
           contentQuality: {
             relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
             informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
@@ -274,7 +271,7 @@ Return a detailed analysis in this exact JSON structure:
           }
         };
       } catch (parseError) {
-        console.error('[Video Analysis] Failed to parse AI response:', parseError, 'Raw content:', content);
+        console.error('[Video Analysis] Failed to parse AI response:', parseError, 'Raw content:', responseText);
         return this.createFallbackAnalysis(pageContent, 'Failed to parse AI response');
       }
     } catch (error) {
@@ -287,7 +284,7 @@ Return a detailed analysis in this exact JSON structure:
     console.log('[Analysis] Creating fallback analysis due to:', errorReason);
 
     // Extract video ID and other metadata for better fallback content
-    const videoId = pageContent.url.includes('youtube.com/watch?v=') 
+    const videoId = pageContent.url.includes('youtube.com/watch?v=')
       ? new URL(pageContent.url).searchParams.get('v')
       : pageContent.url.split('/').pop();
 
@@ -333,10 +330,7 @@ Return a detailed analysis in this exact JSON structure:
       temperature: 0.3,
       messages: [{
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: `Analyze this webpage content briefly:
+        content: `Analyze this webpage content briefly:
 URL: ${pageContent.url}
 Title: ${pageContent.title.slice(0, 100)}
 Type: ${pageContent.type}
@@ -361,8 +355,6 @@ Provide a concise JSON analysis with:
     "suggestedTags": ["optional better tags"]
   }
 }`
-          }
-        ]
       }]
     });
 
@@ -451,7 +443,7 @@ Provide a concise JSON analysis with:
       // Extract content based on type
       let content = '';
       if (type === 'video') {
-        content = $('meta[name="description"]').attr('content') || 
+        content = $('meta[name="description"]').attr('content') ||
                  $('.watch-main-col .content').text() ||
                  $('meta[property="og:description"]').attr('content') || '';
       } else {
@@ -535,7 +527,7 @@ Provide a concise JSON analysis with:
       await this.saveDebugInfo(normalizedUrl, pageContent, 'extracted_content');
 
       // Use different analysis strategies based on content type
-      const analysis = pageContent.type === 'video' 
+      const analysis = pageContent.type === 'video'
         ? await this.analyzeVideoContent(pageContent)
         : await this.analyzeWebContent(pageContent);
 
