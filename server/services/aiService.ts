@@ -48,6 +48,7 @@ export interface AIAnalysis {
     analysisAttempts?: number;
     error?: string;
   };
+  transcriptHighlights?: string[];
 }
 
 interface PageContent {
@@ -62,6 +63,9 @@ interface PageContent {
     lastModified?: string;
     mainImage?: string;
     wordCount?: number;
+    duration?: string;
+    viewCount?: number;
+    category?: string;
   };
 }
 
@@ -155,6 +159,7 @@ export class AIService {
       // Fetch complete video content for YouTube videos
       let videoContent = pageContent.content;
       let videoMetadata = pageContent.metadata || {};
+      let transcriptText = '';
 
       // Extract the actual video ID from the URL
       const videoUrlMatch = pageContent.url.match(/(?:youtube\.com\/watch\?v=|youtu.be\/)([^&]+)/);
@@ -163,18 +168,29 @@ export class AIService {
       if (videoId) {
         const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
         if (youtubeContent) {
+          transcriptText = youtubeContent.transcript || '';
           videoContent = `
-Video Title: ${youtubeContent.title}
+Title: ${youtubeContent.title}
 Creator: ${youtubeContent.author}
 Published: ${youtubeContent.publishDate}
-Description: ${youtubeContent.description}
-Transcript Highlights: ${youtubeContent.transcript}
+Full Description: ${youtubeContent.description}
+
+Complete Transcript:
+${transcriptText}
+
+Additional Context:
+- Video Duration: ${youtubeContent.duration || 'Unknown'}
+- View Count: ${youtubeContent.viewCount || 'Unknown'}
+- Category: ${youtubeContent.category || 'Unknown'}
 `.trim();
 
           videoMetadata = {
             ...videoMetadata,
             author: youtubeContent.author,
-            publishDate: youtubeContent.publishDate
+            publishDate: youtubeContent.publishDate,
+            duration: youtubeContent.duration,
+            viewCount: youtubeContent.viewCount,
+            category: youtubeContent.category
           };
         }
       }
@@ -185,37 +201,39 @@ Transcript Highlights: ${youtubeContent.transcript}
         temperature: 0.3,
         messages: [{
           role: "user",
-          content: `As an expert video content analyst, analyze this YouTube video content and provide detailed insights. Even with partial content, extract maximum value from the available information.
+          content: `As an expert video content analyst, analyze this YouTube video content with its complete transcript and description to provide comprehensive insights. Extract maximum value from all available information.
 
 Content Type: YouTube Video
 URL: ${pageContent.url}
-Title: ${pageContent.title}
-Creator: ${pageContent.metadata?.author || 'Unknown'}
 Available Content:
 ${videoContent}
 
-Provide a comprehensive analysis as a valid JSON object with this structure:
+Create a thorough analysis in valid JSON format with this structure:
 {
-  "title": "An engaging, SEO-optimized title that captures the main value proposition (60-100 chars)",
-  "description": "A detailed analysis that must include:
+  "title": "A compelling, SEO-optimized title that captures the main value proposition (60-100 chars)",
+  "description": "A comprehensive analysis that MUST include:
+    - Detailed summary of the video's main content
+    - Key points and insights from the transcript
     - Core message and key takeaways
-    - Main arguments and supporting points
+    - Main arguments with supporting evidence
     - Target audience and relevance
     - Industry context and trends discussed
-    - Actionable insights and practical applications",
-  "tags": ["10-15 relevant tags covering topic, industry, content type, and key concepts"],
+    - Actionable insights and practical applications
+    - Notable quotes or timestamps",
+  "tags": ["15-20 relevant tags covering topic, industry, content type, key concepts, and transcript-derived keywords"],
   "contentQuality": {
     "relevance": "Score 0-1 based on topic relevance and audience value",
     "informativeness": "Score 0-1 based on depth and actionable insights",
     "credibility": "Score 0-1 based on expertise and evidence",
     "overallScore": "Average of above scores"
   },
-  "mainTopics": ["3-5 main topics or themes"],
+  "mainTopics": ["5-7 main topics or themes extracted from both video and transcript"],
   "recommendations": {
     "improvedTitle": "Enhanced title focusing on value proposition",
     "improvedDescription": "Alternative description emphasizing practical insights",
-    "suggestedTags": ["5-7 additional tags focusing on specific concepts"]
-  }
+    "suggestedTags": ["7-10 additional tags focusing on specific concepts from transcript"]
+  },
+  "transcriptHighlights": ["5-7 key quotes or important segments from the transcript"]
 }`
         }]
       });
@@ -242,19 +260,19 @@ Provide a comprehensive analysis as a valid JSON object with this structure:
           }
         }
 
-        // Validate the analysis structure
+        // Validate and normalize the analysis
         if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
           throw new Error('Invalid analysis structure');
         }
 
-        // Combine and deduplicate tags
+        // Combine and deduplicate tags, including transcript-derived keywords
         const combinedTags = Array.from(new Set([
           ...(analysis.tags || []),
           ...(analysis.recommendations?.suggestedTags || []),
           'video',
           pageContent.type,
-          ...this.extractKeywordsFromContent(videoContent)
-        ])).slice(0, 15);
+          ...this.extractKeywordsFromTranscript(transcriptText)
+        ])).slice(0, 20);  // Allow for more tags
 
         // Ensure all quality scores are valid numbers between 0 and 1
         const qualityScores = {
@@ -269,7 +287,7 @@ Provide a comprehensive analysis as a valid JSON object with this structure:
           description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
           tags: combinedTags.map(tag => tag.toLowerCase()),
           contentQuality: qualityScores,
-          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 5),
+          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 7),
           recommendations: {
             improvedTitle: analysis.recommendations?.improvedTitle,
             improvedDescription: analysis.recommendations?.improvedDescription,
@@ -277,6 +295,7 @@ Provide a comprehensive analysis as a valid JSON object with this structure:
           },
           metadata: {
             ...videoMetadata,
+            transcriptHighlights: analysis.transcriptHighlights || [],
             analysisAttempts: 1
           }
         };

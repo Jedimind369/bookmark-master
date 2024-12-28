@@ -2,12 +2,6 @@ import { pgTable, text, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").unique().notNull(),
-  password: text("password").notNull(),
-});
-
 // Define the analysis status type
 export type AnalysisStatus = 'success' | 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error' | 'processing';
 
@@ -47,6 +41,7 @@ export const bookmarks = pgTable("bookmarks", {
       improvedDescription?: string;
       suggestedTags?: string[];
     };
+    transcriptHighlights?: string[];
   }>(),
   updateHistory: jsonb("update_history").$type<Array<{
     timestamp: string;
@@ -55,14 +50,20 @@ export const bookmarks = pgTable("bookmarks", {
   }>>().default([]),
 });
 
-// User schemas
-export const insertUserSchema = createInsertSchema(users);
-export const selectUserSchema = createSelectSchema(users);
-export type InsertUser = typeof users.$inferInsert;
-export type SelectUser = typeof users.$inferSelect;
-
 // Bookmark schemas
 export const insertBookmarkSchema = createInsertSchema(bookmarks);
 export const selectBookmarkSchema = createSelectSchema(bookmarks);
 export type InsertBookmark = typeof bookmarks.$inferInsert;
 export type SelectBookmark = typeof bookmarks.$inferSelect;
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").unique().notNull(),
+  password: text("password").notNull(),
+});
+
+// User schemas
+export const insertUserSchema = createInsertSchema(users);
+export const selectUserSchema = createSelectSchema(users);
+export type InsertUser = typeof users.$inferInsert;
+export type SelectUser = typeof users.$inferSelect;

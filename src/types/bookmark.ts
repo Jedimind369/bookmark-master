@@ -1,3 +1,5 @@
+export type AnalysisStatus = 'success' | 'error' | 'invalid_url' | 'rate_limited' | 'unreachable' | 'system_error' | 'processing';
+
 export interface Bookmark {
   id: string;
   url: string;
@@ -5,23 +7,42 @@ export interface Bookmark {
   description?: string;
   tags: string[];
   collections: string[];
-  userId: string;
   dateAdded: Date;
+  dateModified?: Date;
   analysis?: {
-    title?: string;
-    summary?: string;
-    credibilityScore?: number;
-    tags?: string[];
-    status?: string;
+    status?: AnalysisStatus;
     lastUpdated?: string;
-    mainTopics?: string[];
+    summary?: string;
+    error?: string;
+    retryable?: boolean;
+    tags?: string[];
     contentQuality?: {
       relevance: number;
       informativeness: number;
       credibility: number;
       overallScore: number;
     };
-  }
+    mainTopics?: string[];
+    videoContent?: {
+      transcript?: string;
+      author?: string;
+      publishDate?: string;
+      viewCount?: number;
+      duration?: string;
+      category?: string;
+    };
+    recommendations?: {
+      improvedTitle?: string;
+      improvedDescription?: string;
+      suggestedTags?: string[];
+    };
+    transcriptHighlights?: string[];
+  };
+  updateHistory?: Array<{
+    timestamp: string;
+    status: AnalysisStatus;
+    message?: string;
+  }>;
 }
 
 export interface CreateBookmarkDto {
