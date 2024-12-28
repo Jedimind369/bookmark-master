@@ -348,9 +348,15 @@ Content: ${pageContent.content}`
 
       let analysis: AIAnalysis;
       try {
-        analysis = JSON.parse(content.text);
+        // Clean the response text to ensure valid JSON
+        const cleanText = content.text.trim();
+        // Handle potential markdown code blocks
+        const jsonText = cleanText.replace(/```json\n?(.*)\n?```/s, '$1').trim();
+        analysis = JSON.parse(jsonText);
       } catch (error) {
-        throw new Error("Invalid JSON response from Claude");
+        console.error("[Analysis] JSON parse error:", error);
+        console.error("[Analysis] Raw text:", content.text);
+        throw new Error(`Failed to parse analysis result: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
       // Validate and normalize the analysis
