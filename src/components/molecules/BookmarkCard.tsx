@@ -1,8 +1,8 @@
+import { FC } from "react";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tag } from "../atoms/Tag";
-import { Bookmark } from "@/types/bookmark";
 import { Edit2, Trash2, ExternalLink } from "lucide-react";
+import { Bookmark } from "@/types/bookmark";
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
@@ -10,7 +10,7 @@ interface BookmarkCardProps {
   onDelete: (id: string) => void;
 }
 
-export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) => {
+export const BookmarkCard: FC<BookmarkCardProps> = ({ bookmark, onEdit, onDelete }) => {
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
@@ -33,11 +33,13 @@ export const BookmarkCard = ({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-          {bookmark.description}
+          {bookmark.description || 'No description available'}
         </p>
         <div className="flex flex-wrap gap-2">
-          {bookmark.tags.map((tag) => (
-            <Tag key={tag} text={tag} />
+          {bookmark.tags?.map((tag) => (
+            <div key={tag} className="px-2 py-1 bg-primary/10 text-primary rounded-md text-sm">
+              {tag}
+            </div>
           ))}
         </div>
       </CardContent>
