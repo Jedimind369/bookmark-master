@@ -27,6 +27,22 @@ export interface VideoContent {
   category?: string;
 }
 
+export interface BookmarkMetadata {
+  author?: string;
+  publishDate?: string;
+  lastModified?: string;
+  mainImage?: string;
+  wordCount?: number;
+  analysisAttempts?: number;
+  transcriptHighlights?: string[];
+  status?: AnalysisStatus;
+  error?: string;
+  // Add video-specific metadata
+  duration?: string;
+  viewCount?: number;
+  category?: string;
+}
+
 export interface BookmarkAnalysis {
   status?: AnalysisStatus;
   summary?: string;
@@ -41,19 +57,9 @@ export interface BookmarkAnalysis {
     improvedDescription?: string;
     suggestedTags?: string[];
   };
-  transcriptHighlights?: string[];
   title?: string;
   description?: string;
-  metadata?: {
-    author?: string;
-    publishDate?: string;
-    lastModified?: string;
-    mainImage?: string;
-    wordCount?: number;
-    analysisAttempts?: number;
-    status?: AnalysisStatus;
-    error?: string;
-  };
+  metadata?: BookmarkMetadata;
 }
 
 export interface UpdateHistory {

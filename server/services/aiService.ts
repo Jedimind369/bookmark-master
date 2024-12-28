@@ -5,7 +5,8 @@ import type { Response } from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
 import { YouTubeService } from './youtubeService';
-import type { BookmarkAnalysis } from '@shared/types/bookmark';
+import type { BookmarkAnalysis, BookmarkMetadata } from '@shared/types/bookmark';
+import { AnalysisStatus } from '@shared/types/bookmark';
 
 // Verify API key is set
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -30,55 +31,7 @@ interface PageContent {
   description: string;
   content: string;
   type: 'webpage' | 'video' | 'article' | 'product';
-  metadata?: {
-    author?: string;
-    publishDate?: string;
-    lastModified?: string;
-    mainImage?: string;
-    wordCount?: number;
-    duration?: string;
-    viewCount?: number;
-    category?: string;
-  };
-}
-
-interface AnalysisMetadata {
-  author?: string;
-  publishDate?: string;
-  lastModified?: string;
-  mainImage?: string;
-  wordCount?: number;
-  analysisAttempts?: number;
-  error?: string;
-  transcriptHighlights?: string[];
-}
-
-export interface AIAnalysis {
-  title: string;
-  description: string;
-  tags: string[];
-  contentQuality: {
-    relevance: number;
-    informativeness: number;
-    credibility: number;
-    overallScore: number;
-  };
-  mainTopics: string[];
-  recommendations?: {
-    improvedTitle?: string;
-    improvedDescription?: string;
-    suggestedTags?: string[];
-  };
-  metadata?: {
-    author?: string;
-    publishDate?: string;
-    lastModified?: string;
-    mainImage?: string;
-    wordCount?: number;
-    analysisAttempts?: number;
-    error?: string;
-  };
-  transcriptHighlights?: string[];
+  metadata?: BookmarkMetadata;
 }
 
 export class AIService {
@@ -164,7 +117,7 @@ export class AIService {
     }
   }
 
-  private static async analyzeVideoContent(pageContent: PageContent): Promise<AIAnalysis> {
+  private static async analyzeVideoContent(pageContent: PageContent): Promise<BookmarkAnalysis> {
     try {
       console.log(`[Video Analysis] Starting analysis for: ${pageContent.url}`);
 
@@ -294,7 +247,7 @@ Create a thorough analysis in valid JSON format with this structure:
           overallScore: this.normalizeScore(analysis.contentQuality?.overallScore)
         };
 
-        const analysisResult = {
+        const analysisResult: BookmarkAnalysis = {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
           description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
           tags: combinedTags.map(tag => tag.toLowerCase()),
@@ -308,8 +261,9 @@ Create a thorough analysis in valid JSON format with this structure:
           metadata: {
             ...videoMetadata,
             transcriptHighlights: analysis.transcriptHighlights || [],
-            analysisAttempts: 1
-          } as AnalysisMetadata
+            analysisAttempts: 1,
+            status: AnalysisStatus.Success
+          }
         };
         return analysisResult;
       } catch (parseError) {
@@ -364,7 +318,7 @@ Create a thorough analysis in valid JSON format with this structure:
       .map(([word]) => word);
   }
 
-  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): AIAnalysis {
+  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): BookmarkAnalysis {
     console.log('[Analysis] Creating fallback analysis due to:', errorReason);
 
     // Extract video ID and other metadata for better fallback content
@@ -399,12 +353,14 @@ Create a thorough analysis in valid JSON format with this structure:
       metadata: {
         ...pageContent.metadata,
         analysisAttempts: 1,
-        error: errorReason
-      }
+        error: errorReason,
+        status: AnalysisStatus.Error
+      },
+      recommendations: {}
     };
   }
 
-  private static async analyzeWebContent(pageContent: PageContent): Promise<AIAnalysis> {
+  private static async analyzeWebContent(pageContent: PageContent): Promise<BookmarkAnalysis> {
     // Truncate content to avoid token limit
     const truncatedContent = pageContent.content.slice(0, 1500);
 
@@ -467,7 +423,8 @@ Provide a concise JSON analysis with:
         recommendations: analysis.recommendations || {},
         metadata: {
           ...pageContent.metadata,
-          analysisAttempts: 1
+          analysisAttempts: 1,
+          status: AnalysisStatus.Success
         }
       };
     } catch (parseError) {
@@ -596,7 +553,7 @@ Provide a concise JSON analysis with:
     }
   }
 
-  static async analyzeUrl(url: string): Promise<AIAnalysis> {
+  static async analyzeUrl(url: string): Promise<BookmarkAnalysis> {
     const normalizedUrl = this.normalizeUrl(url);
     const attempts = (this.analysisAttempts.get(normalizedUrl) || 0) + 1;
     this.analysisAttempts.set(normalizedUrl, attempts);
@@ -645,7 +602,8 @@ Provide a concise JSON analysis with:
           suggestedTags: ['needs-reanalysis']
         },
         metadata: {
-          analysisAttempts: attempts
+          analysisAttempts: attempts,
+          status: AnalysisStatus.Error
         }
       };
     }
