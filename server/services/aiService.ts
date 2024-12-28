@@ -321,17 +321,10 @@ export class AIService {
         }
 
         const transcriptContent = video?.snippet?.description || '';
-
-        // Extract video description and metadata
-        const $ = cheerio.load(html);
-        const rawDescription = pageContent.description || 
-                             $('meta[name="description"]').attr('content') || 
-                             $('meta[property="og:description"]').attr('content');
-
-        // Extract keywords and video info  
-        const keywords = $('meta[name="keywords"]').attr('content')?.split(',').map(k => k.trim()) || [];
-        const duration = $('meta[itemprop="duration"]').attr('content');
-        const viewCount = $('meta[itemprop="interactionCount"]').attr('content');
+        const rawDescription = video?.snippet?.title || pageContent.description;
+        const viewCount = video?.statistics?.viewCount || '0';
+        const duration = video?.contentDetails?.duration || 'unknown';
+        const keywords = video?.snippet?.tags || [];
 
         // Combine transcript with metadata for analysis
         const analysisContent = [
