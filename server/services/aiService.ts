@@ -177,7 +177,7 @@ Full Transcript: ${youtubeContent.transcript}
 
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
-        max_tokens: 4000, //Increased max_tokens
+        max_tokens: 4000,
         temperature: 0.3,
         messages: [{
           role: "user",
@@ -223,8 +223,8 @@ Return a detailed analysis in this exact JSON structure:
         }]
       });
 
-      // Get the first message content
-      const content = message.content[0]?.text;
+      // Get content from the new Anthropic API response format
+      const content = message.content[0].type === 'text' ? message.content[0].text : '';
       if (!content) {
         throw new Error('No content in AI response');
       }
@@ -247,7 +247,7 @@ Return a detailed analysis in this exact JSON structure:
           'video',
           pageContent.type,
           ...this.extractKeywordsFromTranscript(videoContent)
-        ])).slice(0, 15); // Keep up to 15 unique tags
+        ])).slice(0, 15);
 
         return {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
@@ -377,8 +377,8 @@ Provide a concise JSON analysis with:
       }]
     });
 
-    // Get the first response with content
-    const content = message.content[0]?.text;
+    // Get content from the new Anthropic API response format
+    const content = message.content[0].type === 'text' ? message.content[0].text : '';
     if (!content) {
       throw new Error('No content in AI response');
     }

@@ -43,13 +43,9 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        const responseSummary = JSON.stringify(capturedJsonResponse);
+        logLine += ` :: ${responseSummary.length > 100 ? responseSummary.slice(0, 97) + '...' : responseSummary}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
       log(logLine);
     }
   });
@@ -57,14 +53,25 @@ app.use((req, res, next) => {
   next();
 });
 
-// Global error handling middleware
+// Global error handling middleware with better logging
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("Server error:", err);
+  console.error("Server error:", {
+    message: err.message,
+    stack: err.stack,
+    code: err.code,
+    status: err.status || err.statusCode
+  });
+
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
-  res.status(status).json({ message });
+
+  res.status(status).json({ 
+    message,
+    error: app.get('env') === 'development' ? err.stack : undefined
+  });
 });
 
+// Server initialization with proper error handling
 (async () => {
   try {
     console.log("Starting server initialization...");

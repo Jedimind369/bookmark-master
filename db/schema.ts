@@ -34,12 +34,25 @@ export const bookmarks = pgTable("bookmarks", {
       overallScore: number;
     };
     mainTopics?: string[];
+    videoContent?: {
+      transcript?: string;
+      author?: string;
+      publishDate?: string;
+      viewCount?: number;
+      duration?: string;
+      category?: string;
+    };
     recommendations?: {
       improvedTitle?: string;
       improvedDescription?: string;
       suggestedTags?: string[];
     };
   }>(),
+  updateHistory: jsonb("update_history").$type<Array<{
+    timestamp: string;
+    status: AnalysisStatus;
+    message?: string;
+  }>>().default([]),
 });
 
 // User schemas
