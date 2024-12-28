@@ -8,8 +8,19 @@ export interface Bookmark {
   userId: string;
   dateAdded: Date;
   analysis?: {
+    title?: string;
     summary?: string;
     credibilityScore?: number;
+    tags?: string[];
+    status?: string;
+    lastUpdated?: string;
+    mainTopics?: string[];
+    contentQuality?: {
+      relevance: number;
+      informativeness: number;
+      credibility: number;
+      overallScore: number;
+    };
   }
 }
 
