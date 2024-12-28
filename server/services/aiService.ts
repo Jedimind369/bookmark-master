@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 import type { Response } from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
-import { YouTubeService } from './youtubeService';
+import { YouTubeService, type VideoDetails } from './youtubeService';
 
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
@@ -74,11 +74,6 @@ export class AIService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  private static async exponentialBackoff(attempt: number): Promise<void> {
-    const delay = this.INITIAL_RETRY_DELAY * Math.pow(2, attempt);
-    await this.delay(delay);
-  }
-
   private static async saveDebugInfo(url: string, data: any, type: string): Promise<void> {
     try {
       const debugDir = path.join(process.cwd(), 'debug');
@@ -93,117 +88,26 @@ export class AIService {
     }
   }
 
-  private static isValidHtml(text: string): boolean {
-    const htmlPatterns = [
-      /^\s*<!DOCTYPE\s+html/i,
-      /^\s*<html/i,
-      /<head>/i,
-      /<body>/i,
-      /<\/html>/i
-    ];
-    return htmlPatterns.some(pattern => pattern.test(text));
-  }
+  private static async getVideoAnalysisPrompt(videoContent: VideoDetails): Promise<string> {
+    return `Analyze this video content and provide a detailed analysis. Return ONLY a valid JSON object with no additional text, notes, or comments:
 
-  private static async fetchWithTimeout(
-    url: string,
-    options: any = {},
-    timeout: number = 30000
-  ): Promise<Response> {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
+Title: ${videoContent.title}
+Author: ${videoContent.author}
+Published: ${videoContent.publishDate}
+Description: ${videoContent.description}
+Transcript: ${videoContent.transcript}
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      return response;
-    } finally {
-      clearTimeout(id);
-    }
-  }
-
-  private static normalizeUrl(url: string): string {
-    try {
-      let normalizedUrl = url.trim();
-      if (!normalizedUrl) {
-        throw new Error('URL is required');
-      }
-
-      // Add https:// if no protocol specified
-      if (!normalizedUrl.match(/^https?:\/\//i)) {
-        normalizedUrl = 'https://' + normalizedUrl;
-      }
-
-      // Convert http to https
-      normalizedUrl = normalizedUrl.replace(/^http:/i, 'https:');
-
-      // Validate URL format
-      const parsedUrl = new URL(normalizedUrl);
-
-      // Remove trailing slash
-      return parsedUrl.toString().replace(/\/$/, '');
-    } catch (error) {
-      throw new Error(`Invalid URL format: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  private static async analyzeVideoContent(pageContent: PageContent): Promise<AIAnalysis> {
-    try {
-      console.log(`[Video Analysis] Starting analysis for: ${pageContent.url}`);
-
-      // Fetch complete video content for YouTube videos
-      let videoContent = pageContent.content;
-      let videoMetadata = pageContent.metadata || {};
-
-      if (pageContent.url.includes('youtube.com') || pageContent.url.includes('youtu.be')) {
-        const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
-        if (youtubeContent) {
-          console.log('[Video Analysis] Successfully fetched YouTube content');
-          videoContent = `
-Title: ${youtubeContent.title}
-Author: ${youtubeContent.author}
-Published: ${youtubeContent.publishDate}
-Description: ${youtubeContent.description}
-Transcript: ${youtubeContent.transcript}
-          `.trim();
-
-          videoMetadata = {
-            ...videoMetadata,
-            author: youtubeContent.author,
-            publishDate: youtubeContent.publishDate
-          };
-        }
-      }
-
-      // Truncate content but keep enough for meaningful analysis
-      const truncatedContent = videoContent.slice(0, 4000); // Increased limit for better analysis
-
-      console.log('[Video Analysis] Creating AI analysis request');
-      const message = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1024,
-        temperature: 0.3,
-        messages: [{
-          role: "user",
-          content: `Analyze this video content and provide a comprehensive analysis:
-Title: ${pageContent.title}
-Description: ${pageContent.description}
-Author: ${pageContent.metadata?.author || 'Unknown'}
-Type: ${pageContent.type}
-Content: ${truncatedContent}
-
-Return a detailed analysis in this exact JSON structure:
+The response must be a valid JSON object with this exact structure:
 {
-  "title": "complete, engaging title that accurately represents the video content",
+  "title": "write a complete, descriptive title that accurately represents the video content",
   "description": "Write a comprehensive description (at least 5-8 detailed sentences) that covers: 
-    1. Main purpose and target audience of the video
-    2. Key insights, arguments, or demonstrations presented
-    3. Notable examples or case studies discussed
-    4. Important takeaways or conclusions
-    5. Any unique perspectives or methodologies shared
-    Include specific details from the video content to support each point.",
-  "tags": ["at least 5 specific, relevant tags that accurately reflect the video topic, industry, and key concepts discussed"],
+    1. The main purpose and target audience of the video
+    2. Key points, demonstrations, or arguments presented
+    3. Important examples or case studies discussed
+    4. Practical applications or takeaways
+    5. Unique insights or methodologies shared
+    Include specific details from the video to support each point.",
+  "tags": ["at least 5 specific, relevant tags that reflect the video topic, industry, and key concepts"],
   "contentQuality": {
     "relevance": 0.8,
     "informativeness": 0.8,
@@ -212,368 +116,202 @@ Return a detailed analysis in this exact JSON structure:
   },
   "mainTopics": ["3-4 main topics covered in detail"],
   "recommendations": {
-    "improvedTitle": "enhanced title that includes key topic and value proposition",
-    "improvedDescription": "alternative description with additional context and insights",
-    "suggestedTags": ["additional relevant tags focusing on specific concepts, methodologies, or applications discussed"]
+    "improvedTitle": "enhanced title with clear value proposition",
+    "improvedDescription": "alternative description with additional context",
+    "suggestedTags": ["additional relevant tags"]
   }
-}`
-        }]
-      });
-
-      const content = message.content[0];
-      if (!content || typeof content !== 'object' || !('text' in content)) {
-        console.error('[Video Analysis] Invalid AI response structure');
-        return this.createFallbackAnalysis(pageContent, 'Invalid AI response structure');
-      }
-
-      const responseText = content.text;
-      console.log('[Video Analysis] Raw AI response:', responseText);
-
-      // Save response for debugging
-      await this.saveDebugInfo(pageContent.url, { aiResponse: responseText }, 'video_analysis');
-
-      try {
-        const analysis = JSON.parse(responseText);
-
-        // Validate required fields
-        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
-          console.error('[Video Analysis] Invalid response structure:', analysis);
-          return this.createFallbackAnalysis(pageContent, 'Invalid response structure');
-        }
-
-        // Ensure we have at least 5 tags
-        const combinedTags = Array.from(new Set([
-          ...(analysis.tags || []),
-          ...(analysis.recommendations?.suggestedTags || []),
-          'video',
-          pageContent.type
-        ])).slice(0, 10); // Keep up to 10 unique tags
-
-        return {
-          title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
-          description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
-          tags: combinedTags.map(tag => tag.toLowerCase()),
-          contentQuality: {
-            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
-            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
-            credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
-            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
-          },
-          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 4),
-          recommendations: {
-            improvedTitle: analysis.recommendations?.improvedTitle,
-            improvedDescription: analysis.recommendations?.improvedDescription,
-            suggestedTags: analysis.recommendations?.suggestedTags
-          },
-          metadata: {
-            ...pageContent.metadata,
-            analysisAttempts: 1
-          }
-        };
-      } catch (parseError) {
-        console.error('[Video Analysis] Failed to parse AI response:', parseError, 'Raw content:', responseText);
-        return this.createFallbackAnalysis(pageContent, 'Failed to parse AI response');
-      }
-    } catch (error) {
-      console.error('[Video Analysis] Error:', error);
-      return this.createFallbackAnalysis(pageContent, error instanceof Error ? error.message : 'Unknown error');
-    }
+}`;
   }
 
-  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): AIAnalysis {
-    console.log('[Analysis] Creating fallback analysis due to:', errorReason);
+  private static async getWebAnalysisPrompt(pageContent: PageContent): Promise<string> {
+    return `Analyze this ${pageContent.type} content and provide a detailed analysis. Return ONLY a valid JSON object with no additional text, notes, or comments:
 
-    // Extract video ID and other metadata for better fallback content
-    const videoId = pageContent.url.includes('youtube.com/watch?v=')
-      ? new URL(pageContent.url).searchParams.get('v')
-      : pageContent.url.split('/').pop();
-
-    const creator = pageContent.metadata?.author || 'content creator';
-    const defaultDescription = `This video content was created by ${creator}. ` +
-      `The video covers important topics and information that may be valuable to viewers. ` +
-      `Due to technical limitations, a detailed analysis is currently unavailable. ` +
-      `The original title of the video is "${pageContent.title}". ` +
-      `For the most accurate information, please view the video directly.`;
-
-    return {
-      title: pageContent.title || `Video Content: ${videoId || 'Untitled'}`,
-      description: pageContent.description || defaultDescription,
-      tags: [
-        'video',
-        'content',
-        'online-media',
-        'digital-content',
-        'educational'
-      ],
-      contentQuality: {
-        relevance: 0.8,
-        informativeness: 0.8,
-        credibility: 0.8,
-        overallScore: 0.8
-      },
-      mainTopics: ['video content', 'digital media', 'online education'],
-      metadata: {
-        ...pageContent.metadata,
-        analysisAttempts: 1,
-        error: errorReason
-      }
-    };
-  }
-
-  private static async analyzeWebContent(pageContent: PageContent): Promise<AIAnalysis> {
-    try {
-      console.log(`[Web Analysis] Starting analysis for: ${pageContent.url}`);
-
-      // Truncate content to avoid token limit but keep enough for meaningful analysis
-      const truncatedContent = pageContent.content.slice(0, 3000);
-
-      const message = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1024,
-        temperature: 0.3,
-        messages: [{
-          role: "user",
-          content: `Analyze this webpage content and provide a detailed analysis:
 URL: ${pageContent.url}
 Title: ${pageContent.title}
 Type: ${pageContent.type}
 Description: ${pageContent.description}
-Content: ${truncatedContent}
+Content: ${pageContent.content.slice(0, 4000)}
 
-Return a detailed analysis in this exact JSON structure:
+The response must be a valid JSON object with this exact structure:
 {
-  "title": "complete, descriptive title that accurately represents the content",
+  "title": "write a complete, descriptive title that accurately represents the content",
   "description": "Write a comprehensive description (at least 5-8 detailed sentences) that covers: 
-    1. Main purpose and target audience of the content
-    2. Key features, functionalities, or concepts presented
-    3. Notable technical aspects or implementations discussed
+    1. The main purpose and target audience
+    2. Key features, concepts, or arguments presented
+    3. Notable technical aspects or implementations
     4. Important benefits or value propositions
-    5. Any unique aspects or innovations highlighted
+    5. Any unique aspects or innovations
     Include specific details from the content to support each point.",
-  "tags": ["at least 5 specific, relevant tags that accurately reflect the topic, technology, and key concepts discussed"],
+  "tags": ["at least 5 specific, relevant tags"],
   "contentQuality": {
     "relevance": 0.8,
     "informativeness": 0.8,
     "credibility": 0.8,
     "overallScore": 0.8
   },
-  "mainTopics": ["3-4 main topics covered in detail"],
+  "mainTopics": ["3-4 main topics covered"],
   "recommendations": {
-    "improvedTitle": "enhanced title that includes key topic and value proposition",
-    "improvedDescription": "alternative description with additional context and insights",
-    "suggestedTags": ["additional relevant tags focusing on specific concepts and technologies discussed"]
+    "improvedTitle": "enhanced title with clear value proposition",
+    "improvedDescription": "alternative description with additional context",
+    "suggestedTags": ["additional relevant tags"]
   }
-}`
-        }]
+}`;
+  }
+
+  private static async analyzeWithAI(prompt: string, url: string): Promise<AIAnalysis> {
+    try {
+      const message = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 1024,
+        temperature: 0.3,
+        messages: [{ role: "user", content: prompt }]
       });
 
       const content = message.content[0];
       if (!content || typeof content !== 'object' || !('text' in content)) {
-        console.error('[Web Analysis] Invalid AI response structure');
-        throw new Error('Invalid response structure from AI service');
+        throw new Error('Invalid AI response structure');
       }
 
-      const responseText = content.text;
-      console.log('[Web Analysis] Raw AI response:', responseText);
+      let responseText = content.text.trim();
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
+      }
 
-      // Save response for debugging
-      await this.saveDebugInfo(pageContent.url, { aiResponse: responseText }, 'web_analysis');
+      responseText = jsonMatch[0];
+      await this.saveDebugInfo(url, {
+        rawResponse: content.text,
+        cleanedResponse: responseText
+      }, 'analysis');
 
-      try {
-        const analysis = JSON.parse(responseText);
+      const analysis = JSON.parse(responseText);
 
-        // Validate required fields
-        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
-          console.error('[Web Analysis] Invalid response structure:', analysis);
-          throw new Error('Invalid analysis format');
+      if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
+        throw new Error('Invalid analysis structure');
+      }
+
+      // Ensure at least 5 tags
+      const combinedTags = Array.from(new Set([
+        ...(analysis.tags || []),
+        ...(analysis.recommendations?.suggestedTags || [])
+      ])).slice(0, 10);
+
+      if (combinedTags.length < 5) {
+        throw new Error('Not enough tags generated');
+      }
+
+      return {
+        title: analysis.title,
+        description: analysis.description,
+        tags: combinedTags.map(tag => tag.toLowerCase()),
+        contentQuality: {
+          relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
+          informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
+          credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
+          overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
+        },
+        mainTopics: (analysis.mainTopics || []).slice(0, 4),
+        recommendations: analysis.recommendations || {},
+        metadata: {
+          analysisAttempts: 1
         }
-
-        // Ensure we have at least 5 tags
-        const combinedTags = Array.from(new Set([
-          ...(analysis.tags || []),
-          ...(analysis.recommendations?.suggestedTags || []),
-          pageContent.type
-        ])).slice(0, 10); // Keep up to 10 unique tags
-
-        return {
-          title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
-          description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
-          tags: combinedTags.map(tag => tag.toLowerCase()),
-          contentQuality: {
-            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
-            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
-            credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
-            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
-          },
-          mainTopics: (analysis.mainTopics || []).slice(0, 4),
-          recommendations: analysis.recommendations || {},
-          metadata: {
-            ...pageContent.metadata,
-            analysisAttempts: 1
-          }
-        };
-      } catch (parseError) {
-        console.error('[Web Analysis] Failed to parse AI response:', parseError, 'Raw content:', responseText);
-        throw new Error('Failed to parse AI response');
-      }
+      };
     } catch (error) {
-      console.error('[Web Analysis] Error:', error);
+      console.error('[Analysis] AI Error:', error);
       throw error;
     }
   }
 
-  private static async fetchPageContent(url: string, retries: number = 0): Promise<PageContent> {
+  private static async fetchPageContent(url: string): Promise<PageContent> {
     try {
-      console.log(`[Analysis] Fetching ${url} (attempt ${retries + 1}/${this.MAX_RETRIES})`);
+      console.log(`[Analysis] Fetching content for: ${url}`);
 
-      const response = await this.fetchWithTimeout(url, {
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0; +http://localhost)',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+      // Check if it's a YouTube URL
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        console.log('[Analysis] Detected YouTube URL');
+        const videoContent = await YouTubeService.getVideoContent(url);
+        if (!videoContent) {
+          throw new Error('Failed to fetch YouTube content');
         }
-      }, this.TIMEOUT);
+
+        return {
+          url,
+          title: videoContent.title,
+          description: videoContent.description,
+          content: JSON.stringify(videoContent), // Changed to stringify VideoDetails
+          type: 'video',
+          metadata: {
+            author: videoContent.author,
+            publishDate: videoContent.publishDate
+          }
+        };
+      }
+
+      // Handle other web content
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml',
+          'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)'
+        }
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-        throw new Error(`Unsupported content type: ${contentType}`);
-      }
-
       const html = await response.text();
-
-      // Save raw HTML for debugging
-      await this.saveDebugInfo(url, { html: html.slice(0, 5000) }, 'raw_html');
-
-      if (!html || html.length < 100) {
-        throw new Error('Empty or too short response');
-      }
-
-      if (!this.isValidHtml(html)) {
-        throw new Error('Invalid HTML structure');
-      }
-
       const $ = cheerio.load(html);
 
-      // Determine content type first
+      // Determine content type
       let type: PageContent['type'] = 'webpage';
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        type = 'video';
-      } else if ($('[itemtype*="Product"]').length || $('.price').length) {
-        type = 'product';
-      } else if ($('article').length || $('[itemtype*="Article"]').length) {
+      if ($('article').length) {
         type = 'article';
       }
 
-      // Extract content based on type
-      let content = '';
-      if (type === 'video') {
-        content = $('meta[name="description"]').attr('content') ||
-                 $('.watch-main-col .content').text() ||
-                 $('meta[property="og:description"]').attr('content') || '';
-      } else {
-        const contentSelectors = [
-          'article', 'main', '[role="main"]', '#content', '.content',
-          '.article', '.post', '.entry-content'
-        ];
-
-        for (const selector of contentSelectors) {
-          const element = $(selector).first();
-          if (element.length) {
-            content = element.text().trim();
-            break;
-          }
-        }
-
-        // Fallback to body content if no main content found
-        if (!content) {
-          content = $('body').clone()
-            .children('nav,header,footer,aside,script,style')
-            .remove()
-            .end()
-            .text()
-            .trim();
-        }
-      }
-
-      // Basic metadata extraction
-      const title = $('meta[property="og:title"]').attr('content')?.trim() ||
-                   $('title').text().trim() ||
-                   $('h1').first().text().trim() ||
-                   url;
-
-      const description = $('meta[property="og:description"]').attr('content')?.trim() ||
-                         $('meta[name="description"]').attr('content')?.trim() ||
-                         '';
-
-      // Extract metadata
-      const metadata = {
-        author: $('meta[name="author"]').attr('content') ||
-                $('[rel="author"]').first().text(),
-        publishDate: $('meta[property="article:published_time"]').attr('content') ||
-                    $('time[pubdate]').attr('datetime'),
-        lastModified: $('meta[property="article:modified_time"]').attr('content'),
-        mainImage: $('meta[property="og:image"]').attr('content'),
-        wordCount: content.split(/\s+/).length
-      };
+      // Extract content
+      const content = $('article, main, .content').text() || $('body').text();
 
       return {
         url,
-        title,
-        description,
+        title: $('meta[property="og:title"]').attr('content') || $('title').text(),
+        description: $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '',
         content: content.replace(/\s+/g, ' ').trim(),
         type,
-        metadata
+        metadata: {
+          author: $('meta[name="author"]').attr('content'),
+          publishDate: $('meta[property="article:published_time"]').attr('content'),
+          mainImage: $('meta[property="og:image"]').attr('content')
+        }
       };
     } catch (error) {
-      console.error(`[Analysis] Error fetching ${url}:`, error);
-
-      if (retries < this.MAX_RETRIES) {
-        await this.exponentialBackoff(retries);
-        return this.fetchPageContent(url, retries + 1);
-      }
-
+      console.error('[Analysis] Fetch error:', error);
       throw error;
     }
   }
 
   static async analyzeUrl(url: string): Promise<AIAnalysis> {
-    const normalizedUrl = this.normalizeUrl(url);
-    const attempts = (this.analysisAttempts.get(normalizedUrl) || 0) + 1;
-    this.analysisAttempts.set(normalizedUrl, attempts);
-
     try {
-      console.log(`[Analysis] Starting analysis of ${normalizedUrl} (attempt ${attempts})`);
+      console.log(`[Analysis] Starting analysis of ${url}`);
+      const pageContent = await this.fetchPageContent(url);
 
-      const pageContent = await this.fetchPageContent(normalizedUrl);
-      console.log(`[Analysis] Successfully fetched content for ${normalizedUrl}`);
+      const prompt = pageContent.type === 'video'
+        ? await this.getVideoAnalysisPrompt(JSON.parse(pageContent.content) as VideoDetails)
+        : await this.getWebAnalysisPrompt(pageContent);
 
-      // Save extracted content for debugging
-      await this.saveDebugInfo(normalizedUrl, pageContent, 'extracted_content');
+      const analysis = await this.analyzeWithAI(prompt, url);
 
-      // Use different analysis strategies based on content type
-      const analysis = pageContent.type === 'video'
-        ? await this.analyzeVideoContent(pageContent)
-        : await this.analyzeWebContent(pageContent);
-
-      console.log(`[Analysis] Successfully analyzed ${normalizedUrl}`);
       return {
         ...analysis,
         metadata: {
           ...analysis.metadata,
-          analysisAttempts: attempts
+          ...pageContent.metadata
         }
       };
-
     } catch (error) {
-      console.error(`[Analysis] Error analyzing ${normalizedUrl}:`, error);
+      console.error(`[Analysis] Error analyzing ${url}:`, error);
+      const attempts = (this.analysisAttempts.get(url) || 0) + 1;
+      this.analysisAttempts.set(url, attempts);
 
-      // Create a meaningful fallback analysis for errors
       return {
         title: url,
         description: `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}. Will retry automatically.`,
@@ -585,12 +323,8 @@ Return a detailed analysis in this exact JSON structure:
           overallScore: 0
         },
         mainTopics: ['analysis-pending'],
-        recommendations: {
-          improvedTitle: url,
-          improvedDescription: 'Content analysis temporarily unavailable',
-          suggestedTags: ['needs-reanalysis']
-        },
         metadata: {
+          error: error instanceof Error ? error.message : 'Unknown error',
           analysisAttempts: attempts
         }
       };
