@@ -293,12 +293,17 @@ export class AIService {
           : url.split('/').pop();
 
         // Get video details from YouTube API
+        if (!process.env.YOUTUBE_API_KEY) {
+          throw new Error('YouTube API key not configured');
+        }
+        
         const youtube = google.youtube({
           version: 'v3',
           auth: process.env.YOUTUBE_API_KEY
         });
 
-        const videoData = await youtube.videos.list({
+        try {
+          const videoData = await youtube.videos.list({
           part: ['snippet', 'statistics', 'contentDetails'],
           id: [videoId],
           // Add quota limits
@@ -309,6 +314,10 @@ export class AIService {
         const video = videoData.data.items?.[0];
         if (!video) {
           throw new Error('Video not found');
+        }
+        } catch (error) {
+          console.error('[YouTube API] Error:', error);
+          throw new Error('Failed to fetch YouTube video data. Please check API configuration.');
         }
 
         const transcriptContent = video.snippet?.description || '';
