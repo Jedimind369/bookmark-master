@@ -351,4 +351,111 @@ export class BookmarkModel {
       throw new Error("Failed to purge bookmarks");
     }
   }
+
+  static async getEnrichmentCount(): Promise<number> {
+    try {
+      console.log('[Enrichment] Getting enrichment count');
+      // Get count of bookmarks that need enrichment (no analysis, processing, error, or low quality)
+      const results = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookmarks)
+        .where(
+          or(
+            isNull(bookmarks.analysis),
+            sql`${bookmarks.analysis}->>'status' = 'processing'`,
+            sql`${bookmarks.analysis}->>'status' = 'error'`,
+            sql`${bookmarks.analysis}->>'status' = 'success' AND (${bookmarks.analysis}->'contentQuality'->>'overallScore')::float < 0.6`
+          )
+        );
+
+      const count = results[0]?.count || 0;
+      console.log('[Enrichment] Count:', count);
+      return count;
+    } catch (error) {
+      console.error("[Enrichment] Error getting enrichment count:", error);
+      throw new Error("Failed to get enrichment count");
+    }
+  }
+
+  static async getProcessedCount(): Promise<number> {
+    try {
+      // Get count of successfully processed bookmarks
+      const results = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookmarks)
+        .where(
+          and(
+            sql`${bookmarks.analysis} is not null`,
+            sql`${bookmarks.analysis}->>'status' != 'processing'`
+          )
+        );
+
+      return results[0]?.count || 0;
+    } catch (error) {
+      console.error("[Enrichment] Error getting processed count:", error);
+      throw new Error("Failed to get processed count");
+    }
+  }
+
+  static async getTotalBookmarkCount(): Promise<number> {
+    try {
+      const results = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(bookmarks);
+
+      return results[0]?.count || 0;
+    } catch (error) {
+      console.error("[Enrichment] Error getting total count:", error);
+      throw new Error("Failed to get total count");
+    }
+  }
+
+  static async enrichAllBookmarks(): Promise<boolean> {
+    try {
+      const bookmarksToUpdate = await db
+        .select()
+        .from(bookmarks)
+        .where(
+          or(
+            isNull(bookmarks.analysis),
+            sql`${bookmarks.analysis}->>'status' = 'processing'`,
+            sql`${bookmarks.analysis}->>'status' = 'error'`,
+            sql`${bookmarks.analysis}->>'status' = 'system_error'`
+          )
+        );
+
+      console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
+
+      // Process in larger batches for better throughput
+      const batchSize = 10;
+      for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
+        const batch = bookmarksToUpdate.slice(i, i + batchSize);
+        console.log(`[Enrichment] Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(bookmarksToUpdate.length/batchSize)}`);
+
+        // Process each bookmark in the batch sequentially to better track failures
+        for (const bookmark of batch) {
+          try {
+            console.log(`[Enrichment] Processing bookmark ${bookmark.id}: ${bookmark.url}`);
+            await this.enrichBookmarkAnalysis(bookmark);
+          } catch (error) {
+            console.error(`[Enrichment] Error processing bookmark ${bookmark.id}:`, error);
+            // Continue with next bookmark even if current one fails
+          }
+          // Add a small delay between bookmarks to prevent rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Add a delay between batches to prevent overwhelming the system
+        if (i + batchSize < bookmarksToUpdate.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      console.log('[Enrichment] Completed enrichment process');
+      return true;
+    } catch (error) {
+      console.error("[Enrichment] Failed to enrich bookmarks:", error);
+      throw new Error("Failed to enrich bookmarks");
+    }
+  }
 }
