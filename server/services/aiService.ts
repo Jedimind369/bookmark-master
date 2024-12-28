@@ -348,15 +348,32 @@ Content: ${pageContent.content}`
 
       let analysis: AIAnalysis;
       try {
-        // Clean the response text to ensure valid JSON
+        // Clean and validate response
         const cleanText = content.text.trim();
-        // Handle potential markdown code blocks
-        const jsonText = cleanText.replace(/```json\n?(.*)\n?```/s, '$1').trim();
-        analysis = JSON.parse(jsonText);
+        
+        // Check if response starts with HTML
+        if (cleanText.toLowerCase().startsWith('<!doctype') || cleanText.startsWith('<html')) {
+          throw new Error('Received HTML instead of JSON response');
+        }
+
+        // Extract JSON from potential markdown code blocks
+        let jsonText = cleanText;
+        const jsonMatch = cleanText.match(/```json\n?(.*?)\n?```/s);
+        if (jsonMatch) {
+          jsonText = jsonMatch[1].trim();
+        }
+
+        // Attempt to parse JSON
+        try {
+          analysis = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error("[Analysis] JSON parse error:", parseError);
+          console.error("[Analysis] Attempted to parse:", jsonText);
+          throw new Error('Invalid JSON response from analysis');
+        }
       } catch (error) {
-        console.error("[Analysis] JSON parse error:", error);
-        console.error("[Analysis] Raw text:", content.text);
-        throw new Error(`Failed to parse analysis result: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error("[Analysis] Response processing error:", error);
+        throw new Error(`Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
       // Validate and normalize the analysis
