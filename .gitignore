@@ -13,3 +13,18 @@ coverage/
 build/
 tmp/
 temp/
+attached_assets/
+generated-icon.png
+
+# Environment files
+.env*
+!.env.example
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
