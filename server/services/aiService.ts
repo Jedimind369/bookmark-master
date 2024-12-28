@@ -302,9 +302,8 @@ export class AIService {
           auth: process.env.YOUTUBE_API_KEY
         });
 
-        let videoData;
         try {
-          videoData = await youtube.videos.list({
+          const videoData = await youtube.videos.list({
             part: ['snippet', 'statistics', 'contentDetails'],
             id: [videoId],
             maxResults: 1,
@@ -314,25 +313,21 @@ export class AIService {
           if (!videoData?.data?.items || videoData.data.items.length === 0) {
             throw new Error('Video not found');
           }
-        } catch (error) {
-          console.error('[YouTube API] Error:', error);
-          throw new Error('Failed to fetch YouTube video data');
-        }
 
-        const video = videoData.data.items[0];
-        const transcriptContent = video.snippet?.description || '';
-        const rawDescription = video.snippet?.title || pageContent.description;
-        const viewCount = video.statistics?.viewCount || '0';
-        const duration = video.contentDetails?.duration || 'unknown';
-        const keywords = video.snippet?.tags || [];
+          const video = videoData.data.items[0];
+          const transcriptContent = video.snippet?.description || '';
+          const rawDescription = video.snippet?.title || pageContent.description;
+          const viewCount = video.statistics?.viewCount || '0';
+          const duration = video.contentDetails?.duration || 'unknown';
+          const keywords = video.snippet?.tags || [];
 
         // Combine transcript with metadata for analysis
-        const analysisContent = [
-          rawDescription,
-          transcriptContent?.slice(0, 1000), // First 1000 chars of transcript
-          `Video duration: ${duration || 'unknown'}`,
-          `Views: ${viewCount || 'unknown'}`
-        ].filter(Boolean).join('\n\n');
+          const analysisContent = [
+            rawDescription,
+            transcriptContent?.slice(0, 1000), // First 1000 chars of transcript
+            `Video duration: ${duration || 'unknown'}`,
+            `Views: ${viewCount || 'unknown'}`
+          ].filter(Boolean).join('\n\n');
 
         // Send combined content for AI analysis
         const response = await anthropic.messages.create({
