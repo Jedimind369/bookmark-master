@@ -181,7 +181,7 @@ export const BookmarkEnrichment = () => {
       <Button
         variant={isProcessing ? "secondary" : "default"}
         onClick={() => enrichMutation.mutate()}
-        disabled={isProcessing || !enrichmentCount}
+        disabled={isProcessing}
         className="w-full sm:w-auto"
       >
         {isProcessing ? (
