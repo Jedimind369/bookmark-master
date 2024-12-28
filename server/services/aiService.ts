@@ -350,9 +350,23 @@ Content: ${pageContent.content}`
       try {
         // Clean and validate response
         const cleanText = content.text.trim();
+        console.log('[Analysis] Raw response length:', cleanText.length);
+        console.log('[Analysis] Response preview:', cleanText.substring(0, 100));
         
-        // Check if response starts with HTML
-        if (cleanText.toLowerCase().startsWith('<!doctype') || cleanText.startsWith('<html')) {
+        // Track analysis attempts
+        const attempts = (global as any).analysisAttempts = ((global as any).analysisAttempts || 0) + 1;
+        console.log('[Analysis] Total attempts:', attempts);
+        
+        // Enhanced HTML detection
+        if (cleanText.toLowerCase().startsWith('<!doctype') || 
+            cleanText.startsWith('<html') ||
+            cleanText.includes('</html>')) {
+          console.error('[Analysis] HTML detected - saving for debugging');
+          // Save failed response for debugging
+          await fs.promises.writeFile(
+            `debug/failed_analysis_${Date.now()}.txt`,
+            cleanText
+          ).catch(() => {/* Ignore write errors */});
           throw new Error('Received HTML instead of JSON response');
         }
 
