@@ -46,17 +46,23 @@ export class BookmarkModel {
 
   private static async getOrCreateDefaultUser() {
     try {
+      console.log('[User] Looking up default user');
       const defaultUserResult = await db.select().from(users).where(eq(users.username, 'default_user')).limit(1);
 
       if (defaultUserResult.length > 0) {
+        console.log('[User] Found existing default user');
         return defaultUserResult[0];
       }
 
+      console.log('[User] Creating default user');
       const [defaultUser] = await db.insert(users).values({
         username: 'default_user',
         password: 'not_used',
+        dateCreated: new Date(),
+        dateModified: new Date()
       }).returning();
 
+      console.log('[User] Created default user:', defaultUser);
       return defaultUser;
     } catch (error) {
       console.error("Error getting/creating default user:", error);
@@ -66,15 +72,25 @@ export class BookmarkModel {
 
   static async create(data: Omit<InsertBookmark, "id" | "dateAdded" | "userId">) {
     try {
+      // Create default user first
       const defaultUser = await this.getOrCreateDefaultUser();
+      console.log('[Create] Default user:', defaultUser);
+
+      // Ensure we have a valid user before proceeding
+      if (!defaultUser?.id) {
+        throw new Error('Failed to get or create default user');
+      }
 
       const normalizedData = {
         ...data,
         userId: defaultUser.id,
         tags: Array.isArray(data.tags) ? data.tags : [],
         collections: Array.isArray(data.collections) ? data.collections : [],
+        dateAdded: new Date(),
         dateModified: new Date()
       };
+
+      console.log('[Create] Normalized data:', normalizedData);
 
       const [bookmark] = await db
         .insert(bookmarks)
