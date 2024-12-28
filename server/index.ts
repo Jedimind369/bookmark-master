@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { testDatabaseConnection } from "@db";
+import { testDatabaseConnection, initializeDatabase } from "@db";
 
 // Verify required environment variables
 const requiredEnvVars = ['ANTHROPIC_API_KEY', 'DATABASE_URL'];
@@ -55,7 +55,7 @@ app.use((req, res, next) => {
 
 // Global error handling middleware with better logging
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("Server error:", {
+  console.error("[Server] Error:", {
     message: err.message,
     stack: err.stack,
     code: err.code,
@@ -74,14 +74,15 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // Server initialization with proper error handling
 (async () => {
   try {
-    console.log("Starting server initialization...");
+    console.log("[Server] Starting server initialization...");
 
     // Test database connection first
-    const dbConnected = await testDatabaseConnection();
-    if (!dbConnected) {
-      throw new Error("Failed to connect to database");
-    }
-    console.log("Database connection successful");
+    await testDatabaseConnection();
+    console.log("[Server] Database connection successful");
+
+    // Initialize database tables
+    await initializeDatabase();
+    console.log("[Server] Database initialization complete");
 
     const server = registerRoutes(app);
 
@@ -97,12 +98,12 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       return new Promise((resolve, reject) => {
         server.listen(port, "0.0.0.0")
           .once('listening', () => {
-            log(`Server running at http://0.0.0.0:${port}`);
+            log(`[Server] Running at http://0.0.0.0:${port}`);
             resolve();
           })
           .once('error', (err: NodeJS.ErrnoException) => {
             if (err.code === 'EADDRINUSE') {
-              console.log(`Port ${port} in use, trying next port...`);
+              console.log(`[Server] Port ${port} in use, trying next port...`);
               tryPort(port + 1).then(resolve).catch(reject);
             } else {
               reject(err);
@@ -115,7 +116,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     await tryPort(5000);
 
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error("[Server] Failed to start server:", error);
     process.exit(1);
   }
 })();

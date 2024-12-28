@@ -156,15 +156,19 @@ export class AIService {
       let videoContent = pageContent.content;
       let videoMetadata = pageContent.metadata || {};
 
-      if (pageContent.url.includes('youtube.com') || pageContent.url.includes('youtu.be')) {
+      // Extract the actual video ID from the URL
+      const videoUrlMatch = pageContent.url.match(/(?:youtube\.com\/watch\?v=|youtu.be\/)([^&]+)/);
+      const videoId = videoUrlMatch ? videoUrlMatch[1] : null;
+
+      if (videoId) {
         const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
         if (youtubeContent) {
           videoContent = `
-Title: ${youtubeContent.title}
-Author: ${youtubeContent.author}
+Video Title: ${youtubeContent.title}
+Creator: ${youtubeContent.author}
 Published: ${youtubeContent.publishDate}
 Description: ${youtubeContent.description}
-Full Transcript: ${youtubeContent.transcript}
+Transcript Highlights: ${youtubeContent.transcript}
 `.trim();
 
           videoMetadata = {
@@ -181,63 +185,66 @@ Full Transcript: ${youtubeContent.transcript}
         temperature: 0.3,
         messages: [{
           role: "user",
-          content: `Analyze this video content in extreme detail. Extract maximum value from the transcript and description to create a comprehensive analysis:
+          content: `As an expert video content analyst, analyze this YouTube video content and provide detailed insights. Even with partial content, extract maximum value from the available information.
 
+Content Type: YouTube Video
+URL: ${pageContent.url}
 Title: ${pageContent.title}
-Description: ${pageContent.description}
-Author: ${pageContent.metadata?.author || 'Unknown'}
-Type: ${pageContent.type}
-Full Content: ${videoContent}
+Creator: ${pageContent.metadata?.author || 'Unknown'}
+Available Content:
+${videoContent}
 
-Your task is to provide an extremely detailed analysis that captures the depth and nuance of the video content.
-Return a detailed analysis in this exact JSON structure:
+Provide a comprehensive analysis as a valid JSON object with this structure:
 {
-  "title": "Write a complete, engaging title (60-100 characters) that accurately represents the video content and includes key topics",
-  "description": "Write a comprehensive, multi-paragraph description (MINIMUM 5 detailed paragraphs) that MUST include:
-    1. Overview: Main purpose, target audience, and context of the video
-    2. Key Arguments: Present the main arguments, claims, or demonstrations in detail
-    3. Supporting Evidence: Document specific examples, case studies, statistics, or data discussed
-    4. Analysis: Evaluate the quality and credibility of the content
-    5. Value Proposition: Explain why this content is valuable and what viewers will learn
-    Include exact quotes from the transcript when possible to support key points",
-  "tags": ["10-15 specific, relevant tags that accurately capture:
-    - Main topic and all subtopics
-    - Content type and format
-    - Industry or field
-    - Technical terms and methodologies
-    - Target audience
-    - Related concepts and themes"],
+  "title": "An engaging, SEO-optimized title that captures the main value proposition (60-100 chars)",
+  "description": "A detailed analysis that must include:
+    - Core message and key takeaways
+    - Main arguments and supporting points
+    - Target audience and relevance
+    - Industry context and trends discussed
+    - Actionable insights and practical applications",
+  "tags": ["10-15 relevant tags covering topic, industry, content type, and key concepts"],
   "contentQuality": {
-    "relevance": "Score 0-1 based on topic relevance and audience fit",
-    "informativeness": "Score 0-1 based on depth and usefulness of information",
-    "credibility": "Score 0-1 based on evidence and expertise shown",
-    "overallScore": "Average of the above scores"
+    "relevance": "Score 0-1 based on topic relevance and audience value",
+    "informativeness": "Score 0-1 based on depth and actionable insights",
+    "credibility": "Score 0-1 based on expertise and evidence",
+    "overallScore": "Average of above scores"
   },
-  "mainTopics": ["4-6 main topics covered in detail"],
+  "mainTopics": ["3-5 main topics or themes"],
   "recommendations": {
-    "improvedTitle": "Enhanced title emphasizing value proposition",
-    "improvedDescription": "Alternative description focusing on unique insights and practical applications",
-    "suggestedTags": ["5-7 additional tags focusing on specific concepts and applications"]
+    "improvedTitle": "Enhanced title focusing on value proposition",
+    "improvedDescription": "Alternative description emphasizing practical insights",
+    "suggestedTags": ["5-7 additional tags focusing on specific concepts"]
   }
 }`
         }]
       });
 
-      // Get content from the new Anthropic API response format
       const content = message.content[0].type === 'text' ? message.content[0].text : '';
       if (!content) {
         throw new Error('No content in AI response');
       }
 
-      // Save response for debugging
       await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'video_analysis');
 
       try {
-        const analysis = JSON.parse(content);
+        let analysis;
+        // First try to parse the entire response as JSON
+        try {
+          analysis = JSON.parse(content);
+        } catch (parseError) {
+          // If direct parsing fails, try to extract JSON from the response
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            analysis = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error('No valid JSON found in response');
+          }
+        }
 
-        // Validate and enhance the analysis
+        // Validate the analysis structure
         if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
-          throw new Error('Invalid response structure');
+          throw new Error('Invalid analysis structure');
         }
 
         // Combine and deduplicate tags
@@ -246,20 +253,23 @@ Return a detailed analysis in this exact JSON structure:
           ...(analysis.recommendations?.suggestedTags || []),
           'video',
           pageContent.type,
-          ...this.extractKeywordsFromTranscript(videoContent)
+          ...this.extractKeywordsFromContent(videoContent)
         ])).slice(0, 15);
+
+        // Ensure all quality scores are valid numbers between 0 and 1
+        const qualityScores = {
+          relevance: this.normalizeScore(analysis.contentQuality?.relevance),
+          informativeness: this.normalizeScore(analysis.contentQuality?.informativeness),
+          credibility: this.normalizeScore(analysis.contentQuality?.credibility),
+          overallScore: this.normalizeScore(analysis.contentQuality?.overallScore)
+        };
 
         return {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
           description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
           tags: combinedTags.map(tag => tag.toLowerCase()),
-          contentQuality: {
-            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
-            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
-            credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
-            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
-          },
-          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 6),
+          contentQuality: qualityScores,
+          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 5),
           recommendations: {
             improvedTitle: analysis.recommendations?.improvedTitle,
             improvedDescription: analysis.recommendations?.improvedDescription,
@@ -271,13 +281,36 @@ Return a detailed analysis in this exact JSON structure:
           }
         };
       } catch (parseError) {
-        console.error('[Video Analysis] Failed to parse AI response:', parseError, 'Raw content:', content);
-        return this.createFallbackAnalysis(pageContent, 'Failed to parse AI response');
+        console.error('[Video Analysis] Failed to parse AI response:', parseError);
+        throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
       }
     } catch (error) {
       console.error('[Video Analysis] Error:', error);
       return this.createFallbackAnalysis(pageContent, error instanceof Error ? error.message : 'Unknown error');
     }
+  }
+
+  private static normalizeScore(score: any): number {
+    const num = typeof score === 'number' ? score : parseFloat(score);
+    if (isNaN(num)) return 0.5;
+    return Math.max(0, Math.min(1, num));
+  }
+
+  private static extractKeywordsFromContent(content: string): string[] {
+    const words = content.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 3);
+
+    const wordFreq: Record<string, number> = {};
+    words.forEach(word => {
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
+    });
+
+    return Object.entries(wordFreq)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([word]) => word);
   }
 
   private static extractKeywordsFromTranscript(transcript: string): string[] {
