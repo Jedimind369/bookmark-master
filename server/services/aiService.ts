@@ -119,200 +119,144 @@ export class AIService {
       };
 
       // Single fetch with human-like behavior
-      try {
-        const response = await this.fetchWithTimeout(url, {
-          headers: {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'sec-ch-ua': '"Chromium";v="122", "Google Chrome";v="122"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'Upgrade-Insecure-Requests': '1'
-          },
-          credentials: 'include',
-          referrer: 'https://www.google.com/',
-          referrerPolicy: 'strict-origin-when-cross-origin',
-          mode: 'cors'
-        }, this.TIMEOUT);
+      const response = await this.fetchWithTimeout(url, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'sec-ch-ua': '"Chromium";v="122", "Google Chrome";v="122"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1'
+        },
+        credentials: 'include',
+        referrer: 'https://www.google.com/',
+        referrerPolicy: 'strict-origin-when-cross-origin',
+        mode: 'cors'
+      }, this.TIMEOUT);
 
-        let captchaDetected = false;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+        throw new Error('Not a webpage: ' + contentType);
+      }
 
-          const contentType = response.headers.get('content-type') || '';
-          if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-            throw new Error('Not a webpage: ' + contentType);
-          }
+      const html = await response.text();
+      if (!html || html.length < 100) {
+        throw new Error('Empty or too short response');
+      }
 
-          const html = await response.text();
-          if (!html || html.length < 100) {
-            throw new Error('Empty or too short response');
-          }
+      const $ = cheerio.load(html);
 
-          const $ = cheerio.load(html);
+      // Check for CAPTCHA
+      const captchaIndicators = [
+        'captcha',
+        'robot check',
+        'verify human',
+        'security check',
+        'please verify',
+        'bot check'
+      ];
 
-          // Check for CAPTCHA
-          const captchaIndicators = [
-            'captcha',
-            'robot check',
-            'verify human',
-            'security check',
-            'please verify',
-            'bot check'
-          ];
+      const pageText = $('body').text().toLowerCase();
+      const captchaDetected = captchaIndicators.some(indicator =>
+        pageText.includes(indicator.toLowerCase())
+      );
 
-          const pageText = $('body').text().toLowerCase();
-          captchaDetected = captchaIndicators.some(indicator => 
-            pageText.includes(indicator.toLowerCase())
-          );
+      if (captchaDetected) {
+        throw new Error('CAPTCHA detected');
+      }
 
-          if (captchaDetected) {
-            console.log(`[Analysis] CAPTCHA detected on ${url}, attempting screenshot fallback`);
-            
-            // Try metadata first
-            const ogTitle = $('meta[property="og:title"]').attr('content');
-            const ogDesc = $('meta[property="og:description"]').attr('content');
-            
-            // Launch puppeteer for screenshot
-            const browser = await import('puppeteer').then(p => p.launch({
-              headless: 'new',
-              args: ['--no-sandbox']
-            }));
-            
-            try {
-              const page = await browser.newPage();
-              await page.goto(url, { waitUntil: 'networkidle0' });
-              const screenshot = await page.screenshot({ fullPage: true });
-              
-              // Use Tesseract for OCR
-              const { createWorker } = await import('tesseract.js');
-              const worker = await createWorker();
-              await worker.loadLanguage('eng');
-              await worker.initialize('eng');
-              
-              const { data: { text } } = await worker.recognize(screenshot);
-              await worker.terminate();
-              await browser.close();
-              
-              // Extract meaningful content from OCR text
-              const contentLines = text.split('\n')
-                .filter(line => line.length > 30)
-                .slice(0, 5)
-                .join('\n');
-              
-              return {
-                url,
-                title: ogTitle || url,
-                description: ogDesc || contentLines.slice(0, 160),
-                content: contentLines,
-                type: 'webpage',
-                metadata: {
-                  wordCount: contentLines.split(/\s+/).length,
-                  isScreenshotFallback: true
-                }
-              };
-            } catch (screenshotError) {
-              console.error('[Analysis] Screenshot fallback failed:', screenshotError);
-              throw new Error('Content access blocked and fallback failed');
-            }
-          }
+      // Remove non-content elements
+      $('script, style, nav, footer, iframe, noscript').remove();
+      $('.cookie-banner, .advertisement, .popup, .modal').remove();
+      $('[class*="cookie"], [class*="banner"], [class*="popup"]').remove();
 
-          // Remove non-content elements
-          $('script, style, nav, footer, iframe, noscript').remove();
-          $('.cookie-banner, .advertisement, .popup, .modal').remove();
-          $('[class*="cookie"], [class*="banner"], [class*="popup"]').remove();
+      const title = $('meta[property="og:title"]').attr('content')?.trim() ||
+                   $('title').text().trim() ||
+                   $('h1').first().text().trim() ||
+                   'Untitled Page';
 
-          const title = $('meta[property="og:title"]').attr('content')?.trim() ||
-                       $('title').text().trim() ||
-                       $('h1').first().text().trim() ||
-                       'Untitled Page';
+      const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
+                            $('meta[name="description"]').attr('content')?.trim() ||
+                            '';
 
-          const metaDescription = $('meta[property="og:description"]').attr('content')?.trim() ||
-                                $('meta[name="description"]').attr('content')?.trim() ||
-                                '';
+      // Get main content with better fallbacks
+      let mainContent = '';
+      const contentSelectors = [
+        'article',
+        '[role="main"]',
+        'main',
+        '#content',
+        '.content',
+        '.article',
+        '.post'
+      ];
 
-          // Get main content with better fallbacks
-          let mainContent = '';
-          const contentSelectors = [
-            'article',
-            '[role="main"]',
-            'main',
-            '#content',
-            '.content',
-            '.article',
-            '.post'
-          ];
-
-          for (const selector of contentSelectors) {
-            const element = $(selector).first();
-            if (element.length) {
-              mainContent = element.text().trim();
-              break;
-            }
-          }
-
-          if (!mainContent) {
-            mainContent = $('body').clone()
-              .children('nav,header,footer,aside')
-              .remove()
-              .end()
-              .text()
-              .trim();
-          }
-
-          if (!mainContent) {
-            throw new Error('No meaningful content found');
-          }
-
-          // Extract metadata
-          const metadata = {
-            author: $('meta[name="author"]').attr('content') ||
-                    $('[rel="author"]').first().text(),
-            publishDate: $('meta[property="article:published_time"]').attr('content') ||
-                        $('time[pubdate]').attr('datetime'),
-            lastModified: $('meta[property="article:modified_time"]').attr('content'),
-            mainImage: $('meta[property="og:image"]').attr('content'),
-            wordCount: mainContent.split(/\s+/).length
-          };
-
-          // Determine content type
-          let type: 'webpage' | 'video' | 'article' | 'product' = 'webpage';
-          if ($('[itemtype*="Product"]').length || $('.price').length) {
-            type = 'product';
-          } else if ($('article').length || $('[itemtype*="Article"]').length) {
-            type = 'article';
-          }
-
-          return {
-            url,
-            title,
-            description: metaDescription,
-            content: [title, metaDescription, mainContent]
-              .filter(Boolean)
-              .join('\n\n')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 1500), // Reduced content length for efficiency
-            type,
-            metadata
-          };
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error('Unknown error');
-          console.warn(`[Analysis] Failed to fetch from ${proxyUrl}:`, lastError.message);
-          continue; // Try next proxy
+      for (const selector of contentSelectors) {
+        const element = $(selector).first();
+        if (element.length) {
+          mainContent = element.text().trim();
+          break;
         }
       }
 
-      } catch (error) {
+      if (!mainContent) {
+        mainContent = $('body').clone()
+          .children('nav,header,footer,aside')
+          .remove()
+          .end()
+          .text()
+          .trim();
+      }
+
+      if (!mainContent) {
+        throw new Error('No meaningful content found');
+      }
+
+      // Extract metadata
+      const metadata = {
+        author: $('meta[name="author"]').attr('content') ||
+                $('[rel="author"]').first().text(),
+        publishDate: $('meta[property="article:published_time"]').attr('content') ||
+                    $('time[pubdate]').attr('datetime'),
+        lastModified: $('meta[property="article:modified_time"]').attr('content'),
+        mainImage: $('meta[property="og:image"]').attr('content'),
+        wordCount: mainContent.split(/\s+/).length
+      };
+
+      // Determine content type
+      let type: 'webpage' | 'video' | 'article' | 'product' = 'webpage';
+      if ($('[itemtype*="Product"]').length || $('.price').length) {
+        type = 'product';
+      } else if ($('article').length || $('[itemtype*="Article"]').length) {
+        type = 'article';
+      }
+
+      return {
+        url,
+        title,
+        description: metaDescription,
+        content: [title, metaDescription, mainContent]
+          .filter(Boolean)
+          .join('\n\n')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 1500), // Reduced content length for efficiency
+        type,
+        metadata
+      };
+
+    } catch (error) {
       console.error(`[Analysis] Error fetching ${url}:`, error);
 
       if (retries < this.MAX_RETRIES) {
@@ -321,7 +265,7 @@ export class AIService {
         return this.fetchWithRetry(url, retries + 1);
       }
 
-      throw new Error(`Failed to fetch page: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
     }
   }
 
@@ -400,8 +344,8 @@ Content: ${pageContent.content}`
       console.error('[Analysis] Error in analyzeUrl:', error);
 
       // Handle rate limits with retries
-      if (error instanceof Error && 
-          (error.message.includes('rate') || error.message.includes('timeout')) && 
+      if (error instanceof Error &&
+          (error.message.includes('rate') || error.message.includes('timeout')) &&
           retries < this.MAX_RETRIES) {
         console.log(`[Analysis] Rate limit/timeout hit, retrying after backoff (attempt ${retries + 1})`);
         await this.exponentialBackoff(retries);
