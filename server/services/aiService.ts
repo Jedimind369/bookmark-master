@@ -117,9 +117,8 @@ export class AIService {
       });
       clearTimeout(id);
       return response;
-    } catch (error) {
+    } finally {
       clearTimeout(id);
-      throw error;
     }
   }
 
@@ -283,110 +282,16 @@ export class AIService {
       // Save extracted content for debugging
       await this.saveDebugInfo(normalizedUrl, pageContent, 'extracted_content');
 
-      // Special handling for YouTube URLs
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        console.log('[Analysis] Detected YouTube URL, using YouTube API');
-        const { google } = await import('googleapis');
-
-        const videoId = url.includes('youtube.com/watch?v=') 
-          ? new URL(url).searchParams.get('v')
-          : url.split('/').pop();
-
-        // Get video details from YouTube API
-        if (!process.env.YOUTUBE_API_KEY) {
-          throw new Error('YouTube API key not configured');
-        }
-        
-        const youtube = google.youtube({
-          version: 'v3',
-          auth: process.env.YOUTUBE_API_KEY
-        });
-
-        try {
-          const videoData = await youtube.videos.list({
-            part: ['snippet', 'statistics', 'contentDetails'],
-            id: [videoId],
-            maxResults: 1,
-            fields: 'items(snippet,statistics,contentDetails)'
-          });
-
-          if (!videoData?.data?.items || videoData.data.items.length === 0) {
-            throw new Error('Video not found');
-          }
-          
-          let video, transcriptContent, rawDescription, viewCount, duration, keywords, analysisContent;
-          
-          try {
-            video = videoData.data.items[0];
-            transcriptContent = video.snippet?.description || '';
-            rawDescription = video.snippet?.title || pageContent.description;
-            viewCount = video.statistics?.viewCount || '0';
-            duration = video.contentDetails?.duration || 'unknown';
-            keywords = video.snippet?.tags || [];
-
-            // Combine transcript with metadata for analysis
-            analysisContent = [
-              rawDescription,
-              transcriptContent?.slice(0, 1000), // First 1000 chars of transcript
-              `Video duration: ${duration || 'unknown'}`,
-              `Views: ${viewCount || 'unknown'}`
-            ].filter(Boolean).join('\n\n');
-
-        // Send combined content for AI analysis
+      try {
         const response = await anthropic.messages.create({
           model: "claude-3-5-sonnet-20241022",
           max_tokens: 1024,
           temperature: 0.3,
-          messages: [{
-            role: "user",
-            content: `Analyze this YouTube video content and create a detailed 5-sentence description:\n\n${analysisContent}`
-          }]
-        });
-
-        const enhancedDescription = response.messages[0].content || rawDescription;
-        
-        const fullDescription = enhancedDescription || [
-          rawDescription || 'A YouTube video providing valuable content',
-          `Created by ${pageContent.metadata?.author || 'unknown creator'}`,
-          `Video transcript analysis: ${transcriptContent?.slice(0, 100)}...`,
-          `Duration: ${duration || 'unknown'}, Views: ${viewCount || 'unknown'}`,
-          `Topics covered: ${keywords.slice(0, 3).join(', ')}`
-        ].filter(s => s && !s.includes('undefined')).join('. ') + '.';
-
-        return {
-          title: pageContent.title || 'YouTube Video',
-          description: fullDescription,
-          tags: [
-            'video',
-            'youtube',
-            'educational',
-            'online-content',
-            'digital-media',
-            pageContent.metadata?.author ? 'verified-creator' : 'creator'
-          ].filter(Boolean),
-          contentQuality: {
-            relevance: 0.8,
-            informativeness: 0.7,
-            credibility: 0.9,
-            overallScore: 0.8
-          },
-          mainTopics: ['video content', 'digital media', 'online education'],
-          metadata: {
-            ...pageContent.metadata,
-            analysisAttempts: attempts
-          }
-        };
-      }
-
-      const response = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1024,
-        temperature: 0.3,
-        system: `You are a content analyst. Analyze web content and provide a detailed analysis. Return a JSON response with:
+          system: `You are a content analyst. Analyze web content and return a JSON response with:
 {
   "title": "<60 char title>",
-  "description": "<Write at least 5 complete sentences describing the content, its value, and key takeaways>",
-  "tags": ["5-8 relevant and specific tags"],
+  "description": "<160 char summary>",
+  "tags": ["3-5 relevant tags"],
   "contentQuality": {
     "relevance": 0-1 score,
     "informativeness": 0-1 score,
@@ -400,56 +305,57 @@ export class AIService {
     "suggestedTags": ["optional better tags"]
   }
 }`,
-        messages: [{
-          role: "user",
-          content: `Analyze this webpage content:
+          messages: [{
+            role: "user",
+            content: `Analyze this webpage content:
 URL: ${pageContent.url}
 Title: ${pageContent.title}
 Type: ${pageContent.type}
 Description: ${pageContent.description}
 Content: ${pageContent.content.slice(0, 2000)}`
-        }]
-      });
+          }]
+        });
 
-      // Get the content from the response
-      const analysisText = response.messages[0].content;
+        if (!response.content[0] || !response.content[0].text) {
+          throw new Error('Invalid response from AI analysis');
+        }
 
-      if (!analysisText) {
-        throw new Error('Invalid response from AI analysis');
-      }
+        const analysisText = response.content[0].text;
 
-      // Save AI response for debugging
-      await this.saveDebugInfo(normalizedUrl, { response: analysisText }, 'ai_response');
+        // Save AI response for debugging
+        await this.saveDebugInfo(normalizedUrl, { response: analysisText }, 'ai_response');
 
-      try {
-        const analysis = JSON.parse(analysisText);
+        try {
+          const analysis = JSON.parse(analysisText);
 
-        // Validate and normalize the analysis
-        return {
-          title: (analysis.title || pageContent.title).slice(0, 60),
-          description: (analysis.description || pageContent.description).slice(0, 160),
-          tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
-          contentQuality: {
-            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
-            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
-            credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0)),
-            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0))
-          },
-          mainTopics: (analysis.mainTopics || []).slice(0, 3),
-          recommendations: analysis.recommendations || {},
-          metadata: {
-            ...pageContent.metadata,
-            analysisAttempts: attempts
-          }
-        };
-      } catch (parseError) {
-        console.error('[Analysis] Failed to parse AI response:', parseError);
-        throw new Error('Invalid analysis result format');
+          return {
+            title: (analysis.title || pageContent.title).slice(0, 60),
+            description: (analysis.description || pageContent.description).slice(0, 160),
+            tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
+            contentQuality: {
+              relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
+              informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
+              credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0)),
+              overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0))
+            },
+            mainTopics: (analysis.mainTopics || []).slice(0, 3),
+            recommendations: analysis.recommendations || {},
+            metadata: {
+              ...pageContent.metadata,
+              analysisAttempts: attempts
+            }
+          };
+        } catch (parseError) {
+          console.error('[Analysis] Failed to parse AI response:', parseError);
+          throw new Error('Invalid analysis result format');
+        }
+      } catch (aiError) {
+        console.error('[Analysis] AI analysis error:', aiError);
+        throw aiError;
       }
     } catch (error) {
       console.error(`[Analysis] Error analyzing ${normalizedUrl}:`, error);
 
-      // Create a meaningful fallback analysis for errors
       return {
         title: url,
         description: `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}. Will retry automatically.`,
