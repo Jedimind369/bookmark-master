@@ -9,24 +9,26 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const db = drizzle(process.env.DATABASE_URL, { 
+// Configure database with Neon serverless driver
+export const db = drizzle({
+  connection: process.env.DATABASE_URL,
   schema,
-  logger: true,
-  connectionOptions: {
-    WebSocket: ws,
-    keepAlive: true,
-    keepAliveTimeout: 10000,
-    maxUses: 7 * 24 * 60 * 60,
-    maxLifetime: 7 * 24 * 60 * 60,
-    retries: 3,
-  }
+  logger: {
+    logQuery: (query: string, params: any[]) => {
+      console.log('Query:', query);
+      console.log('Params:', params);
+    },
+  },
+  ws
 });
 
 // Export connection test function with better error handling
 export async function testDatabaseConnection() {
   try {
-    console.log('Query:', 'SELECT 1');
-    const result = await db.execute(sql`SELECT 1`);
+    console.log('Testing database connection...');
+    // Test query that should always work
+    const result = await db.execute(sql`SELECT current_timestamp`);
+    console.log('Database connection successful:', result);
     return true;
   } catch (error) {
     console.error('Database connection test failed:', error);

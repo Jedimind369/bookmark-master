@@ -164,7 +164,7 @@ Title: ${youtubeContent.title}
 Author: ${youtubeContent.author}
 Published: ${youtubeContent.publishDate}
 Description: ${youtubeContent.description}
-Transcript: ${youtubeContent.transcript}
+Full Transcript: ${youtubeContent.transcript}
 `.trim();
 
           videoMetadata = {
@@ -177,11 +177,12 @@ Transcript: ${youtubeContent.transcript}
 
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1024,
+        max_tokens: 1500,
         temperature: 0.3,
         messages: [{
           role: "user",
-          content: `Analyze this video content and provide a comprehensive analysis:
+          content: `Analyze this video content and provide a comprehensive analysis. Pay special attention to the transcript and description to extract maximum value:
+
 Title: ${pageContent.title}
 Description: ${pageContent.description}
 Author: ${pageContent.metadata?.author || 'Unknown'}
@@ -190,25 +191,31 @@ Full Content: ${videoContent}
 
 Return a detailed analysis in this exact JSON structure:
 {
-  "title": "complete, engaging title that accurately represents the video content",
-  "description": "Write a comprehensive description (at least 5-8 detailed sentences) that covers: 
-    1. Main purpose and target audience of the video
-    2. Key insights, arguments, or demonstrations presented
-    3. Notable examples or case studies discussed
-    4. Important takeaways or conclusions
-    5. Any unique perspectives or methodologies shared
-    Include specific details from the video content to support each point.",
-  "tags": ["at least 5 specific, relevant tags that accurately reflect the video topic, industry, and key concepts discussed"],
+  "title": "Write a complete, engaging title (60-100 characters) that accurately represents the video content and includes key topics",
+  "description": "Write a comprehensive description (MINIMUM 5 detailed paragraphs) that MUST cover: 
+    1. Overview: Main purpose, target audience, and context of the video
+    2. Key Points: Major arguments, demonstrations, or insights presented
+    3. Supporting Details: Specific examples, case studies, or data discussed
+    4. Methodology/Approach: How the content is presented and structured
+    5. Value Proposition: Why this content is valuable and key takeaways
+    Include specific quotes or examples from the video transcript when possible.",
+  "tags": ["AT LEAST 8-10 specific, relevant tags that accurately reflect:
+    - Main topic and subtopics
+    - Content type and format
+    - Industry or field
+    - Technical terms or methodologies
+    - Target audience
+    - Related concepts"],
   "contentQuality": {
     "relevance": 0.8,
     "informativeness": 0.8,
     "credibility": 0.8,
     "overallScore": 0.8
   },
-  "mainTopics": ["3-4 main topics covered in detail"],
+  "mainTopics": ["4-5 main topics covered in detail"],
   "recommendations": {
     "improvedTitle": "enhanced title that includes key topic and value proposition",
-    "improvedDescription": "alternative description with additional context and insights",
+    "improvedDescription": "alternative description focusing on unique insights and practical applications",
     "suggestedTags": ["additional relevant tags focusing on specific concepts, methodologies, or applications discussed"]
   }
 }`
