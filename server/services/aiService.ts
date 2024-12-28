@@ -312,9 +312,7 @@ export class AIService {
         }
       }
 
-      throw lastError || new Error('All proxies failed');
-
-    } catch (error) {
+      } catch (error) {
       console.error(`[Analysis] Error fetching ${url}:`, error);
 
       if (retries < this.MAX_RETRIES) {
