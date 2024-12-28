@@ -313,21 +313,24 @@ export class AIService {
           if (!videoData?.data?.items || videoData.data.items.length === 0) {
             throw new Error('Video not found');
           }
+          
+          let video, transcriptContent, rawDescription, viewCount, duration, keywords, analysisContent;
+          
+          try {
+            video = videoData.data.items[0];
+            transcriptContent = video.snippet?.description || '';
+            rawDescription = video.snippet?.title || pageContent.description;
+            viewCount = video.statistics?.viewCount || '0';
+            duration = video.contentDetails?.duration || 'unknown';
+            keywords = video.snippet?.tags || [];
 
-          const video = videoData.data.items[0];
-          const transcriptContent = video.snippet?.description || '';
-          const rawDescription = video.snippet?.title || pageContent.description;
-          const viewCount = video.statistics?.viewCount || '0';
-          const duration = video.contentDetails?.duration || 'unknown';
-          const keywords = video.snippet?.tags || [];
-
-        // Combine transcript with metadata for analysis
-          const analysisContent = [
-            rawDescription,
-            transcriptContent?.slice(0, 1000), // First 1000 chars of transcript
-            `Video duration: ${duration || 'unknown'}`,
-            `Views: ${viewCount || 'unknown'}`
-          ].filter(Boolean).join('\n\n');
+            // Combine transcript with metadata for analysis
+            analysisContent = [
+              rawDescription,
+              transcriptContent?.slice(0, 1000), // First 1000 chars of transcript
+              `Video duration: ${duration || 'unknown'}`,
+              `Views: ${viewCount || 'unknown'}`
+            ].filter(Boolean).join('\n\n');
 
         // Send combined content for AI analysis
         const response = await anthropic.messages.create({
