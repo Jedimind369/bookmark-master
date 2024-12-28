@@ -285,15 +285,27 @@ export class AIService {
 
       // Special handling for YouTube URLs
       if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        console.log('[Analysis] Detected YouTube URL, using special handling');
+        console.log('[Analysis] Detected YouTube URL, using YouTube API');
+        const { google } = require('googleapis');
+        const youtube = google.youtube('v3');
+
         const videoId = url.includes('youtube.com/watch?v=') 
           ? new URL(url).searchParams.get('v')
           : url.split('/').pop();
 
-        // Extract transcript
-        const transcriptContent = $('[class*="transcript-container"]').text().trim() ||
-                                $('[class*="caption-window"]').text().trim() ||
-                                $('.ytd-transcript-renderer').text().trim();
+        // Get video details from YouTube API
+        const videoData = await youtube.videos.list({
+          key: process.env.YOUTUBE_API_KEY,
+          part: ['snippet', 'statistics', 'contentDetails'],
+          id: [videoId]
+        });
+
+        const video = videoData.data.items?.[0];
+        if (!video) {
+          throw new Error('Video not found');
+        }
+
+        const transcriptContent = video.snippet?.description || '';
 
         // Extract video description and metadata
         const rawDescription = pageContent.description || 
