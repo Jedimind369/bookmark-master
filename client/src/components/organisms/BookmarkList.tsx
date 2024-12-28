@@ -46,8 +46,14 @@ export const BookmarkList = ({ onEdit, onDelete, onRefresh }: BookmarkListProps)
     );
   }
 
-  // Sort bookmarks by dateModified in descending order
+  // Sort bookmarks by quality score and date
   const sortedBookmarks = [...bookmarks].sort((a, b) => {
+    const scoreA = a.analysis?.contentQuality?.overallScore || 0;
+    const scoreB = b.analysis?.contentQuality?.overallScore || 0;
+    if (scoreA !== scoreB) {
+      return scoreB - scoreA; // Higher scores first
+    }
+    // If scores are equal, sort by date
     const dateA = new Date(a.dateModified || a.dateAdded || 0).getTime();
     const dateB = new Date(b.dateModified || b.dateAdded || 0).getTime();
     return dateB - dateA;
