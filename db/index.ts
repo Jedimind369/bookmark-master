@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@db/schema";
+import { sql } from "drizzle-orm";
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
