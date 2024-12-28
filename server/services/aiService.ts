@@ -302,29 +302,25 @@ export class AIService {
           auth: process.env.YOUTUBE_API_KEY
         });
 
-        let video;
+        let videoData;
         try {
-          const videoData = await youtube.videos.list({
+          videoData = await youtube.videos.list({
             part: ['snippet', 'statistics', 'contentDetails'],
             id: [videoId],
             maxResults: 1,
             fields: 'items(snippet,statistics,contentDetails)'
           });
 
-          video = videoData.data.items?.[0];
-          if (!video) {
+          if (!videoData?.data?.items || videoData.data.items.length === 0) {
             throw new Error('Video not found');
           }
-        } catch (error) {
-          console.error('[YouTube API] Error:', error);
-          throw new Error('Failed to fetch YouTube video data. Please check API configuration.');
-        }
 
-        const transcriptContent = video?.snippet?.description || '';
-        const rawDescription = video?.snippet?.title || pageContent.description;
-        const viewCount = video?.statistics?.viewCount || '0';
-        const duration = video?.contentDetails?.duration || 'unknown';
-        const keywords = video?.snippet?.tags || [];
+          const video = videoData.data.items[0];
+          const transcriptContent = video.snippet?.description || '';
+          const rawDescription = video.snippet?.title || pageContent.description;
+          const viewCount = video.statistics?.viewCount || '0';
+          const duration = video.contentDetails?.duration || 'unknown';
+          const keywords = video.snippet?.tags || [];
 
         // Combine transcript with metadata for analysis
         const analysisContent = [
