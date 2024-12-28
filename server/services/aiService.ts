@@ -5,6 +5,7 @@ import type { Response } from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
 import { YouTubeService } from './youtubeService';
+import type { BookmarkAnalysis } from '@shared/types/bookmark';
 
 // Verify API key is set
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -22,6 +23,35 @@ const debugDir = path.join(process.cwd(), 'debug');
 fs.mkdir(debugDir).catch(() => {
   // Ignore error if directory already exists
 });
+
+interface PageContent {
+  url: string;
+  title: string;
+  description: string;
+  content: string;
+  type: 'webpage' | 'video' | 'article' | 'product';
+  metadata?: {
+    author?: string;
+    publishDate?: string;
+    lastModified?: string;
+    mainImage?: string;
+    wordCount?: number;
+    duration?: string;
+    viewCount?: number;
+    category?: string;
+  };
+}
+
+interface AnalysisMetadata {
+  author?: string;
+  publishDate?: string;
+  lastModified?: string;
+  mainImage?: string;
+  wordCount?: number;
+  analysisAttempts?: number;
+  error?: string;
+  transcriptHighlights?: string[];
+}
 
 export interface AIAnalysis {
   title: string;
@@ -49,24 +79,6 @@ export interface AIAnalysis {
     error?: string;
   };
   transcriptHighlights?: string[];
-}
-
-interface PageContent {
-  url: string;
-  title: string;
-  description: string;
-  content: string;
-  type: 'webpage' | 'video' | 'article' | 'product';
-  metadata?: {
-    author?: string;
-    publishDate?: string;
-    lastModified?: string;
-    mainImage?: string;
-    wordCount?: number;
-    duration?: string;
-    viewCount?: number;
-    category?: string;
-  };
 }
 
 export class AIService {
@@ -282,7 +294,7 @@ Create a thorough analysis in valid JSON format with this structure:
           overallScore: this.normalizeScore(analysis.contentQuality?.overallScore)
         };
 
-        return {
+        const analysisResult = {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
           description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
           tags: combinedTags.map(tag => tag.toLowerCase()),
@@ -297,8 +309,9 @@ Create a thorough analysis in valid JSON format with this structure:
             ...videoMetadata,
             transcriptHighlights: analysis.transcriptHighlights || [],
             analysisAttempts: 1
-          }
+          } as AnalysisMetadata
         };
+        return analysisResult;
       } catch (parseError) {
         console.error('[Video Analysis] Failed to parse AI response:', parseError);
         throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);

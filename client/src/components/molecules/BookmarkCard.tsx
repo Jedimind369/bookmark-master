@@ -2,7 +2,7 @@ import { FC } from "react";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit2, Trash2, ExternalLink, RefreshCw } from "lucide-react";
-import { Bookmark } from "@/types/bookmark";
+import type { Bookmark } from "@/types/bookmark";
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
@@ -17,9 +17,10 @@ export const BookmarkCard: FC<BookmarkCardProps> = ({
   onDelete,
   onRefresh 
 }) => {
+  // Combine user-added tags with AI-generated tags
   const combinedTags = Array.from(new Set([
     ...(bookmark.tags || []),
-    ...(bookmark.analysis?.mainTopics || [])
+    ...(bookmark.analysis?.tags || [])
   ]));
 
   return (
@@ -27,7 +28,7 @@ export const BookmarkCard: FC<BookmarkCardProps> = ({
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <h3 className="text-lg font-semibold line-clamp-1">
-            {bookmark.analysis?.title || bookmark.title}
+            {bookmark.title}
           </h3>
           <div className="flex gap-2">
             {onRefresh && (
@@ -62,7 +63,7 @@ export const BookmarkCard: FC<BookmarkCardProps> = ({
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-          {bookmark.description || 'No description available'}
+          {bookmark.description || bookmark.analysis?.summary || 'No description available'}
         </p>
         <div className="flex flex-wrap gap-2">
           {combinedTags.map((tag) => (

@@ -8,6 +8,9 @@ interface VideoDetails {
   transcript: string;
   author: string;
   publishDate: string;
+  duration?: string;
+  viewCount?: number;
+  category?: string;
 }
 
 export class YouTubeService {
@@ -67,23 +70,29 @@ export class YouTubeService {
       let description = '';
       const metaDescription = $('meta[property="og:description"]').attr('content') || '';
       const fullDescription = $('.ytd-video-description-text').text().trim() || 
-                            $('#description-text').text().trim() || 
-                            $('.description').text().trim();
+                          $('#description-text').text().trim() || 
+                          $('.description').text().trim();
 
       // Combine descriptions, preferring the longer one
       description = fullDescription.length > metaDescription.length ? fullDescription : metaDescription;
 
-      // Get other metadata
+      // Get metadata
       const title = $('meta[property="og:title"]').attr('content') || '';
       const author = $('link[itemprop="name"]').attr('content') || 
-                    $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
+                  $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
       const publishDate = $('meta[itemprop="datePublished"]').attr('content') || '';
+
+      // Extract additional metadata
+      const duration = $('meta[itemprop="duration"]').attr('content') || '';
+      const viewCountText = $('[class*="view-count"]').text().trim();
+      const viewCount = viewCountText ? parseInt(viewCountText.replace(/\D/g, '')) : undefined;
+      const category = $('meta[itemprop="genre"]').attr('content') || '';
 
       // If description is still empty or too short, try additional selectors
       if (description.length < 100) {
         const additionalDescription = $('#eow-description').text().trim() || 
-                                    $('.watch-description-text').text().trim() || 
-                                    $('[itemprop="description"]').text().trim();
+                                  $('.watch-description-text').text().trim() || 
+                                  $('[itemprop="description"]').text().trim();
         if (additionalDescription.length > description.length) {
           description = additionalDescription;
         }
@@ -93,7 +102,10 @@ export class YouTubeService {
         title,
         description: description || 'No description available',
         author,
-        publishDate
+        publishDate,
+        duration,
+        viewCount,
+        category
       };
     } catch (error) {
       console.error('Error fetching video details:', error);
@@ -125,7 +137,10 @@ export class YouTubeService {
         description: details.description || '',
         transcript: transcript || '',
         author: details.author || '',
-        publishDate: details.publishDate || ''
+        publishDate: details.publishDate || '',
+        duration: details.duration,
+        viewCount: details.viewCount,
+        category: details.category
       };
     } catch (error) {
       console.error('[YouTube] Error getting video content:', error);
