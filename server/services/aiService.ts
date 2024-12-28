@@ -183,6 +183,26 @@ export class AIService {
       );
 
       if (captchaDetected) {
+        // For YouTube URLs, use alternative metadata extraction
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          const videoId = url.includes('youtube.com/watch?v=') 
+            ? new URL(url).searchParams.get('v')
+            : url.split('/').pop();
+            
+          return {
+            url,
+            title: $('meta[property="og:title"]').attr('content') || 'YouTube Video',
+            description: $('meta[property="og:description"]').attr('content') || 'YouTube video content',
+            content: $('meta[property="og:description"]').attr('content') || '',
+            type: 'video',
+            metadata: {
+              author: $('meta[name="author"]').attr('content'),
+              publishDate: $('meta[property="article:published_time"]').attr('content'),
+              mainImage: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+            }
+          };
+        }
+        
         throw new Error('CAPTCHA detected');
       }
 
