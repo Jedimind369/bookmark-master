@@ -289,14 +289,22 @@ export class AIService {
         const videoId = url.includes('youtube.com/watch?v=') 
           ? new URL(url).searchParams.get('v')
           : url.split('/').pop();
-          
+
+        // Extract video description from meta tags and page content
+        const rawDescription = pageContent.description || 
+                             $('meta[name="description"]').attr('content') || 
+                             $('meta[property="og:description"]').attr('content');
+
+        // Extract keywords
+        const keywords = $('meta[name="keywords"]').attr('content')?.split(',').map(k => k.trim()) || [];
+        
         const fullDescription = [
-          pageContent.description || 'A YouTube video providing valuable content',
-          `Published by channel ${pageContent.metadata?.author || 'unknown creator'}`,
-          `This video explores various topics and insights`,
-          `The content is professionally produced and edited`,
-          `Viewers can expect to gain knowledge and understanding from this presentation`
-        ].join('. ') + '.';
+          rawDescription || 'A YouTube video providing valuable content',
+          `Created by ${pageContent.metadata?.author || 'unknown creator'}`,
+          `This video covers topics including: ${keywords.slice(0, 3).join(', ')}`,
+          `The content is professionally curated and edited for viewer engagement`,
+          `Viewers will gain insights into ${keywords.slice(-2).join(' and ')}`
+        ].filter(s => s && !s.includes('undefined')).join('. ') + '.';
 
         return {
           title: pageContent.title || 'YouTube Video',
