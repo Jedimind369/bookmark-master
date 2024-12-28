@@ -169,24 +169,54 @@ export class AIService {
           );
 
           if (captchaDetected) {
-            console.log(`[Analysis] CAPTCHA detected on ${url}`);
-            // Try to get metadata from alternative sources
+            console.log(`[Analysis] CAPTCHA detected on ${url}, attempting screenshot fallback`);
+            
+            // Try metadata first
             const ogTitle = $('meta[property="og:title"]').attr('content');
             const ogDesc = $('meta[property="og:description"]').attr('content');
             
-            if (ogTitle || ogDesc) {
+            // Launch puppeteer for screenshot
+            const browser = await import('puppeteer').then(p => p.launch({
+              headless: 'new',
+              args: ['--no-sandbox']
+            }));
+            
+            try {
+              const page = await browser.newPage();
+              await page.goto(url, { waitUntil: 'networkidle0' });
+              const screenshot = await page.screenshot({ fullPage: true });
+              
+              // Use Tesseract for OCR
+              const { createWorker } = await import('tesseract.js');
+              const worker = await createWorker();
+              await worker.loadLanguage('eng');
+              await worker.initialize('eng');
+              
+              const { data: { text } } = await worker.recognize(screenshot);
+              await worker.terminate();
+              await browser.close();
+              
+              // Extract meaningful content from OCR text
+              const contentLines = text.split('\n')
+                .filter(line => line.length > 30)
+                .slice(0, 5)
+                .join('\n');
+              
               return {
                 url,
                 title: ogTitle || url,
-                description: ogDesc || 'Content temporarily unavailable due to CAPTCHA',
-                content: ogDesc || '',
+                description: ogDesc || contentLines.slice(0, 160),
+                content: contentLines,
                 type: 'webpage',
                 metadata: {
-                  wordCount: 0
+                  wordCount: contentLines.split(/\s+/).length,
+                  isScreenshotFallback: true
                 }
               };
+            } catch (screenshotError) {
+              console.error('[Analysis] Screenshot fallback failed:', screenshotError);
+              throw new Error('Content access blocked and fallback failed');
             }
-            throw new Error('CAPTCHA verification required');
           }
 
           // Remove non-content elements
