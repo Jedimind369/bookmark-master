@@ -17,6 +17,17 @@ import { Plus, Trash2 } from "lucide-react";
 import { Bookmark, CreateBookmarkDto, UpdateBookmarkDto } from "@/types/bookmark";
 import { useToast } from "@/hooks/use-toast";
 
+// Placeholder for BookmarkHealth component (needs to be implemented separately)
+const BookmarkHealth = () => {
+  return (
+    <div>
+      <p>Bookmark Health Status: (Implementation needed)</p>
+      {/* Add logic to fetch and display health status here */}
+    </div>
+  );
+};
+
+
 export const Home = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
@@ -212,23 +223,14 @@ export const Home = () => {
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Bookmarks</h1>
-        <div className="flex gap-4">
-          <BookmarkEnrichment />
-          <BookmarkImport />
-          <Button
-            variant="outline"
-            onClick={() => setIsPurgeDialogOpen(true)}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Purge All
-          </Button>
-          <Button onClick={() => setIsFormOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Bookmark
-          </Button>
+        <div className="space-y-4">
+          <h1 className="text-3xl font-bold">Bookmarks</h1>
+          <BookmarkHealth />
         </div>
+        <Button onClick={() => setIsFormOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Bookmark
+        </Button>
       </div>
 
       <BookmarkList

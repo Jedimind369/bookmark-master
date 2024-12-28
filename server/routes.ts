@@ -267,6 +267,26 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/bookmarks/health", async (req, res) => {
+    try {
+      const bookmarks = await BookmarkModel.findAll();
+      const total = bookmarks.length;
+      const healthy = bookmarks.filter(b => 
+        b.analysis?.status === 'success' && 
+        b.analysis?.contentQuality?.overallScore >= 0.6
+      ).length;
+      
+      res.json({
+        total,
+        healthy,
+        percentage: total > 0 ? Math.round((healthy / total) * 100) : 0
+      });
+    } catch (error) {
+      console.error("Failed to get bookmark health:", error);
+      res.status(500).json({ message: "Failed to get bookmark health status" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
