@@ -171,8 +171,14 @@ Content: ${truncatedContent}
 Return a detailed analysis in this exact JSON structure:
 {
   "title": "complete, engaging title that accurately represents the video content",
-  "description": "comprehensive 5-8 sentence description covering key points, main arguments, and value proposition. Include specific details from the video content",
-  "tags": ["at least 5 specific, relevant tags based on content"],
+  "description": "Write a comprehensive description (at least 5-8 detailed sentences) that covers: 
+    1. Main purpose and target audience of the video
+    2. Key insights, arguments, or demonstrations presented
+    3. Notable examples or case studies discussed
+    4. Important takeaways or conclusions
+    5. Any unique perspectives or methodologies shared
+    Include specific details from the video content to support each point.",
+  "tags": ["at least 5 specific, relevant tags that accurately reflect the video topic, industry, and key concepts discussed"],
   "contentQuality": {
     "relevance": 0.8,
     "informativeness": 0.8,
@@ -181,9 +187,9 @@ Return a detailed analysis in this exact JSON structure:
   },
   "mainTopics": ["3-4 main topics covered in detail"],
   "recommendations": {
-    "improvedTitle": "optional better title if current one is incomplete",
-    "improvedDescription": "optional enhanced description with more context",
-    "suggestedTags": ["additional relevant tags"]
+    "improvedTitle": "enhanced title that includes key topic and value proposition",
+    "improvedDescription": "alternative description with additional context and insights",
+    "suggestedTags": ["additional relevant tags focusing on specific concepts, methodologies, or applications discussed"]
   }
 }`
             }
@@ -218,7 +224,7 @@ Return a detailed analysis in this exact JSON structure:
           ...(analysis.recommendations?.suggestedTags || []),
           'video',
           pageContent.type
-        ])].slice(0, 8); // Keep up to 8 unique tags
+        ])].slice(0, 10); // Keep up to 10 unique tags
 
         return {
           title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
