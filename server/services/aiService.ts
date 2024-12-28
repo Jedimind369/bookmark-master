@@ -115,7 +115,6 @@ export class AIService {
         ...options,
         signal: controller.signal
       });
-      clearTimeout(id);
       return response;
     } finally {
       clearTimeout(id);
@@ -125,7 +124,6 @@ export class AIService {
   private static normalizeUrl(url: string): string {
     try {
       let normalizedUrl = url.trim();
-
       if (!normalizedUrl) {
         throw new Error('URL is required');
       }
@@ -145,6 +143,146 @@ export class AIService {
       return parsedUrl.toString().replace(/\/$/, '');
     } catch (error) {
       throw new Error(`Invalid URL format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private static async analyzeVideoContent(pageContent: PageContent): Promise<AIAnalysis> {
+    try {
+      const message = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 1024,
+        temperature: 0.3,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Analyze this video content and metadata:
+Title: ${pageContent.title}
+Description: ${pageContent.description}
+Author: ${pageContent.metadata?.author || 'Unknown'}
+Type: ${pageContent.type}
+Additional Content: ${pageContent.content}
+
+Please provide a concise analysis in JSON format with:
+1. A clear, engaging title (max 60 chars)
+2. A comprehensive description (max 160 chars)
+3. 3-5 relevant tags
+4. Content quality metrics
+5. Main topics covered`
+            }
+          ]
+        }]
+      });
+
+      // Get the first response with content
+      const content = message.content[0]?.text;
+      if (!content) {
+        throw new Error('No content in AI response');
+      }
+
+      // Save response for debugging
+      await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'video_analysis');
+
+      try {
+        const analysis = JSON.parse(content);
+        return {
+          title: (analysis.title || pageContent.title).slice(0, 60),
+          description: (analysis.description || pageContent.description).slice(0, 160),
+          tags: (analysis.tags || ['video']).slice(0, 5).map((tag: string) => tag.toLowerCase()),
+          contentQuality: {
+            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.7)),
+            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.7)),
+            credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
+            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.75))
+          },
+          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 3),
+          metadata: {
+            ...pageContent.metadata,
+            analysisAttempts: 1
+          }
+        };
+      } catch (parseError) {
+        console.error('[Video Analysis] Failed to parse AI response:', parseError);
+        throw new Error('Invalid video analysis format');
+      }
+    } catch (error) {
+      console.error('[Video Analysis] Error:', error);
+      throw error;
+    }
+  }
+
+  private static async analyzeWebContent(pageContent: PageContent): Promise<AIAnalysis> {
+    const message = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 1024,
+      temperature: 0.3,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Analyze this webpage content and return a JSON response:
+URL: ${pageContent.url}
+Title: ${pageContent.title}
+Type: ${pageContent.type}
+Description: ${pageContent.description}
+Content: ${pageContent.content.slice(0, 2000)}
+
+Required JSON format:
+{
+  "title": "<60 char title>",
+  "description": "<160 char summary>",
+  "tags": ["3-5 relevant tags"],
+  "contentQuality": {
+    "relevance": <0-1 score>,
+    "informativeness": <0-1 score>,
+    "credibility": <0-1 score>,
+    "overallScore": <0-1 average>
+  },
+  "mainTopics": ["2-3 main topics"],
+  "recommendations": {
+    "improvedTitle": "optional better title",
+    "improvedDescription": "optional better description",
+    "suggestedTags": ["optional better tags"]
+  }
+}`
+          }
+        ]
+      }]
+    });
+
+    // Get the first response with content
+    const content = message.content[0]?.text;
+    if (!content) {
+      throw new Error('No content in AI response');
+    }
+
+    // Save response for debugging
+    await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'web_analysis');
+
+    try {
+      const analysis = JSON.parse(content);
+      return {
+        title: (analysis.title || pageContent.title).slice(0, 60),
+        description: (analysis.description || pageContent.description).slice(0, 160),
+        tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
+        contentQuality: {
+          relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
+          informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
+          credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0)),
+          overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0))
+        },
+        mainTopics: (analysis.mainTopics || []).slice(0, 3),
+        recommendations: analysis.recommendations || {},
+        metadata: {
+          ...pageContent.metadata,
+          analysisAttempts: 1
+        }
+      };
+    } catch (parseError) {
+      console.error('[Web Analysis] Failed to parse AI response:', parseError);
+      throw new Error('Invalid analysis format');
     }
   }
 
@@ -240,12 +378,12 @@ export class AIService {
 
       // Determine content type
       let type: PageContent['type'] = 'webpage';
-      if ($('[itemtype*="Product"]').length || $('.price').length) {
+      if (url.includes('youtube.com') || url.includes('vimeo.com')) {
+        type = 'video';
+      } else if ($('[itemtype*="Product"]').length || $('.price').length) {
         type = 'product';
       } else if ($('article').length || $('[itemtype*="Article"]').length) {
         type = 'article';
-      } else if (url.includes('youtube.com') || url.includes('vimeo.com')) {
-        type = 'video';
       }
 
       return {
@@ -282,81 +420,24 @@ export class AIService {
       // Save extracted content for debugging
       await this.saveDebugInfo(normalizedUrl, pageContent, 'extracted_content');
 
-      try {
-        const response = await anthropic.messages.create({
-          model: "claude-3-5-sonnet-20241022",
-          max_tokens: 1024,
-          temperature: 0.3,
-          system: `You are a content analyst. Analyze web content and return a JSON response with:
-{
-  "title": "<60 char title>",
-  "description": "<160 char summary>",
-  "tags": ["3-5 relevant tags"],
-  "contentQuality": {
-    "relevance": 0-1 score,
-    "informativeness": 0-1 score,
-    "credibility": 0-1 score,
-    "overallScore": 0-1 average
-  },
-  "mainTopics": ["2-3 main topics"],
-  "recommendations": {
-    "improvedTitle": "optional better title",
-    "improvedDescription": "optional better description",
-    "suggestedTags": ["optional better tags"]
-  }
-}`,
-          messages: [{
-            role: "user",
-            content: `Analyze this webpage content:
-URL: ${pageContent.url}
-Title: ${pageContent.title}
-Type: ${pageContent.type}
-Description: ${pageContent.description}
-Content: ${pageContent.content.slice(0, 2000)}`
-          }]
-        });
+      // Use different analysis strategies based on content type
+      const analysis = pageContent.type === 'video' 
+        ? await this.analyzeVideoContent(pageContent)
+        : await this.analyzeWebContent(pageContent);
 
-        // Access content directly from response
-        const analysisText = response.content[0]?.value || '';
-
-        if (!analysisText) {
-          throw new Error('Invalid response from AI analysis');
+      console.log(`[Analysis] Successfully analyzed ${normalizedUrl}`);
+      return {
+        ...analysis,
+        metadata: {
+          ...analysis.metadata,
+          analysisAttempts: attempts
         }
+      };
 
-        // Save AI response for debugging
-        await this.saveDebugInfo(normalizedUrl, { response: analysisText }, 'ai_response');
-
-        try {
-          const analysis = JSON.parse(analysisText);
-
-          return {
-            title: (analysis.title || pageContent.title).slice(0, 60),
-            description: (analysis.description || pageContent.description).slice(0, 160),
-            tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
-            contentQuality: {
-              relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
-              informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
-              credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0)),
-              overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0))
-            },
-            mainTopics: (analysis.mainTopics || []).slice(0, 3),
-            recommendations: analysis.recommendations || {},
-            metadata: {
-              ...pageContent.metadata,
-              analysisAttempts: attempts
-            }
-          };
-        } catch (parseError) {
-          console.error('[Analysis] Failed to parse AI response:', parseError);
-          throw new Error('Invalid analysis result format');
-        }
-      } catch (aiError) {
-        console.error('[Analysis] AI analysis error:', aiError);
-        throw aiError;
-      }
     } catch (error) {
       console.error(`[Analysis] Error analyzing ${normalizedUrl}:`, error);
 
+      // Create a meaningful fallback analysis for errors
       return {
         title: url,
         description: `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}. Will retry automatically.`,
