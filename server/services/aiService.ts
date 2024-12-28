@@ -14,7 +14,6 @@ if (!ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
-// the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
 const anthropic = new Anthropic({
   apiKey: ANTHROPIC_API_KEY
 });
@@ -121,162 +120,58 @@ export class AIService {
     try {
       console.log(`[Video Analysis] Starting analysis for: ${pageContent.url}`);
 
-      // Fetch complete video content for YouTube videos
-      let videoContent = pageContent.content;
-      let videoMetadata = pageContent.metadata || {};
-      let transcriptText = '';
-      let fullDescription = '';
+      // Get basic metadata from YouTube
+      const metadata = await YouTubeService.getMetadata(pageContent.url);
 
-      // Extract the actual video ID from the URL
-      const videoUrlMatch = pageContent.url.match(/(?:youtube\.com\/watch\?v=|youtu.be\/)([^&]+)/);
-      const videoId = videoUrlMatch ? videoUrlMatch[1] : null;
-
-      if (videoId) {
-        const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
-        if (youtubeContent) {
-          transcriptText = youtubeContent.transcript || '';
-          fullDescription = youtubeContent.description || '';
-          videoContent = `
-Title: ${youtubeContent.title}
-Creator: ${youtubeContent.author}
-Published: ${youtubeContent.publishDate}
-Full Description: ${fullDescription}
-
-Complete Transcript:
-${transcriptText}
-
-Additional Context:
-- Video Duration: ${youtubeContent.duration || 'Unknown'}
-- View Count: ${youtubeContent.viewCount || 'Unknown'}
-- Category: ${youtubeContent.category || 'Unknown'}
-`.trim();
-
-          videoMetadata = {
-            ...videoMetadata,
-            author: youtubeContent.author,
-            publishDate: youtubeContent.publishDate,
-            duration: youtubeContent.duration,
-            viewCount: youtubeContent.viewCount,
-            category: youtubeContent.category
-          };
-        }
+      if (!metadata) {
+        throw new Error('Could not fetch video metadata');
       }
 
-      const message = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 4000,
-        temperature: 0.3,
-        messages: [{
-          role: "user",
-          content: `As an expert video content analyst, analyze this YouTube video content with its complete transcript and description to provide comprehensive insights. Extract maximum value from all available information, including the full video description and transcript.
-
-Content Type: YouTube Video
-URL: ${pageContent.url}
-Available Content:
-${videoContent}
-
-Create a thorough analysis in valid JSON format with this structure:
-{
-  "title": "A compelling, SEO-optimized title that captures the main value proposition (60-100 chars)",
-  "description": "A comprehensive analysis that MUST include:
-    - Complete summary of the video's content using both description and transcript
-    - Detailed analysis of key points and insights
-    - Core message and key takeaways
-    - Main arguments with supporting evidence from transcript
-    - Target audience and relevance
-    - Industry context and trends discussed
-    - Actionable insights and practical applications
-    - Notable quotes or timestamps from transcript
-    - Additional context from video description",
-  "tags": ["15-20 relevant tags covering topic, industry, content type, key concepts, transcript-derived keywords"],
-  "contentQuality": {
-    "relevance": "Score 0-1 based on topic relevance and audience value",
-    "informativeness": "Score 0-1 based on depth and actionable insights",
-    "credibility": "Score 0-1 based on expertise and evidence",
-    "overallScore": "Average of above scores"
-  },
-  "mainTopics": ["5-7 main topics or themes extracted from both video and transcript"],
-  "recommendations": {
-    "improvedTitle": "Enhanced title focusing on value proposition",
-    "improvedDescription": "Alternative description emphasizing practical insights",
-    "suggestedTags": ["7-10 additional tags focusing on specific concepts from transcript"]
-  },
-  "transcriptHighlights": ["5-7 key quotes or important segments from the transcript"]
-}`
-        }]
-      });
-
-      const content = message.content[0].type === 'text' ? message.content[0].text : '';
-      if (!content) {
-        throw new Error('No content in AI response');
-      }
-
-      await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'video_analysis');
-
-      try {
-        let analysis;
-        // First try to parse the entire response as JSON
-        try {
-          analysis = JSON.parse(content);
-        } catch (parseError) {
-          // If direct parsing fails, try to extract JSON from the response
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            analysis = JSON.parse(jsonMatch[0]);
-          } else {
-            throw new Error('No valid JSON found in response');
-          }
+      return {
+        title: metadata.title,
+        description: metadata.description,
+        tags: ['video', 'youtube'],
+        contentQuality: {
+          relevance: 0.8,
+          informativeness: 0.8,
+          credibility: 0.8,
+          overallScore: 0.8
+        },
+        mainTopics: ['video content'],
+        recommendations: {},
+        metadata: {
+          thumbnailUrl: metadata.thumbnailUrl,
+          analysisAttempts: 1,
+          status: AnalysisStatus.Success
         }
-
-        // Validate and normalize the analysis
-        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
-          throw new Error('Invalid analysis structure');
-        }
-
-        // Combine and deduplicate tags, including transcript-derived keywords
-        const combinedTags = Array.from(new Set([
-          ...(analysis.tags || []),
-          ...(analysis.recommendations?.suggestedTags || []),
-          'video',
-          pageContent.type,
-          ...this.extractKeywordsFromTranscript(transcriptText)
-        ])).slice(0, 20);  // Allow for more tags
-
-        // Ensure all quality scores are valid numbers between 0 and 1
-        const qualityScores = {
-          relevance: this.normalizeScore(analysis.contentQuality?.relevance),
-          informativeness: this.normalizeScore(analysis.contentQuality?.informativeness),
-          credibility: this.normalizeScore(analysis.contentQuality?.credibility),
-          overallScore: this.normalizeScore(analysis.contentQuality?.overallScore)
-        };
-
-        const analysisResult: BookmarkAnalysis = {
-          title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
-          description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
-          tags: combinedTags.map(tag => tag.toLowerCase()),
-          contentQuality: qualityScores,
-          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 7),
-          recommendations: {
-            improvedTitle: analysis.recommendations?.improvedTitle,
-            improvedDescription: analysis.recommendations?.improvedDescription,
-            suggestedTags: analysis.recommendations?.suggestedTags
-          },
-          metadata: {
-            ...videoMetadata,
-            transcriptHighlights: analysis.transcriptHighlights || [],
-            analysisAttempts: 1,
-            status: AnalysisStatus.Success
-          }
-        };
-        return analysisResult;
-      } catch (parseError) {
-        console.error('[Video Analysis] Failed to parse AI response:', parseError);
-        throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
-      }
+      };
     } catch (error) {
       console.error('[Video Analysis] Error:', error);
       return this.createFallbackAnalysis(pageContent, error instanceof Error ? error.message : 'Unknown error');
     }
+  }
+
+  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): BookmarkAnalysis {
+    console.log('[Analysis] Creating fallback analysis due to:', errorReason);
+
+    return {
+      title: pageContent.title || pageContent.url,
+      description: pageContent.description || 'Content analysis temporarily unavailable',
+      tags: ['analysis-pending'],
+      contentQuality: {
+        relevance: 0.5,
+        informativeness: 0.5,
+        credibility: 0.5,
+        overallScore: 0.5
+      },
+      mainTopics: ['content-pending'],
+      metadata: {
+        analysisAttempts: 1,
+        error: errorReason,
+        status: AnalysisStatus.Error
+      },
+      recommendations: {}
+    };
   }
 
   private static normalizeScore(score: any): number {
@@ -321,120 +216,6 @@ Create a thorough analysis in valid JSON format with this structure:
       .map(([word]) => word);
   }
 
-  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): BookmarkAnalysis {
-    console.log('[Analysis] Creating fallback analysis due to:', errorReason);
-
-    // Extract video ID and other metadata for better fallback content
-    const videoId = pageContent.url.includes('youtube.com/watch?v=')
-      ? new URL(pageContent.url).searchParams.get('v')
-      : pageContent.url.split('/').pop();
-
-    const creator = pageContent.metadata?.author || 'content creator';
-    const defaultDescription = `This video content was created by ${creator}. ` +
-      `The video covers important topics and information that may be valuable to viewers. ` +
-      `Due to technical limitations, a detailed analysis is currently unavailable. ` +
-      `The original title of the video is "${pageContent.title}". ` +
-      `For the most accurate information, please view the video directly.`;
-
-    return {
-      title: pageContent.title || `Video Content: ${videoId || 'Untitled'}`,
-      description: pageContent.description || defaultDescription,
-      tags: [
-        'video',
-        'content',
-        'online-media',
-        'digital-content',
-        'educational'
-      ],
-      contentQuality: {
-        relevance: 0.8,
-        informativeness: 0.8,
-        credibility: 0.8,
-        overallScore: 0.8
-      },
-      mainTopics: ['video content', 'digital media', 'online education'],
-      metadata: {
-        ...pageContent.metadata,
-        analysisAttempts: 1,
-        error: errorReason,
-        status: AnalysisStatus.Error
-      },
-      recommendations: {}
-    };
-  }
-
-  private static async analyzeWebContent(pageContent: PageContent): Promise<BookmarkAnalysis> {
-    // Truncate content to avoid token limit
-    const truncatedContent = pageContent.content.slice(0, 1500);
-
-    const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 1024,
-      temperature: 0.3,
-      messages: [{
-        role: "user",
-        content: `Analyze this webpage content briefly:
-URL: ${pageContent.url}
-Title: ${pageContent.title.slice(0, 100)}
-Type: ${pageContent.type}
-Description: ${pageContent.description.slice(0, 200)}
-Content Preview: ${truncatedContent}
-
-Provide a concise JSON analysis with:
-{
-  "title": "<60 char title>",
-  "description": "<160 char summary>",
-  "tags": ["3-5 tags"],
-  "contentQuality": {
-    "relevance": 0-1,
-    "informativeness": 0-1,
-    "credibility": 0-1,
-    "overallScore": 0-1
-  },
-  "mainTopics": ["2-3 topics"],
-  "recommendations": {
-    "improvedTitle": "optional better title",
-    "improvedDescription": "optional better description",
-    "suggestedTags": ["optional better tags"]
-  }
-}`
-      }]
-    });
-
-    // Get content from the new Anthropic API response format
-    const content = message.content[0].type === 'text' ? message.content[0].text : '';
-    if (!content) {
-      throw new Error('No content in AI response');
-    }
-
-    // Save response for debugging
-    await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'web_analysis');
-
-    try {
-      const analysis = JSON.parse(content);
-      return {
-        title: (analysis.title || pageContent.title).slice(0, 60),
-        description: (analysis.description || pageContent.description).slice(0, 160),
-        tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
-        contentQuality: {
-          relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
-          informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
-          credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0)),
-          overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0))
-        },
-        mainTopics: (analysis.mainTopics || []).slice(0, 3),
-        recommendations: analysis.recommendations || {},
-        metadata: {
-          ...pageContent.metadata,
-          analysisAttempts: 1,
-          status: AnalysisStatus.Success
-        }
-      };
-    } catch (parseError) {
-      console.error('[Web Analysis] Failed to parse AI response:', parseError);
-      throw new Error('Invalid analysis format');
-    }
-  }
 
   private static async fetchPageContent(url: string, retries: number = 0): Promise<PageContent> {
     try {
