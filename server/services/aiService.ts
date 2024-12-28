@@ -141,16 +141,26 @@ export class AIService {
         mode: 'cors'
       }, this.TIMEOUT);
 
-      if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      if (!response.ok || (contentType && !contentType.includes('text/html'))) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-        throw new Error('Not a webpage: ' + contentType);
+      const html = await response.text();
+      if (html.trim().startsWith('<!DOCTYPE')) {
+        const $ = cheerio.load(html);
+        const title = $('title').text() || url;
+        return {
+          url,
+          title,
+          description: `Failed to fetch page: ${response.status} ${response.statusText}`,
+          content: $('body').text().trim(),
+          type: 'webpage', // Assuming webpage type for failed fetches
+          metadata: {} // Empty metadata for failed fetches
+        };
       }
 
-      const html = await response.text();
+
       if (!html || html.length < 100) {
         throw new Error('Empty or too short response');
       }
