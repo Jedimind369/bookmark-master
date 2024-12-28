@@ -148,6 +148,9 @@ export class AIService {
 
   private static async analyzeVideoContent(pageContent: PageContent): Promise<AIAnalysis> {
     try {
+      // Truncate content to avoid token limit
+      const truncatedContent = pageContent.content.slice(0, 1000);
+
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
         max_tokens: 1024,
@@ -157,19 +160,26 @@ export class AIService {
           content: [
             {
               type: "text",
-              text: `Analyze this video content and metadata:
-Title: ${pageContent.title}
-Description: ${pageContent.description}
-Author: ${pageContent.metadata?.author || 'Unknown'}
+              text: `Analyze this video content briefly:
+Title: ${pageContent.title.slice(0, 100)}
+Description: ${pageContent.description.slice(0, 200)}
+Author: ${pageContent.metadata?.author?.slice(0, 50) || 'Unknown'}
 Type: ${pageContent.type}
-Additional Content: ${pageContent.content}
+Content Preview: ${truncatedContent}
 
-Please provide a concise analysis in JSON format with:
-1. A clear, engaging title (max 60 chars)
-2. A comprehensive description (max 160 chars)
-3. 3-5 relevant tags
-4. Content quality metrics
-5. Main topics covered`
+Provide a concise JSON analysis with:
+{
+  "title": "<60 char title>",
+  "description": "<160 char summary>",
+  "tags": ["3-5 tags"],
+  "contentQuality": {
+    "relevance": 0-1,
+    "informativeness": 0-1,
+    "credibility": 0-1,
+    "overallScore": 0-1
+  },
+  "mainTopics": ["2-3 topics"]
+}`
             }
           ]
         }]
@@ -207,12 +217,33 @@ Please provide a concise analysis in JSON format with:
         throw new Error('Invalid video analysis format');
       }
     } catch (error) {
+      if (error.message?.includes('too long')) {
+        return {
+          title: pageContent.title.slice(0, 60),
+          description: pageContent.description.slice(0, 160) || 'A video content piece',
+          tags: ['video', 'content'],
+          contentQuality: {
+            relevance: 0.7,
+            informativeness: 0.7,
+            credibility: 0.8,
+            overallScore: 0.75
+          },
+          mainTopics: ['video content'],
+          metadata: {
+            ...pageContent.metadata,
+            analysisAttempts: 1
+          }
+        };
+      }
       console.error('[Video Analysis] Error:', error);
       throw error;
     }
   }
 
   private static async analyzeWebContent(pageContent: PageContent): Promise<AIAnalysis> {
+    // Truncate content to avoid token limit
+    const truncatedContent = pageContent.content.slice(0, 1500);
+
     const message = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
       max_tokens: 1024,
@@ -222,25 +253,25 @@ Please provide a concise analysis in JSON format with:
         content: [
           {
             type: "text",
-            text: `Analyze this webpage content and return a JSON response:
+            text: `Analyze this webpage content briefly:
 URL: ${pageContent.url}
-Title: ${pageContent.title}
+Title: ${pageContent.title.slice(0, 100)}
 Type: ${pageContent.type}
-Description: ${pageContent.description}
-Content: ${pageContent.content.slice(0, 2000)}
+Description: ${pageContent.description.slice(0, 200)}
+Content Preview: ${truncatedContent}
 
-Required JSON format:
+Provide a concise JSON analysis with:
 {
   "title": "<60 char title>",
   "description": "<160 char summary>",
-  "tags": ["3-5 relevant tags"],
+  "tags": ["3-5 tags"],
   "contentQuality": {
-    "relevance": <0-1 score>,
-    "informativeness": <0-1 score>,
-    "credibility": <0-1 score>,
-    "overallScore": <0-1 average>
+    "relevance": 0-1,
+    "informativeness": 0-1,
+    "credibility": 0-1,
+    "overallScore": 0-1
   },
-  "mainTopics": ["2-3 main topics"],
+  "mainTopics": ["2-3 topics"],
   "recommendations": {
     "improvedTitle": "optional better title",
     "improvedDescription": "optional better description",
@@ -300,12 +331,6 @@ Required JSON format:
         }
       }, this.TIMEOUT);
 
-      // Save response headers for debugging
-      await this.saveDebugInfo(url, {
-        status: response.status,
-        headers: Object.fromEntries(response.headers.entries())
-      }, 'response_headers');
-
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -318,7 +343,7 @@ Required JSON format:
       const html = await response.text();
 
       // Save raw HTML for debugging
-      await this.saveDebugInfo(url, { html }, 'raw_html');
+      await this.saveDebugInfo(url, { html: html.slice(0, 5000) }, 'raw_html');
 
       if (!html || html.length < 100) {
         throw new Error('Empty or too short response');
@@ -330,7 +355,48 @@ Required JSON format:
 
       const $ = cheerio.load(html);
 
-      // Basic content extraction
+      // Determine content type first
+      let type: PageContent['type'] = 'webpage';
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        type = 'video';
+      } else if ($('[itemtype*="Product"]').length || $('.price').length) {
+        type = 'product';
+      } else if ($('article').length || $('[itemtype*="Article"]').length) {
+        type = 'article';
+      }
+
+      // Extract content based on type
+      let content = '';
+      if (type === 'video') {
+        content = $('meta[name="description"]').attr('content') || 
+                 $('.watch-main-col .content').text() ||
+                 $('meta[property="og:description"]').attr('content') || '';
+      } else {
+        const contentSelectors = [
+          'article', 'main', '[role="main"]', '#content', '.content',
+          '.article', '.post', '.entry-content'
+        ];
+
+        for (const selector of contentSelectors) {
+          const element = $(selector).first();
+          if (element.length) {
+            content = element.text().trim();
+            break;
+          }
+        }
+
+        // Fallback to body content if no main content found
+        if (!content) {
+          content = $('body').clone()
+            .children('nav,header,footer,aside,script,style')
+            .remove()
+            .end()
+            .text()
+            .trim();
+        }
+      }
+
+      // Basic metadata extraction
       const title = $('meta[property="og:title"]').attr('content')?.trim() ||
                    $('title').text().trim() ||
                    $('h1').first().text().trim() ||
@@ -339,31 +405,6 @@ Required JSON format:
       const description = $('meta[property="og:description"]').attr('content')?.trim() ||
                          $('meta[name="description"]').attr('content')?.trim() ||
                          '';
-
-      // Get main content
-      let content = '';
-      const contentSelectors = [
-        'article', 'main', '[role="main"]', '#content', '.content',
-        '.article', '.post', '.entry-content'
-      ];
-
-      for (const selector of contentSelectors) {
-        const element = $(selector).first();
-        if (element.length) {
-          content = element.text().trim();
-          break;
-        }
-      }
-
-      // Fallback to body content if no main content found
-      if (!content) {
-        content = $('body').clone()
-          .children('nav,header,footer,aside')
-          .remove()
-          .end()
-          .text()
-          .trim();
-      }
 
       // Extract metadata
       const metadata = {
@@ -375,16 +416,6 @@ Required JSON format:
         mainImage: $('meta[property="og:image"]').attr('content'),
         wordCount: content.split(/\s+/).length
       };
-
-      // Determine content type
-      let type: PageContent['type'] = 'webpage';
-      if (url.includes('youtube.com') || url.includes('vimeo.com')) {
-        type = 'video';
-      } else if ($('[itemtype*="Product"]').length || $('.price').length) {
-        type = 'product';
-      } else if ($('article').length || $('[itemtype*="Article"]').length) {
-        type = 'article';
-      }
 
       return {
         url,
