@@ -321,74 +321,104 @@ Return a detailed analysis in this exact JSON structure:
   }
 
   private static async analyzeWebContent(pageContent: PageContent): Promise<AIAnalysis> {
-    // Truncate content to avoid token limit
-    const truncatedContent = pageContent.content.slice(0, 1500);
+    try {
+      console.log(`[Web Analysis] Starting analysis for: ${pageContent.url}`);
 
-    const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 1024,
-      temperature: 0.3,
-      messages: [{
-        role: "user",
-        content: `Analyze this webpage content briefly:
+      // Truncate content to avoid token limit but keep enough for meaningful analysis
+      const truncatedContent = pageContent.content.slice(0, 3000);
+
+      const message = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 1024,
+        temperature: 0.3,
+        messages: [{
+          role: "user",
+          content: `Analyze this webpage content and provide a detailed analysis:
 URL: ${pageContent.url}
-Title: ${pageContent.title.slice(0, 100)}
+Title: ${pageContent.title}
 Type: ${pageContent.type}
-Description: ${pageContent.description.slice(0, 200)}
-Content Preview: ${truncatedContent}
+Description: ${pageContent.description}
+Content: ${truncatedContent}
 
-Provide a concise JSON analysis with:
+Return a detailed analysis in this exact JSON structure:
 {
-  "title": "<60 char title>",
-  "description": "<160 char summary>",
-  "tags": ["3-5 tags"],
+  "title": "complete, descriptive title that accurately represents the content",
+  "description": "Write a comprehensive description (at least 5-8 detailed sentences) that covers: 
+    1. Main purpose and target audience of the content
+    2. Key features, functionalities, or concepts presented
+    3. Notable technical aspects or implementations discussed
+    4. Important benefits or value propositions
+    5. Any unique aspects or innovations highlighted
+    Include specific details from the content to support each point.",
+  "tags": ["at least 5 specific, relevant tags that accurately reflect the topic, technology, and key concepts discussed"],
   "contentQuality": {
-    "relevance": 0-1,
-    "informativeness": 0-1,
-    "credibility": 0-1,
-    "overallScore": 0-1
+    "relevance": 0.8,
+    "informativeness": 0.8,
+    "credibility": 0.8,
+    "overallScore": 0.8
   },
-  "mainTopics": ["2-3 topics"],
+  "mainTopics": ["3-4 main topics covered in detail"],
   "recommendations": {
-    "improvedTitle": "optional better title",
-    "improvedDescription": "optional better description",
-    "suggestedTags": ["optional better tags"]
+    "improvedTitle": "enhanced title that includes key topic and value proposition",
+    "improvedDescription": "alternative description with additional context and insights",
+    "suggestedTags": ["additional relevant tags focusing on specific concepts and technologies discussed"]
   }
 }`
-      }]
-    });
+        }]
+      });
 
-    // Get the first response with content
-    const content = message.content[0]?.text;
-    if (!content) {
-      throw new Error('No content in AI response');
-    }
+      const content = message.content[0];
+      if (!content || typeof content !== 'object' || !('text' in content)) {
+        console.error('[Web Analysis] Invalid AI response structure');
+        throw new Error('Invalid response structure from AI service');
+      }
 
-    // Save response for debugging
-    await this.saveDebugInfo(pageContent.url, { aiResponse: content }, 'web_analysis');
+      const responseText = content.text;
+      console.log('[Web Analysis] Raw AI response:', responseText);
 
-    try {
-      const analysis = JSON.parse(content);
-      return {
-        title: (analysis.title || pageContent.title).slice(0, 60),
-        description: (analysis.description || pageContent.description).slice(0, 160),
-        tags: (analysis.tags || []).slice(0, 5).map((tag: string) => tag.toLowerCase()),
-        contentQuality: {
-          relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0)),
-          informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0)),
-          credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0)),
-          overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0))
-        },
-        mainTopics: (analysis.mainTopics || []).slice(0, 3),
-        recommendations: analysis.recommendations || {},
-        metadata: {
-          ...pageContent.metadata,
-          analysisAttempts: 1
+      // Save response for debugging
+      await this.saveDebugInfo(pageContent.url, { aiResponse: responseText }, 'web_analysis');
+
+      try {
+        const analysis = JSON.parse(responseText);
+
+        // Validate required fields
+        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
+          console.error('[Web Analysis] Invalid response structure:', analysis);
+          throw new Error('Invalid analysis format');
         }
-      };
-    } catch (parseError) {
-      console.error('[Web Analysis] Failed to parse AI response:', parseError);
-      throw new Error('Invalid analysis format');
+
+        // Ensure we have at least 5 tags
+        const combinedTags = Array.from(new Set([
+          ...(analysis.tags || []),
+          ...(analysis.recommendations?.suggestedTags || []),
+          pageContent.type
+        ])).slice(0, 10); // Keep up to 10 unique tags
+
+        return {
+          title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
+          description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
+          tags: combinedTags.map(tag => tag.toLowerCase()),
+          contentQuality: {
+            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
+            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
+            credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
+            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
+          },
+          mainTopics: (analysis.mainTopics || []).slice(0, 4),
+          recommendations: analysis.recommendations || {},
+          metadata: {
+            ...pageContent.metadata,
+            analysisAttempts: 1
+          }
+        };
+      } catch (parseError) {
+        console.error('[Web Analysis] Failed to parse AI response:', parseError, 'Raw content:', responseText);
+        throw new Error('Failed to parse AI response');
+      }
+    } catch (error) {
+      console.error('[Web Analysis] Error:', error);
+      throw error;
     }
   }
 

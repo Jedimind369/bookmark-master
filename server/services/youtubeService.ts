@@ -2,7 +2,7 @@ import { google } from 'googleapis';
 import fetch from 'node-fetch';
 import { load } from 'cheerio';
 
-interface VideoDetails {
+export interface VideoDetails {
   title: string;
   description: string;
   transcript: string;
@@ -57,6 +57,7 @@ export class YouTubeService {
       const html = await response.text();
       const $ = load(html);
 
+      // Extract video metadata using meta tags
       const title = $('meta[property="og:title"]').attr('content') || '';
       const description = $('meta[property="og:description"]').attr('content') || '';
       const author = $('link[itemprop="name"]').attr('content') || 
