@@ -283,6 +283,31 @@ export class AIService {
       // Save extracted content for debugging
       await this.saveDebugInfo(normalizedUrl, pageContent, 'extracted_content');
 
+      // Special handling for YouTube URLs
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        console.log('[Analysis] Detected YouTube URL, using special handling');
+        const videoId = url.includes('youtube.com/watch?v=') 
+          ? new URL(url).searchParams.get('v')
+          : url.split('/').pop();
+          
+        return {
+          title: pageContent.title || 'YouTube Video',
+          description: pageContent.description || 'YouTube video content',
+          tags: ['video', 'youtube'],
+          contentQuality: {
+            relevance: 0.8,
+            informativeness: 0.7,
+            credibility: 0.9,
+            overallScore: 0.8
+          },
+          mainTopics: ['video content'],
+          metadata: {
+            ...pageContent.metadata,
+            analysisAttempts: attempts
+          }
+        };
+      }
+
       const response = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
         max_tokens: 1024,
