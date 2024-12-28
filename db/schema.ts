@@ -1,5 +1,6 @@
-import { pgTable, text, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { relations } from "drizzle-orm";
 import { z } from "zod";
 
 export const users = pgTable("users", {
@@ -18,6 +19,7 @@ export const bookmarks = pgTable("bookmarks", {
   description: text("description"),
   tags: jsonb("tags").$type<string[]>().default([]),
   collections: jsonb("collections").$type<string[]>().default([]),
+  userId: integer("user_id").references(() => users.id).notNull(),
   dateAdded: timestamp("date_added").defaultNow(),
   dateModified: timestamp("date_modified"),
   analysis: jsonb("analysis").$type<{
@@ -41,6 +43,18 @@ export const bookmarks = pgTable("bookmarks", {
     };
   }>(),
 });
+
+// Define relations
+export const bookmarksRelations = relations(bookmarks, ({ one }) => ({
+  user: one(users, {
+    fields: [bookmarks.userId],
+    references: [users.id],
+  }),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+  bookmarks: many(bookmarks),
+}));
 
 // User schemas
 export const insertUserSchema = createInsertSchema(users);

@@ -1,49 +1,9 @@
 import { db } from "@db";
-import { bookmarks, users, type InsertBookmark, type SelectBookmark, type AnalysisStatus } from "@db/schema";
+import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
 import { eq, sql, desc, isNull, or, and } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
 export class BookmarkModel {
-  static async findAll() {
-    try {
-      const results = await db
-        .select()
-        .from(bookmarks)
-        .orderBy(desc(bookmarks.dateModified), desc(bookmarks.dateAdded));
-
-      return results.map(bookmark => ({
-        ...bookmark,
-        tags: bookmark.tags || [],
-        collections: bookmark.collections || []
-      }));
-    } catch (error) {
-      console.error("Error fetching bookmarks:", error);
-      throw new Error("Failed to fetch bookmarks");
-    }
-  }
-
-  static async findById(id: number) {
-    try {
-      const results = await db
-        .select()
-        .from(bookmarks)
-        .where(eq(bookmarks.id, id))
-        .limit(1);
-
-      if (!results.length) return null;
-
-      const bookmark = results[0];
-      return {
-        ...bookmark,
-        tags: bookmark.tags || [],
-        collections: bookmark.collections || []
-      };
-    } catch (error) {
-      console.error("Error fetching bookmark:", error);
-      throw new Error(`Failed to fetch bookmark with id ${id}`);
-    }
-  }
-
   private static async getOrCreateDefaultUser() {
     try {
       console.log('[User] Looking up default user');
@@ -57,9 +17,7 @@ export class BookmarkModel {
       console.log('[User] Creating default user');
       const [defaultUser] = await db.insert(users).values({
         username: 'default_user',
-        password: 'not_used',
-        dateCreated: new Date(),
-        dateModified: new Date()
+        password: 'not_used_password'
       }).returning();
 
       console.log('[User] Created default user:', defaultUser);
@@ -104,6 +62,45 @@ export class BookmarkModel {
     }
   }
 
+  static async findAll() {
+    try {
+      const results = await db
+        .select()
+        .from(bookmarks)
+        .orderBy(sql`${bookmarks.dateModified} DESC, ${bookmarks.dateAdded} DESC`);
+
+      return results.map(bookmark => ({
+        ...bookmark,
+        tags: bookmark.tags || [],
+        collections: bookmark.collections || []
+      }));
+    } catch (error) {
+      console.error("Error fetching bookmarks:", error);
+      throw new Error("Failed to fetch bookmarks");
+    }
+  }
+
+  static async findById(id: number) {
+    try {
+      const results = await db
+        .select()
+        .from(bookmarks)
+        .where(eq(bookmarks.id, id))
+        .limit(1);
+
+      if (!results.length) return null;
+
+      const bookmark = results[0];
+      return {
+        ...bookmark,
+        tags: bookmark.tags || [],
+        collections: bookmark.collections || []
+      };
+    } catch (error) {
+      console.error("Error fetching bookmark:", error);
+      throw new Error(`Failed to fetch bookmark with id ${id}`);
+    }
+  }
   static async update(id: number, data: Partial<Omit<InsertBookmark, "id">>) {
     try {
       const existing = await this.findById(id);
@@ -332,7 +329,7 @@ export class BookmarkModel {
         .update(bookmarks)
         .set({
           analysis: {
-            status: 'processing' as AnalysisStatus,
+            status: 'processing' ,
             lastUpdated: new Date().toISOString()
           },
           dateModified: new Date()
@@ -351,7 +348,7 @@ export class BookmarkModel {
             description: analysis.recommendations?.improvedDescription || analysis.description || bookmark.description,
             tags: analysis.recommendations?.suggestedTags || analysis.tags || bookmark.tags || [],
             analysis: {
-              status: 'success' as AnalysisStatus,
+              status: 'success' ,
               lastUpdated: new Date().toISOString(),
               summary: analysis.description,
               contentQuality: analysis.contentQuality,
@@ -370,7 +367,7 @@ export class BookmarkModel {
       } catch (error) {
         console.error(`[Enrichment] Failed to analyze URL for bookmark ${bookmark.id}:`, error);
 
-        let status: AnalysisStatus = 'error';
+        let status = 'error';
         let errorSummary = "Failed to analyze this URL";
         let retryable = true;
 
@@ -422,7 +419,7 @@ export class BookmarkModel {
           .update(bookmarks)
           .set({
             analysis: {
-              status: 'system_error' as AnalysisStatus,
+              status: 'system_error',
               lastUpdated: new Date().toISOString(),
               summary: "Error processing bookmark",
               error: error instanceof Error ? error.message : 'Unknown error',
