@@ -302,25 +302,25 @@ export class AIService {
           auth: process.env.YOUTUBE_API_KEY
         });
 
+        let video;
         try {
           const videoData = await youtube.videos.list({
-          part: ['snippet', 'statistics', 'contentDetails'],
-          id: [videoId],
-          // Add quota limits
-          maxResults: 1,
-          fields: 'items(snippet,statistics,contentDetails)'
-        });
+            part: ['snippet', 'statistics', 'contentDetails'],
+            id: [videoId],
+            maxResults: 1,
+            fields: 'items(snippet,statistics,contentDetails)'
+          });
 
-        const video = videoData.data.items?.[0];
-        if (!video) {
-          throw new Error('Video not found');
-        }
+          video = videoData.data.items?.[0];
+          if (!video) {
+            throw new Error('Video not found');
+          }
         } catch (error) {
           console.error('[YouTube API] Error:', error);
           throw new Error('Failed to fetch YouTube video data. Please check API configuration.');
         }
 
-        const transcriptContent = video.snippet?.description || '';
+        const transcriptContent = video?.snippet?.description || '';
 
         // Extract video description and metadata
         const rawDescription = pageContent.description || 
