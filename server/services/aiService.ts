@@ -4,6 +4,7 @@ import fetch from 'node-fetch';
 import type { Response } from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
+import { YouTubeService } from './youtubeService';
 
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
@@ -149,8 +150,33 @@ export class AIService {
 
   private static async analyzeVideoContent(pageContent: PageContent): Promise<AIAnalysis> {
     try {
+      console.log(`[Video Analysis] Starting analysis for: ${pageContent.url}`);
+
+      // Fetch complete video content for YouTube videos
+      let videoContent = pageContent.content;
+      let videoMetadata = pageContent.metadata || {};
+
+      if (pageContent.url.includes('youtube.com') || pageContent.url.includes('youtu.be')) {
+        const youtubeContent = await YouTubeService.getVideoContent(pageContent.url);
+        if (youtubeContent) {
+          videoContent = `
+            Title: ${youtubeContent.title}
+            Author: ${youtubeContent.author}
+            Published: ${youtubeContent.publishDate}
+            Description: ${youtubeContent.description}
+            Transcript: ${youtubeContent.transcript}
+          `.trim();
+
+          videoMetadata = {
+            ...videoMetadata,
+            author: youtubeContent.author,
+            publishDate: youtubeContent.publishDate
+          };
+        }
+      }
+
       // Truncate content but keep enough for meaningful analysis
-      const truncatedContent = pageContent.content.slice(0, 2000);
+      const truncatedContent = videoContent.slice(0, 2000);
 
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
