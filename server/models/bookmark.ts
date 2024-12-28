@@ -1,5 +1,5 @@
 import { db } from "@db";
-import { bookmarks, users, type InsertBookmark, type SelectBookmark } from "@db/schema";
+import { bookmarks, users, type InsertBookmark, type SelectBookmark, type AnalysisStatus } from "@db/schema";
 import { eq, sql, desc, isNull, or, and } from "drizzle-orm";
 import { AIService } from "../services/aiService";
 
@@ -101,6 +101,7 @@ export class BookmarkModel {
       throw new Error(`Failed to fetch bookmark with id ${id}`);
     }
   }
+
   static async update(id: number, data: Partial<Omit<InsertBookmark, "id">>) {
     try {
       const existing = await this.findById(id);
@@ -218,108 +219,6 @@ export class BookmarkModel {
     }
   }
 
-  static async getEnrichmentCount() {
-    try {
-      // Get count of bookmarks that need enrichment (no analysis, processing, error, or low quality)
-      const results = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(bookmarks)
-        .where(
-          or(
-            isNull(bookmarks.analysis),
-            eq(sql`${bookmarks.analysis}->>'status'`, 'processing'),
-            eq(sql`${bookmarks.analysis}->>'status'`, 'error'),
-            sql`${bookmarks.analysis}->>'status' = 'success' AND (${bookmarks.analysis}->'contentQuality'->>'overallScore')::float < 0.6`
-          )
-        );
-
-      return results[0]?.count || 0;
-    } catch (error) {
-      console.error("[Enrichment] Error getting enrichment count:", error);
-      return 0;
-    }
-  }
-
-  static async getProcessedCount() {
-    try {
-      // Get count of successfully processed bookmarks
-      const results = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(bookmarks)
-        .where(
-          and(
-            sql`${bookmarks.analysis} is not null`,
-            sql`${bookmarks.analysis}->>'status' != 'processing'`
-          )
-        );
-
-      return results[0]?.count || 0;
-    } catch (error) {
-      console.error("[Enrichment] Error getting processed count:", error);
-      return 0;
-    }
-  }
-
-  static async getTotalBookmarkCount() {
-    try {
-      const results = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(bookmarks);
-
-      return results[0]?.count || 0;
-    } catch (error) {
-      console.error("[Enrichment] Error getting total count:", error);
-      return 0;
-    }
-  }
-
-  static async enrichAllBookmarks() {
-    try {
-      const bookmarksToUpdate = await db
-        .select()
-        .from(bookmarks)
-        .where(
-          sql`analysis IS NULL OR 
-              (analysis->>'status')::text IS NULL OR 
-              (analysis->>'status')::text = 'processing' OR
-              (analysis->>'status')::text = 'error'`
-        );
-
-      console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
-
-      // Process in larger batches for better throughput
-      const batchSize = 10;
-      for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
-        const batch = bookmarksToUpdate.slice(i, i + batchSize);
-        console.log(`[Enrichment] Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(bookmarksToUpdate.length/batchSize)}`);
-
-        // Process each bookmark in the batch sequentially to better track failures
-        for (const bookmark of batch) {
-          try {
-            console.log(`[Enrichment] Processing bookmark ${bookmark.id}: ${bookmark.url}`);
-            await this.enrichBookmarkAnalysis(bookmark);
-          } catch (error) {
-            console.error(`[Enrichment] Error processing bookmark ${bookmark.id}:`, error);
-            // Continue with next bookmark even if current one fails
-          }
-          // Add a small delay between bookmarks
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-
-        // Add a delay between batches to prevent rate limiting
-        if (i + batchSize < bookmarksToUpdate.length) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-
-      console.log('[Enrichment] Completed enrichment process');
-      return true;
-    } catch (error) {
-      console.error("[Enrichment] Failed to enrich bookmarks:", error);
-      return false;
-    }
-  }
-
   static async enrichBookmarkAnalysis(bookmark: SelectBookmark) {
     try {
       console.log(`[Enrichment] Starting analysis for bookmark ${bookmark.id}: ${bookmark.url}`);
@@ -329,7 +228,7 @@ export class BookmarkModel {
         .update(bookmarks)
         .set({
           analysis: {
-            status: 'processing' ,
+            status: 'processing' as AnalysisStatus,
             lastUpdated: new Date().toISOString()
           },
           dateModified: new Date()
@@ -348,7 +247,7 @@ export class BookmarkModel {
             description: analysis.recommendations?.improvedDescription || analysis.description || bookmark.description,
             tags: analysis.recommendations?.suggestedTags || analysis.tags || bookmark.tags || [],
             analysis: {
-              status: 'success' ,
+              status: 'success' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
               summary: analysis.description,
               contentQuality: analysis.contentQuality,
@@ -367,7 +266,7 @@ export class BookmarkModel {
       } catch (error) {
         console.error(`[Enrichment] Failed to analyze URL for bookmark ${bookmark.id}:`, error);
 
-        let status = 'error';
+        let status: AnalysisStatus = 'error';
         let errorSummary = "Failed to analyze this URL";
         let retryable = true;
 
@@ -419,7 +318,7 @@ export class BookmarkModel {
           .update(bookmarks)
           .set({
             analysis: {
-              status: 'system_error',
+              status: 'system_error' as AnalysisStatus,
               lastUpdated: new Date().toISOString(),
               summary: "Error processing bookmark",
               error: error instanceof Error ? error.message : 'Unknown error',
@@ -442,6 +341,7 @@ export class BookmarkModel {
       }
     }
   }
+
   static async purgeAll() {
     try {
       await db.delete(bookmarks);
