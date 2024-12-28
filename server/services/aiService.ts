@@ -149,8 +149,8 @@ export class AIService {
 
   private static async analyzeVideoContent(pageContent: PageContent): Promise<AIAnalysis> {
     try {
-      // Truncate content to avoid token limit
-      const truncatedContent = pageContent.content.slice(0, 1000);
+      // Truncate content but keep enough for meaningful analysis
+      const truncatedContent = pageContent.content.slice(0, 2000);
 
       const message = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
@@ -161,25 +161,30 @@ export class AIService {
           content: [
             {
               type: "text",
-              text: `Analyze this video content:
-Title: ${pageContent.title.slice(0, 100)}
-Description: ${pageContent.description.slice(0, 200)}
-Author: ${pageContent.metadata?.author?.slice(0, 50) || 'Unknown'}
+              text: `Analyze this video content and provide a comprehensive analysis:
+Title: ${pageContent.title}
+Description: ${pageContent.description}
+Author: ${pageContent.metadata?.author || 'Unknown'}
 Type: ${pageContent.type}
-Content Preview: ${truncatedContent}
+Content: ${truncatedContent}
 
-Return the analysis in this exact JSON structure:
+Return a detailed analysis in this exact JSON structure:
 {
-  "title": "<60 char title>",
-  "description": "<160 char summary>",
-  "tags": ["3-5 tags"],
+  "title": "complete, engaging title that accurately represents the video content",
+  "description": "comprehensive 5-8 sentence description covering key points, main arguments, and value proposition. Include specific details from the video content",
+  "tags": ["at least 5 specific, relevant tags based on content"],
   "contentQuality": {
     "relevance": 0.8,
     "informativeness": 0.8,
     "credibility": 0.8,
     "overallScore": 0.8
   },
-  "mainTopics": ["2-3 topics"]
+  "mainTopics": ["3-4 main topics covered in detail"],
+  "recommendations": {
+    "improvedTitle": "optional better title if current one is incomplete",
+    "improvedDescription": "optional enhanced description with more context",
+    "suggestedTags": ["additional relevant tags"]
+  }
 }`
             }
           ]
@@ -207,17 +212,30 @@ Return the analysis in this exact JSON structure:
           return this.createFallbackAnalysis(pageContent, 'Invalid response structure');
         }
 
+        // Ensure we have at least 5 tags
+        const combinedTags = [...new Set([
+          ...(analysis.tags || []),
+          ...(analysis.recommendations?.suggestedTags || []),
+          'video',
+          pageContent.type
+        ])].slice(0, 8); // Keep up to 8 unique tags
+
         return {
-          title: (analysis.title || pageContent.title).slice(0, 60),
-          description: (analysis.description || pageContent.description).slice(0, 160),
-          tags: (analysis.tags || ['video']).slice(0, 5).map((tag: string) => tag.toLowerCase()),
+          title: analysis.title || analysis.recommendations?.improvedTitle || pageContent.title,
+          description: analysis.description || analysis.recommendations?.improvedDescription || pageContent.description,
+          tags: combinedTags.map((tag: string) => tag.toLowerCase()),
           contentQuality: {
             relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
             informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
             credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
             overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
           },
-          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 3),
+          mainTopics: (analysis.mainTopics || ['video content']).slice(0, 4),
+          recommendations: {
+            improvedTitle: analysis.recommendations?.improvedTitle,
+            improvedDescription: analysis.recommendations?.improvedDescription,
+            suggestedTags: analysis.recommendations?.suggestedTags
+          },
           metadata: {
             ...pageContent.metadata,
             analysisAttempts: 1
@@ -236,22 +254,35 @@ Return the analysis in this exact JSON structure:
   private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): AIAnalysis {
     console.log('[Analysis] Creating fallback analysis due to:', errorReason);
 
-    // Extract video ID for better title if available
+    // Extract video ID and other metadata for better fallback content
     const videoId = pageContent.url.includes('youtube.com/watch?v=') 
       ? new URL(pageContent.url).searchParams.get('v')
       : pageContent.url.split('/').pop();
 
+    const creator = pageContent.metadata?.author || 'content creator';
+    const defaultDescription = `This video content was created by ${creator}. ` +
+      `The video covers important topics and information that may be valuable to viewers. ` +
+      `Due to technical limitations, a detailed analysis is currently unavailable. ` +
+      `The original title of the video is "${pageContent.title}". ` +
+      `For the most accurate information, please view the video directly.`;
+
     return {
-      title: pageContent.title.slice(0, 60) || `Video ${videoId || 'content'}`,
-      description: pageContent.description.slice(0, 160) || 'Video content analysis unavailable',
-      tags: ['video', 'content', 'unanalyzed'],
+      title: pageContent.title || `Video Content: ${videoId || 'Untitled'}`,
+      description: pageContent.description || defaultDescription,
+      tags: [
+        'video',
+        'content',
+        'online-media',
+        'digital-content',
+        'educational'
+      ],
       contentQuality: {
         relevance: 0.8,
         informativeness: 0.8,
         credibility: 0.8,
         overallScore: 0.8
       },
-      mainTopics: ['video content'],
+      mainTopics: ['video content', 'digital media', 'online education'],
       metadata: {
         ...pageContent.metadata,
         analysisAttempts: 1,
