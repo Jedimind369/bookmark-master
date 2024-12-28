@@ -266,7 +266,8 @@ export class BookmarkModel {
         .where(
           sql`analysis IS NULL OR 
               (analysis->>'status')::text IS NULL OR 
-              (analysis->>'status')::text = 'processing'`
+              (analysis->>'status')::text = 'processing' OR
+              (analysis->>'status')::text = 'error'`
         );
 
       console.log(`[Enrichment] Starting enrichment process for ${bookmarksToUpdate.length} bookmarks`);
