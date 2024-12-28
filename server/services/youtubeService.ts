@@ -1,21 +1,14 @@
-import { google } from 'googleapis';
 import fetch from 'node-fetch';
 import { load } from 'cheerio';
 
-interface VideoDetails {
+interface VideoMetadata {
   title: string;
   description: string;
-  transcript: string;
+  thumbnailUrl: string;
   author: string;
-  publishDate: string;
-  duration?: string;
-  viewCount?: number;
-  category?: string;
 }
 
 export class YouTubeService {
-  private static youtube = google.youtube('v3');
-
   private static async getVideoId(url: string): Promise<string | null> {
     try {
       const urlObj = new URL(url);
@@ -30,120 +23,53 @@ export class YouTubeService {
     }
   }
 
-  private static async fetchTranscript(videoId: string): Promise<string> {
-    try {
-      const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
-      const html = await response.text();
-      const $ = load(html);
-
-      // First try to get the transcript from captions
-      const transcriptElements = $('[class*="caption-window"]');
-      if (transcriptElements.length > 0) {
-        const transcriptParts: string[] = [];
-        transcriptElements.each((_, element) => {
-          transcriptParts.push($(element).text().trim());
-        });
-        return transcriptParts.join(' ');
-      }
-
-      // If no captions, try to get auto-generated transcript
-      const transcriptText = $('[class*="transcript-text"]').text().trim();
-      if (transcriptText) {
-        return transcriptText;
-      }
-
-      return '';
-    } catch (error) {
-      console.error('Error fetching transcript:', error);
-      return '';
+  static async getVideoMetadata(url: string): Promise<VideoMetadata | null> {
+    if (!url) {
+      console.error('[YouTube] No URL provided');
+      return null;
     }
-  }
 
-  private static async fetchVideoDetails(videoId: string): Promise<Partial<VideoDetails>> {
     try {
-      // First try to get data using API
-      const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
-      const html = await response.text();
-      const $ = load(html);
-
-      // Extract full description from meta tags and description element
-      let description = '';
-      const metaDescription = $('meta[property="og:description"]').attr('content') || '';
-      const fullDescription = $('.ytd-video-description-text').text().trim() || 
-                          $('#description-text').text().trim() || 
-                          $('.description').text().trim();
-
-      // Combine descriptions, preferring the longer one
-      description = fullDescription.length > metaDescription.length ? fullDescription : metaDescription;
-
-      // Get metadata
-      const title = $('meta[property="og:title"]').attr('content') || '';
-      const author = $('link[itemprop="name"]').attr('content') || 
-                  $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
-      const publishDate = $('meta[itemprop="datePublished"]').attr('content') || '';
-
-      // Extract additional metadata
-      const duration = $('meta[itemprop="duration"]').attr('content') || '';
-      const viewCountText = $('[class*="view-count"]').text().trim();
-      const viewCount = viewCountText ? parseInt(viewCountText.replace(/\D/g, '')) : undefined;
-      const category = $('meta[itemprop="genre"]').attr('content') || '';
-
-      // If description is still empty or too short, try additional selectors
-      if (description.length < 100) {
-        const additionalDescription = $('#eow-description').text().trim() || 
-                                  $('.watch-description-text').text().trim() || 
-                                  $('[itemprop="description"]').text().trim();
-        if (additionalDescription.length > description.length) {
-          description = additionalDescription;
-        }
-      }
-
-      return {
-        title,
-        description: description || 'No description available',
-        author,
-        publishDate,
-        duration,
-        viewCount,
-        category
-      };
-    } catch (error) {
-      console.error('Error fetching video details:', error);
-      return {};
-    }
-  }
-
-  static async getVideoContent(url: string): Promise<VideoDetails | null> {
-    try {
-      console.log('[YouTube] Fetching content for:', url);
+      console.log('[YouTube] Fetching metadata for:', url);
       const videoId = await this.getVideoId(url);
+
       if (!videoId) {
         console.error('[YouTube] Invalid YouTube URL:', url);
         return null;
       }
 
-      console.log('[YouTube] Found video ID:', videoId);
+      // Fetch the video page
+      const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
 
-      // Fetch both details and transcript in parallel
-      const [details, transcript] = await Promise.all([
-        this.fetchVideoDetails(videoId),
-        this.fetchTranscript(videoId)
-      ]);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      console.log('[YouTube] Successfully fetched video content');
+      const html = await response.text();
+      const $ = load(html);
+
+      // Extract basic metadata using meta tags
+      const title = $('meta[property="og:title"]').attr('content') || '';
+      const description = $('meta[property="og:description"]').attr('content') || '';
+      const thumbnailUrl = $('meta[property="og:image"]').attr('content') || 
+                        `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+      const author = $('link[itemprop="name"]').attr('content') || 
+                    $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
+
+      console.log('[YouTube] Successfully fetched video metadata');
 
       return {
-        title: details.title || '',
-        description: details.description || '',
-        transcript: transcript || '',
-        author: details.author || '',
-        publishDate: details.publishDate || '',
-        duration: details.duration,
-        viewCount: details.viewCount,
-        category: details.category
+        title,
+        description,
+        thumbnailUrl,
+        author
       };
     } catch (error) {
-      console.error('[YouTube] Error getting video content:', error);
+      console.error('[YouTube] Error fetching video metadata:', error);
       return null;
     }
   }
