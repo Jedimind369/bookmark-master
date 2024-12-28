@@ -286,24 +286,16 @@ export class AIService {
       // Special handling for YouTube URLs
       if (url.includes('youtube.com') || url.includes('youtu.be')) {
         console.log('[Analysis] Detected YouTube URL, using YouTube API');
-        import { google } from 'googleapis';
+        const { google } = require('googleapis');
 
         const videoId = url.includes('youtube.com/watch?v=') 
           ? new URL(url).searchParams.get('v')
           : url.split('/').pop();
 
         // Get video details from YouTube API
-        // Configure YouTube API with quotas and restrictions
         const youtube = google.youtube({
           version: 'v3',
-          auth: process.env.YOUTUBE_API_KEY,
-          quotaUser: 'bookmark-analyzer', // Identifies your application
-          userIp: req?.ip, // Optional IP-based quota
-          // Restrict API key usage
-          headers: {
-            'Referer': 'https://replit.com',
-            'X-Requested-With': 'XMLHttpRequest'
-          }
+          auth: process.env.YOUTUBE_API_KEY
         });
 
         const videoData = await youtube.videos.list({
