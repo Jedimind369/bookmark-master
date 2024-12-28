@@ -44,6 +44,7 @@ export interface AIAnalysis {
     mainImage?: string;
     wordCount?: number;
     analysisAttempts?: number;
+    error?: string;
   };
 }
 
@@ -160,23 +161,23 @@ export class AIService {
           content: [
             {
               type: "text",
-              text: `Analyze this video content briefly:
+              text: `Analyze this video content:
 Title: ${pageContent.title.slice(0, 100)}
 Description: ${pageContent.description.slice(0, 200)}
 Author: ${pageContent.metadata?.author?.slice(0, 50) || 'Unknown'}
 Type: ${pageContent.type}
 Content Preview: ${truncatedContent}
 
-Provide a concise JSON analysis with:
+Return the analysis in this exact JSON structure:
 {
   "title": "<60 char title>",
   "description": "<160 char summary>",
   "tags": ["3-5 tags"],
   "contentQuality": {
-    "relevance": 0-1,
-    "informativeness": 0-1,
-    "credibility": 0-1,
-    "overallScore": 0-1
+    "relevance": 0.8,
+    "informativeness": 0.8,
+    "credibility": 0.8,
+    "overallScore": 0.8
   },
   "mainTopics": ["2-3 topics"]
 }`
@@ -185,10 +186,13 @@ Provide a concise JSON analysis with:
         }]
       });
 
+      console.log('[Video Analysis] Raw AI response:', message.content[0]?.text);
+
       // Get the first response with content
       const content = message.content[0]?.text;
       if (!content) {
-        throw new Error('No content in AI response');
+        console.error('[Video Analysis] No content in AI response');
+        return this.createFallbackAnalysis(pageContent, 'No content in AI response');
       }
 
       // Save response for debugging
@@ -196,15 +200,22 @@ Provide a concise JSON analysis with:
 
       try {
         const analysis = JSON.parse(content);
+
+        // Validate required fields
+        if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags) || !analysis.contentQuality) {
+          console.error('[Video Analysis] Invalid response structure:', analysis);
+          return this.createFallbackAnalysis(pageContent, 'Invalid response structure');
+        }
+
         return {
           title: (analysis.title || pageContent.title).slice(0, 60),
           description: (analysis.description || pageContent.description).slice(0, 160),
           tags: (analysis.tags || ['video']).slice(0, 5).map((tag: string) => tag.toLowerCase()),
           contentQuality: {
-            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.7)),
-            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.7)),
+            relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
+            informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
             credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
-            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.75))
+            overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
           },
           mainTopics: (analysis.mainTopics || ['video content']).slice(0, 3),
           metadata: {
@@ -213,31 +224,40 @@ Provide a concise JSON analysis with:
           }
         };
       } catch (parseError) {
-        console.error('[Video Analysis] Failed to parse AI response:', parseError);
-        throw new Error('Invalid video analysis format');
+        console.error('[Video Analysis] Failed to parse AI response:', parseError, 'Raw content:', content);
+        return this.createFallbackAnalysis(pageContent, 'Failed to parse AI response');
       }
     } catch (error) {
-      if (error.message?.includes('too long')) {
-        return {
-          title: pageContent.title.slice(0, 60),
-          description: pageContent.description.slice(0, 160) || 'A video content piece',
-          tags: ['video', 'content'],
-          contentQuality: {
-            relevance: 0.7,
-            informativeness: 0.7,
-            credibility: 0.8,
-            overallScore: 0.75
-          },
-          mainTopics: ['video content'],
-          metadata: {
-            ...pageContent.metadata,
-            analysisAttempts: 1
-          }
-        };
-      }
       console.error('[Video Analysis] Error:', error);
-      throw error;
+      return this.createFallbackAnalysis(pageContent, error instanceof Error ? error.message : 'Unknown error');
     }
+  }
+
+  private static createFallbackAnalysis(pageContent: PageContent, errorReason: string): AIAnalysis {
+    console.log('[Analysis] Creating fallback analysis due to:', errorReason);
+
+    // Extract video ID for better title if available
+    const videoId = pageContent.url.includes('youtube.com/watch?v=') 
+      ? new URL(pageContent.url).searchParams.get('v')
+      : pageContent.url.split('/').pop();
+
+    return {
+      title: pageContent.title.slice(0, 60) || `Video ${videoId || 'content'}`,
+      description: pageContent.description.slice(0, 160) || 'Video content analysis unavailable',
+      tags: ['video', 'content', 'unanalyzed'],
+      contentQuality: {
+        relevance: 0.8,
+        informativeness: 0.8,
+        credibility: 0.8,
+        overallScore: 0.8
+      },
+      mainTopics: ['video content'],
+      metadata: {
+        ...pageContent.metadata,
+        analysisAttempts: 1,
+        error: errorReason
+      }
+    };
   }
 
   private static async analyzeWebContent(pageContent: PageContent): Promise<AIAnalysis> {
