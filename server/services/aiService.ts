@@ -316,11 +316,12 @@ Content: ${pageContent.content.slice(0, 2000)}`
           }]
         });
 
-        if (!response.content[0] || !response.content[0].text) {
+        // Access content directly from response
+        const analysisText = response.content[0]?.value || '';
+
+        if (!analysisText) {
           throw new Error('Invalid response from AI analysis');
         }
-
-        const analysisText = response.content[0].text;
 
         // Save AI response for debugging
         await this.saveDebugInfo(normalizedUrl, { response: analysisText }, 'ai_response');
