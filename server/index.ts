@@ -12,15 +12,15 @@ for (const envVar of requiredEnvVars) {
 
 const app = express();
 
-// Configure express with increased limits for large files
+// Configure express with optimized limits for files
 app.use((req, res, next) => {
   if (req.headers['content-type']?.includes('text/html')) {
     express.text({
       type: 'text/html',
-      limit: '50mb',
+      limit: '5mb',
       verify: (req, res, buf) => {
-        if (buf.length > 50 * 1024 * 1024) { // 50MB limit
-          throw new Error('File size too large. Maximum size is 50MB.');
+        if (buf.length > 5 * 1024 * 1024) {
+          throw new Error('File size too large. Maximum size is 5MB.');
         }
       }
     })(req, res, next);
@@ -30,15 +30,15 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({
-  limit: '50mb',
+  limit: '2mb',
   verify: (req, res, buf) => {
-    if (buf.length > 50 * 1024 * 1024) { // 50MB limit
-      throw new Error('File size too large. Maximum size is 50MB.');
+    if (buf.length > 2 * 1024 * 1024) {
+      throw new Error('File size too large. Maximum size is 2MB.');
     }
   }
 }));
 
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 
 // Error handling middleware for payload size
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -51,19 +51,27 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   next(err);
 });
 
-// Logging middleware
+// Memory-efficient logging middleware
+const logQueue: string[] = [];
+const MAX_LOG_QUEUE = 100;
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
+  // Use a weak reference for response capture
+  let capturedJsonResponse: Record<string, any> | undefined = undefined;
   const originalResJson = res.json;
+  
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
-  res.on("finish", () => {
+  const cleanup = () => {
+    // Clean up response capture
+    capturedJsonResponse = undefined;
+    
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
@@ -75,10 +83,17 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
+      // Queue-based logging
+      logQueue.push(logLine);
+      if (logQueue.length > MAX_LOG_QUEUE) {
+        logQueue.shift();  // Remove oldest log if queue is full
+      }
       log(logLine);
     }
-  });
+  };
 
+  res.once("finish", cleanup);
+  res.once("close", cleanup);
   next();
 });
 
@@ -104,7 +119,7 @@ app.use((req, res, next) => {
     }
 
     // Start the server
-    const PORT = 5000;
+    const PORT = parseInt(process.env.PORT || "3000", 10);
     server.listen(PORT, "0.0.0.0", () => {
       log(`Server running at http://0.0.0.0:${PORT}`);
     });

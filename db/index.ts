@@ -8,8 +8,8 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const db = drizzle({
-  connection: process.env.DATABASE_URL,
+// Create database instance with optimized settings
+export const db = drizzle(process.env.DATABASE_URL, {
   schema,
-  ws: ws,
+  logger: false,
 });

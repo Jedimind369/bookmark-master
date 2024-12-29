@@ -9,6 +9,7 @@ import { type Server } from "http";
 import viteConfig from "../vite.config";
 
 const viteLogger = createLogger();
+const PORT = parseInt(process.env.PORT || "3000", 10);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -46,9 +47,11 @@ export async function setupVite(app: Express, server: Server) {
       },
     },
     server: {
+      port: PORT,
       host: '0.0.0.0',
       middlewareMode: true,
       hmr: { server },
+      strictPort: true
     },
     appType: "custom",
   });

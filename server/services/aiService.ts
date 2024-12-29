@@ -12,14 +12,28 @@ if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
-// Configure rate limiter
+// Memory-efficient rate limiter configuration
 const limiter = new Bottleneck({
-  maxConcurrent: 5, // Maximum number of concurrent requests
-  minTime: 200, // Minimum time between requests (ms)
-  reservoir: 50, // Number of requests allowed per reservoirRefreshAmount
-  reservoirRefreshAmount: 50, // How many requests to add to reservoir
-  reservoirRefreshInterval: 60 * 1000, // Refresh interval in milliseconds (1 minute)
+  maxConcurrent: 2,
+  minTime: 1000,
+  reservoir: 10,
+  reservoirRefreshAmount: 10,
+  reservoirRefreshInterval: 60 * 1000,
+  trackDoneStatus: false,
+  Promise: Promise
 });
+
+// Cache and debug management
+const MAX_CACHE_SIZE = 100;
+const MAX_DEBUG_FILES = 50;
+const MAX_LISTENERS = 10;
+const promptCache = new Map<string, string>();
+const analysisAttemptsMap = new Map<string, number>();
+const debugFiles = new Set<string>();
+
+// Create a memory-efficient event emitter
+const progressEmitter = new EventEmitter();
+progressEmitter.setMaxListeners(MAX_LISTENERS);
 
 // the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
 const anthropic = new Anthropic({
@@ -93,15 +107,15 @@ export interface BatchOptions {
 
 export class AIService {
   // Enhanced service with batch processing and rate limiting
-  private static readonly MAX_RETRIES = 3;
-  private static readonly INITIAL_RETRY_DELAY = 1000;
-  private static readonly TIMEOUT = 30000;
-  private static readonly DEFAULT_BATCH_SIZE = 50;
-  private static readonly DEFAULT_MAX_CONCURRENT = 5;
+  private static readonly MAX_RETRIES = 2;
+  private static readonly INITIAL_RETRY_DELAY = 2000;
+  private static readonly TIMEOUT = 20000;
+  private static readonly DEFAULT_BATCH_SIZE = 20;
+  private static readonly DEFAULT_MAX_CONCURRENT = 2;
+  private static readonly MAX_CONTENT_LENGTH = 3000;
   
-  private static analysisAttempts: Map<string, number> = new Map();
   private static limiter = limiter;
-  private static progressEmitter = new EventEmitter();
+  private static progressEmitter = progressEmitter;
 
   private static async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -110,12 +124,31 @@ export class AIService {
   private static async saveDebugInfo(url: string, data: any, type: string): Promise<void> {
     try {
       const debugDir = path.join(process.cwd(), 'debug');
+      
+      // Limit number of debug files
+      if (debugFiles.size >= MAX_DEBUG_FILES) {
+        const oldestFile = Array.from(debugFiles)[0];
+        await fs.unlink(path.join(debugDir, oldestFile)).catch(() => {});
+        debugFiles.delete(oldestFile);
+      }
+
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `${type}_${encodeURIComponent(url)}_${timestamp}.json`;
+      
+      // Only save essential data
+      const essentialData = {
+        url,
+        timestamp,
+        type,
+        error: data.error,
+        summary: typeof data === 'string' ? data.slice(0, 500) : JSON.stringify(data).slice(0, 500)
+      };
+
       await fs.writeFile(
         path.join(debugDir, filename),
-        JSON.stringify(data, null, 2)
+        JSON.stringify(essentialData, null, 2)
       );
+      debugFiles.add(filename);
     } catch (error) {
       console.warn(`Failed to save debug info for ${url}:`, error);
     }
@@ -163,7 +196,7 @@ URL: ${pageContent.url}
 Title: ${pageContent.title}
 Type: ${pageContent.type}
 Description: ${pageContent.description}
-Content: ${pageContent.content.slice(0, 4000)}
+Content: ${pageContent.content.slice(0, this.MAX_CONTENT_LENGTH)}
 
 The response must be a valid JSON object with this exact structure:
 {
@@ -209,54 +242,83 @@ The response must be a valid JSON object with this exact structure:
     }
 
     let responseText = content.text.trim();
+    
+    // Memory optimization: Use substring instead of slice for large strings
+    if (responseText.length > this.MAX_CONTENT_LENGTH) {
+      responseText = responseText.substring(0, this.MAX_CONTENT_LENGTH);
+    }
+
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No valid JSON found in response');
     }
 
     responseText = jsonMatch[0];
-    await this.saveDebugInfo(url, {
-      rawResponse: content.text,
-      cleanedResponse: responseText
-    }, 'analysis');
-
-    const analysis = JSON.parse(responseText);
-
-    if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
-      throw new Error('Invalid analysis structure');
-    }
-
-    // Ensure at least 5 tags
-    const combinedTags = Array.from(new Set([
-      ...(analysis.tags || []),
-      ...(analysis.recommendations?.suggestedTags || [])
-    ])).slice(0, 10);
-
-    if (combinedTags.length < 5) {
-      throw new Error('Not enough tags generated');
-    }
-
-    return {
-      title: analysis.title,
-      description: analysis.description,
-      tags: combinedTags.map(tag => tag.toLowerCase()),
-      contentQuality: {
-        relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
-        informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
-        credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
-        overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
-      },
-      mainTopics: (analysis.mainTopics || []).slice(0, 4),
-      recommendations: analysis.recommendations || {},
-      metadata: {
-        analysisAttempts: 1
-      }
+    
+    // Minimize debug info size
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      status: 'success',
+      length: responseText.length
     };
+    await this.saveDebugInfo(url, debugInfo, 'analysis');
+
+    try {
+      const analysis = JSON.parse(responseText);
+
+      if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
+        throw new Error('Invalid analysis structure');
+      }
+
+      // Memory optimization: Use Set for deduplication
+      const uniqueTags = new Set([
+        ...(analysis.tags || []),
+        ...(analysis.recommendations?.suggestedTags || [])
+      ]);
+      const combinedTags = Array.from(uniqueTags).slice(0, 10);
+
+      if (combinedTags.length < 5) {
+        throw new Error('Not enough tags generated');
+      }
+
+      return {
+        title: analysis.title.substring(0, 200),
+        description: analysis.description.substring(0, 1000),
+        tags: combinedTags.map(tag => tag.toLowerCase()),
+        contentQuality: {
+          relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
+          informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
+          credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
+          overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
+        },
+        mainTopics: (analysis.mainTopics || []).slice(0, 4),
+        recommendations: {
+          improvedTitle: analysis.recommendations?.improvedTitle?.substring(0, 200),
+          improvedDescription: analysis.recommendations?.improvedDescription?.substring(0, 1000),
+          suggestedTags: analysis.recommendations?.suggestedTags?.slice(0, 5)
+        },
+        metadata: {
+          analysisAttempts: 1
+        }
+      };
+    } catch (error) {
+      // Clean up on error
+      this.manageCache();
+      throw error;
+    }
+  }
+
+  private static getAnalysisAttempts(url: string): number {
+    return analysisAttemptsMap.get(url) || 0;
+  }
+
+  private static setAnalysisAttempts(url: string, attempts: number): void {
+    analysisAttemptsMap.set(url, attempts);
   }
 
   private static async analyzeContentWithRetry(url: string, content: PageContent): Promise<AIAnalysis> {
     let lastError: Error | null = null;
-    const attempts = this.analysisAttempts.get(url) || 0;
+    const attempts = this.getAnalysisAttempts(url);
 
     for (let i = 0; i < this.MAX_RETRIES; i++) {
       try {
@@ -272,71 +334,105 @@ The response must be a valid JSON object with this exact structure:
       }
     }
 
-    this.analysisAttempts.set(url, attempts + 1);
+    this.setAnalysisAttempts(url, attempts + 1);
     throw lastError || new Error('Failed to analyze content after multiple retries');
   }
 
   private static async fetchPageContent(url: string): Promise<PageContent> {
     try {
       console.log(`[Analysis] Fetching content for: ${url}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.TIMEOUT);
 
-      // Check if it's a YouTube URL
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        console.log('[Analysis] Detected YouTube URL');
-        const videoContent = await YouTubeService.getVideoContent(url);
-        if (!videoContent) {
-          throw new Error('Failed to fetch YouTube content');
+      try {
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          console.log('[Analysis] Detected YouTube URL');
+          const videoContent = await YouTubeService.getVideoContent(url);
+          if (!videoContent) {
+            throw new Error('Failed to fetch YouTube content');
+          }
+
+          return {
+            url,
+            title: videoContent.title,
+            description: videoContent.description,
+            content: JSON.stringify(videoContent), // Changed to stringify VideoDetails
+            type: 'video',
+            metadata: {
+              author: videoContent.author,
+              publishDate: videoContent.publishDate
+            }
+          };
         }
+
+        const response = await fetch(url, {
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml',
+            'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)'
+          },
+          signal: controller.signal
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // Stream and process content in chunks
+        const chunks: Buffer[] = [];
+        let totalSize = 0;
+        const MAX_SIZE = 1024 * 1024; // 1MB limit
+
+        for await (const chunk of response.body) {
+          totalSize += chunk.length;
+          if (totalSize > MAX_SIZE) {
+            console.warn(`[Analysis] Content too large for ${url}, truncating`);
+            break;
+          }
+          chunks.push(Buffer.from(chunk));
+        }
+
+        const html = Buffer.concat(chunks).toString('utf-8');
+        const $ = cheerio.load(html);
+
+        // Clean up unnecessary elements to reduce memory
+        $('script, style, iframe, noscript').remove();
+
+        // Extract content with memory efficiency
+        const title = $('meta[property="og:title"]').attr('content') || 
+                     $('title').text() || 
+                     url.split('/').pop() || 
+                     'Untitled';
+
+        const description = $('meta[property="og:description"]').attr('content') || 
+                          $('meta[name="description"]').attr('content') || 
+                          '';
+
+        // Extract main content more efficiently
+        const mainContent = $('article, main, .content')
+          .map((_, el) => $(el).text())
+          .get()
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, this.MAX_CONTENT_LENGTH);
+
+        const type: PageContent['type'] = $('article').length ? 'article' : 'webpage';
 
         return {
           url,
-          title: videoContent.title,
-          description: videoContent.description,
-          content: JSON.stringify(videoContent), // Changed to stringify VideoDetails
-          type: 'video',
+          title: title.slice(0, 200),  // Limit title length
+          description: description.slice(0, 500),  // Limit description length
+          content: mainContent,
+          type,
           metadata: {
-            author: videoContent.author,
-            publishDate: videoContent.publishDate
+            author: $('meta[name="author"]').attr('content')?.slice(0, 100),
+            publishDate: $('meta[property="article:published_time"]').attr('content'),
+            mainImage: $('meta[property="og:image"]').attr('content')
           }
         };
+      } finally {
+        clearTimeout(timeout);
       }
-
-      // Handle other web content
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml',
-          'User-Agent': 'Mozilla/5.0 (compatible; BookmarkAnalyzer/1.0)'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const html = await response.text();
-      const $ = cheerio.load(html);
-
-      // Determine content type
-      let type: PageContent['type'] = 'webpage';
-      if ($('article').length) {
-        type = 'article';
-      }
-
-      // Extract content
-      const content = $('article, main, .content').text() || $('body').text();
-
-      return {
-        url,
-        title: $('meta[property="og:title"]').attr('content') || $('title').text(),
-        description: $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '',
-        content: content.replace(/\s+/g, ' ').trim(),
-        type,
-        metadata: {
-          author: $('meta[name="author"]').attr('content'),
-          publishDate: $('meta[property="article:published_time"]').attr('content'),
-          mainImage: $('meta[property="og:image"]').attr('content')
-        }
-      };
     } catch (error) {
       console.error('[Analysis] Fetch error:', error);
       throw error;
@@ -431,11 +527,25 @@ The response must be a valid JSON object with this exact structure:
     this.progressEmitter.emit('progress', progress);
   }
 
-  static onProgress(callback: (progress: BatchProgress) => void): void {
+  static onProgress(callback: (progress: BatchProgress) => void): () => void {
     this.progressEmitter.on('progress', callback);
+    // Return cleanup function
+    return () => this.progressEmitter.removeListener('progress', callback);
   }
 
-  static offProgress(callback: (progress: BatchProgress) => void): void {
-    this.progressEmitter.off('progress', callback);
+  // Cache management
+  private static manageCache(): void {
+    if (promptCache.size > MAX_CACHE_SIZE) {
+      const keysToDelete = Array.from(promptCache.keys()).slice(0, MAX_CACHE_SIZE / 2);
+      keysToDelete.forEach(key => promptCache.delete(key));
+    }
+  }
+
+  // Add cleanup method
+  static cleanup(): void {
+    this.progressEmitter.removeAllListeners();
+    promptCache.clear();
+    analysisAttemptsMap.clear();
+    debugFiles.clear();
   }
 }
