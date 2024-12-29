@@ -4,11 +4,22 @@ import fetch from 'node-fetch';
 import type { Response } from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
+import Bottleneck from 'bottleneck';
 import { YouTubeService, type VideoDetails } from './youtubeService';
+import { EventEmitter } from 'events';
 
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
+
+// Configure rate limiter
+const limiter = new Bottleneck({
+  maxConcurrent: 5, // Maximum number of concurrent requests
+  minTime: 200, // Minimum time between requests (ms)
+  reservoir: 50, // Number of requests allowed per reservoirRefreshAmount
+  reservoirRefreshAmount: 50, // How many requests to add to reservoir
+  reservoirRefreshInterval: 60 * 1000, // Refresh interval in milliseconds (1 minute)
+});
 
 // the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
 const anthropic = new Anthropic({
@@ -64,11 +75,32 @@ interface PageContent {
   };
 }
 
+export interface BatchProgress {
+  total: number;
+  completed: number;
+  failed: number;
+  inProgress: number;
+  errors: Array<{ url: string; error: string }>;
+  startTime: Date;
+  estimatedTimeRemaining?: number;
+}
+
+export interface BatchOptions {
+  batchSize?: number;
+  maxConcurrent?: number;
+  onProgress?: (progress: BatchProgress) => void;
+}
+
 export class AIService {
   private static readonly MAX_RETRIES = 3;
   private static readonly INITIAL_RETRY_DELAY = 1000;
   private static readonly TIMEOUT = 30000;
+  private static readonly DEFAULT_BATCH_SIZE = 50;
+  private static readonly DEFAULT_MAX_CONCURRENT = 5;
+  
   private static analysisAttempts: Map<string, number> = new Map();
+  private static limiter = limiter;
+  private static progressEmitter = new EventEmitter();
 
   private static async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -158,68 +190,89 @@ The response must be a valid JSON object with this exact structure:
 }`;
   }
 
-  private static async analyzeWithAI(prompt: string, url: string): Promise<AIAnalysis> {
-    try {
-      const message = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1024,
-        temperature: 0.3,
+  private static async callAnthropicWithRateLimit(prompt: string): Promise<any> {
+    return this.limiter.schedule(async () => {
+      const response = await anthropic.messages.create({
+        model: "claude-3-sonnet-20240229",
+        max_tokens: 4000,
         messages: [{ role: "user", content: prompt }]
       });
+      return response;
+    });
+  }
 
-      const content = message.content[0];
-      if (!content || typeof content !== 'object' || !('text' in content)) {
-        throw new Error('Invalid AI response structure');
-      }
-
-      let responseText = content.text.trim();
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No valid JSON found in response');
-      }
-
-      responseText = jsonMatch[0];
-      await this.saveDebugInfo(url, {
-        rawResponse: content.text,
-        cleanedResponse: responseText
-      }, 'analysis');
-
-      const analysis = JSON.parse(responseText);
-
-      if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
-        throw new Error('Invalid analysis structure');
-      }
-
-      // Ensure at least 5 tags
-      const combinedTags = Array.from(new Set([
-        ...(analysis.tags || []),
-        ...(analysis.recommendations?.suggestedTags || [])
-      ])).slice(0, 10);
-
-      if (combinedTags.length < 5) {
-        throw new Error('Not enough tags generated');
-      }
-
-      return {
-        title: analysis.title,
-        description: analysis.description,
-        tags: combinedTags.map(tag => tag.toLowerCase()),
-        contentQuality: {
-          relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
-          informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
-          credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
-          overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
-        },
-        mainTopics: (analysis.mainTopics || []).slice(0, 4),
-        recommendations: analysis.recommendations || {},
-        metadata: {
-          analysisAttempts: 1
-        }
-      };
-    } catch (error) {
-      console.error('[Analysis] AI Error:', error);
-      throw error;
+  private static async processAIResponse(response: any, url: string): Promise<AIAnalysis> {
+    const content = response.content[0];
+    if (!content || typeof content !== 'object' || !('text' in content)) {
+      throw new Error('Invalid AI response structure');
     }
+
+    let responseText = content.text.trim();
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No valid JSON found in response');
+    }
+
+    responseText = jsonMatch[0];
+    await this.saveDebugInfo(url, {
+      rawResponse: content.text,
+      cleanedResponse: responseText
+    }, 'analysis');
+
+    const analysis = JSON.parse(responseText);
+
+    if (!analysis.title || !analysis.description || !Array.isArray(analysis.tags)) {
+      throw new Error('Invalid analysis structure');
+    }
+
+    // Ensure at least 5 tags
+    const combinedTags = Array.from(new Set([
+      ...(analysis.tags || []),
+      ...(analysis.recommendations?.suggestedTags || [])
+    ])).slice(0, 10);
+
+    if (combinedTags.length < 5) {
+      throw new Error('Not enough tags generated');
+    }
+
+    return {
+      title: analysis.title,
+      description: analysis.description,
+      tags: combinedTags.map(tag => tag.toLowerCase()),
+      contentQuality: {
+        relevance: Math.max(0, Math.min(1, analysis.contentQuality?.relevance || 0.8)),
+        informativeness: Math.max(0, Math.min(1, analysis.contentQuality?.informativeness || 0.8)),
+        credibility: Math.max(0, Math.min(1, analysis.contentQuality?.credibility || 0.8)),
+        overallScore: Math.max(0, Math.min(1, analysis.contentQuality?.overallScore || 0.8))
+      },
+      mainTopics: (analysis.mainTopics || []).slice(0, 4),
+      recommendations: analysis.recommendations || {},
+      metadata: {
+        analysisAttempts: 1
+      }
+    };
+  }
+
+  private static async analyzeContentWithRetry(url: string, content: PageContent): Promise<AIAnalysis> {
+    let lastError: Error | null = null;
+    const attempts = this.analysisAttempts.get(url) || 0;
+
+    for (let i = 0; i < this.MAX_RETRIES; i++) {
+      try {
+        const prompt = content.type === 'video' 
+          ? await this.getVideoAnalysisPrompt(content as unknown as VideoDetails)
+          : await this.getWebAnalysisPrompt(content);
+        const response = await this.callAnthropicWithRateLimit(prompt);
+        return await this.processAIResponse(response, url);
+      } catch (error) {
+        lastError = error as Error;
+        const delay = this.INITIAL_RETRY_DELAY * Math.pow(2, i);
+        await this.delay(delay);
+      }
+    }
+
+    this.analysisAttempts.set(url, attempts + 1);
+    throw lastError || new Error('Failed to analyze content after multiple retries');
   }
 
   private static async fetchPageContent(url: string): Promise<PageContent> {
@@ -291,43 +344,97 @@ The response must be a valid JSON object with this exact structure:
 
   static async analyzeUrl(url: string): Promise<AIAnalysis> {
     try {
-      console.log(`[Analysis] Starting analysis of ${url}`);
-      const pageContent = await this.fetchPageContent(url);
-
-      const prompt = pageContent.type === 'video'
-        ? await this.getVideoAnalysisPrompt(JSON.parse(pageContent.content) as VideoDetails)
-        : await this.getWebAnalysisPrompt(pageContent);
-
-      const analysis = await this.analyzeWithAI(prompt, url);
-
-      return {
-        ...analysis,
-        metadata: {
-          ...analysis.metadata,
-          ...pageContent.metadata
-        }
-      };
+      const content = await this.fetchPageContent(url);
+      return this.analyzeContentWithRetry(url, content);
     } catch (error) {
-      console.error(`[Analysis] Error analyzing ${url}:`, error);
-      const attempts = (this.analysisAttempts.get(url) || 0) + 1;
-      this.analysisAttempts.set(url, attempts);
-
-      return {
-        title: url,
-        description: `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}. Will retry automatically.`,
-        tags: ['analysis-failed', 'retry-needed'],
-        contentQuality: {
-          relevance: 0,
-          informativeness: 0,
-          credibility: 0,
-          overallScore: 0
-        },
-        mainTopics: ['analysis-pending'],
-        metadata: {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          analysisAttempts: attempts
-        }
-      };
+      console.error(`[Analysis] Failed to analyze URL ${url}:`, error);
+      throw error;
     }
+  }
+
+  static async analyzeBatch(
+    urls: string[],
+    options: BatchOptions = {}
+  ): Promise<Map<string, AIAnalysis>> {
+    const {
+      batchSize = this.DEFAULT_BATCH_SIZE,
+      maxConcurrent = this.DEFAULT_MAX_CONCURRENT,
+      onProgress
+    } = options;
+
+    const results = new Map<string, AIAnalysis>();
+    const progress: BatchProgress = {
+      total: urls.length,
+      completed: 0,
+      failed: 0,
+      inProgress: 0,
+      errors: [],
+      startTime: new Date()
+    };
+
+    // Process URLs in batches
+    for (let i = 0; i < urls.length; i += batchSize) {
+      const batchUrls = urls.slice(i, i + batchSize);
+      const batchPromises = batchUrls.map(async (url) => {
+        progress.inProgress++;
+        this.updateProgress(progress, onProgress);
+
+        try {
+          const result = await this.analyzeUrl(url);
+          results.set(url, result);
+          progress.completed++;
+        } catch (error) {
+          progress.failed++;
+          progress.errors.push({
+            url,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          console.error(`[Batch] Failed to analyze ${url}:`, error);
+        } finally {
+          progress.inProgress--;
+          this.updateEstimatedTimeRemaining(progress);
+          this.updateProgress(progress, onProgress);
+        }
+      });
+
+      // Process batch with concurrency limit
+      await Promise.all(
+        batchPromises.map((promise) => this.limiter.schedule(() => promise))
+      );
+
+      // Log batch completion
+      console.log(`[Batch] Completed batch ${i / batchSize + 1} of ${Math.ceil(urls.length / batchSize)}`);
+      console.log(`[Batch] Progress: ${progress.completed}/${progress.total} (${progress.failed} failed)`);
+    }
+
+    return results;
+  }
+
+  private static updateEstimatedTimeRemaining(progress: BatchProgress): void {
+    const elapsed = Date.now() - progress.startTime.getTime();
+    const completedCount = progress.completed + progress.failed;
+    if (completedCount === 0) return;
+
+    const averageTimePerUrl = elapsed / completedCount;
+    const remainingUrls = progress.total - completedCount;
+    progress.estimatedTimeRemaining = averageTimePerUrl * remainingUrls;
+  }
+
+  private static updateProgress(
+    progress: BatchProgress,
+    onProgress?: (progress: BatchProgress) => void
+  ): void {
+    if (onProgress) {
+      onProgress(progress);
+    }
+    this.progressEmitter.emit('progress', progress);
+  }
+
+  static onProgress(callback: (progress: BatchProgress) => void): void {
+    this.progressEmitter.on('progress', callback);
+  }
+
+  static offProgress(callback: (progress: BatchProgress) => void): void {
+    this.progressEmitter.off('progress', callback);
   }
 }
