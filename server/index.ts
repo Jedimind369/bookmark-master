@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { performanceMonitor } from "./utils/monitoring";
+import { setupMonitoring } from "./services/monitoringService";
 
 // Verify required environment variables
 const requiredEnvVars = ['ANTHROPIC_API_KEY', 'DATABASE_URL'];
@@ -17,6 +18,9 @@ const app = express();
 // Configure express with optimized limits for files and disable x-powered-by
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+
+// Setup monitoring first to track all requests
+setupMonitoring(app);
 
 // Configure express with optimized limits for files
 app.use((req, res, next) => {

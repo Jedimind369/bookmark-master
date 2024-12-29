@@ -7,8 +7,33 @@ import { parseHtmlBookmarks } from "./utils/bookmarkParser";
 import { db } from "@db";
 import { bookmarks } from "@db/schema";
 import { z } from "zod";
+import { performanceMonitor } from "./utils/monitoring";
 
 export function registerRoutes(app: Express): Server {
+  // Add monitoring endpoint
+  app.get("/api/monitoring/status", (_req, res) => {
+    try {
+      const metrics = performanceMonitor.getLatestMetrics();
+      if (!metrics) {
+        return res.status(404).json({ message: "No metrics available yet" });
+      }
+      res.json(metrics);
+    } catch (error) {
+      console.error("Failed to get monitoring status:", error);
+      res.status(500).json({ message: "Failed to get monitoring status" });
+    }
+  });
+
+  app.get("/api/monitoring/history", (_req, res) => {
+    try {
+      const history = performanceMonitor.getMetricsHistory();
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to get monitoring history:", error);
+      res.status(500).json({ message: "Failed to get monitoring history" });
+    }
+  });
+
   // Import bookmarks
   app.post("/api/bookmarks/import", async (req, res) => {
     try {
