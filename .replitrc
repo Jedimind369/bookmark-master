@@ -1,0 +1,11 @@
+{
+  "language": "nodejs",
+  "run": "npm run dev",
+  "entrypoint": "server/index.ts",
+  "onBoot": "npm install",
+  "configure": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }
+} 

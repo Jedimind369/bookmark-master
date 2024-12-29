@@ -15,20 +15,28 @@ GITHUB_STATUS=$?
 if [ $GITHUB_STATUS -eq 0 ]; then
     echo "✅ Successfully pushed to GitHub!"
     
-    # Deploy to Replit
+    # Deploy to Replit using CLI
     echo "🔄 Deploying to Replit..."
-    echo "Please manually sync your Replit project:"
-    echo "1. Go to https://replit.com/@jedimind/BookmarkMaster"
-    echo "2. Click on the 'Version Control' tab"
-    echo "3. Click 'Pull' to get the latest changes"
     
-    # Open Replit in browser
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        open "https://replit.com/@jedimind/BookmarkMaster"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        xdg-open "https://replit.com/@jedimind/BookmarkMaster"
-    elif [[ "$OSTYPE" == "msys" ]]; then
-        start "https://replit.com/@jedimind/BookmarkMaster"
+    # Check if replit-cli is installed
+    if ! command -v replit &> /dev/null; then
+        echo "Installing Replit CLI..."
+        npm install -g replit-cli
+    fi
+    
+    # Deploy using Replit CLI
+    echo "Deploying to Replit..."
+    npx replit-cli deploy
+    REPLIT_STATUS=$?
+    
+    if [ $REPLIT_STATUS -eq 0 ]; then
+        echo "✅ Successfully deployed to Replit!"
+    else
+        echo "❌ Failed to deploy to Replit. Please check your Replit connection."
+        echo "Alternative deployment methods:"
+        echo "1. Use 'git pull' directly in Replit's shell"
+        echo "2. Fork the repository in Replit"
+        echo "3. Import from GitHub in Replit"
     fi
 else
     echo "❌ Failed to push to GitHub"
