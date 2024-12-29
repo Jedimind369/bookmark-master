@@ -92,6 +92,7 @@ export interface BatchOptions {
 }
 
 export class AIService {
+  // Enhanced service with batch processing and rate limiting
   private static readonly MAX_RETRIES = 3;
   private static readonly INITIAL_RETRY_DELAY = 1000;
   private static readonly TIMEOUT = 30000;
