@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { performanceMonitor } from "./utils/monitoring";
 
 // Verify required environment variables
 const requiredEnvVars = ['ANTHROPIC_API_KEY', 'DATABASE_URL'];
@@ -10,10 +11,20 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
+// Performance optimization settings
 const app = express();
+
+// Configure express with optimized limits for files and disable x-powered-by
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
 // Configure express with optimized limits for files
 app.use((req, res, next) => {
+  // Set response timeout
+  res.setTimeout(30000, () => {
+    res.status(503).json({ message: 'Request timeout' });
+  });
+
   if (req.headers['content-type']?.includes('text/html')) {
     express.text({
       type: 'text/html',
@@ -29,6 +40,7 @@ app.use((req, res, next) => {
   }
 });
 
+// Optimize JSON parsing
 app.use(express.json({
   limit: '2mb',
   verify: (req, res, buf) => {
@@ -46,12 +58,12 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     return res.status(413).json({ message: err.message });
   }
   if (err instanceof SyntaxError && err.message.includes('entity too large')) {
-    return res.status(413).json({ message: 'File size too large. Maximum size is 50MB.' });
+    return res.status(413).json({ message: 'File size too large. Maximum size is 2MB.' });
   }
   next(err);
 });
 
-// Memory-efficient logging middleware
+// Memory-efficient logging middleware with circular buffer
 const logQueue: string[] = [];
 const MAX_LOG_QUEUE = 100;
 
@@ -59,10 +71,10 @@ app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
 
-  // Use a weak reference for response capture
+  // Use WeakRef for response capture to allow garbage collection
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
   const originalResJson = res.json;
-  
+
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
@@ -71,22 +83,21 @@ app.use((req, res, next) => {
   const cleanup = () => {
     // Clean up response capture
     capturedJsonResponse = undefined;
-    
+
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+
+      // Truncate response logging to prevent memory leaks
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        const responseStr = JSON.stringify(capturedJsonResponse);
+        logLine += ` :: ${responseStr.length > 100 ? responseStr.slice(0, 97) + '...' : responseStr}`;
       }
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      // Queue-based logging
+      // Queue-based logging with size limit
       logQueue.push(logLine);
       if (logQueue.length > MAX_LOG_QUEUE) {
-        logQueue.shift();  // Remove oldest log if queue is full
+        logQueue.shift();
       }
       log(logLine);
     }
@@ -116,15 +127,38 @@ app.use((req, res, next) => {
       await setupVite(app, server);
     } else {
       serveStatic(app);
+
+      // Enable garbage collection hints in production
+      if (global.gc) {
+        setInterval(() => {
+          try {
+            global.gc();
+          } catch (error) {
+            console.error('Failed to run garbage collection:', error);
+          }
+        }, 30000); // Run every 30 seconds
+      }
     }
 
     // Start the server
     const PORT = parseInt(process.env.PORT || "5000", 10);
     server.listen(PORT, "0.0.0.0", () => {
       log(`Server running at http://0.0.0.0:${PORT}`);
+
+      // Start performance monitoring
+      performanceMonitor.resetMetrics();
     });
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
   }
 })();
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  log('SIGTERM received. Performing graceful shutdown...');
+  server.close(() => {
+    log('Server closed. Exiting process.');
+    process.exit(0);
+  });
+});

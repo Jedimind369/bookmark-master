@@ -8,8 +8,18 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Create database instance with optimized settings
-export const db = drizzle(process.env.DATABASE_URL, {
+// Optimize database connection settings
+const dbOptions = {
   schema,
-  logger: false,
-});
+  logger: false, // Disable logging in production
+  // Database connection pool settings
+  pool: {
+    min: 1,               // Minimum connections
+    max: 5,               // Maximum connections
+    idleTimeoutMillis: 30000, // Close idle connections after 30s
+    acquireTimeoutMillis: 5000, // Timeout after 5s if can't acquire connection
+    reapIntervalMillis: 1000, // Check for idle connections every 1s
+  }
+};
+
+export const db = drizzle(process.env.DATABASE_URL, dbOptions);
