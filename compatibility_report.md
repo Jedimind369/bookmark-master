@@ -1,85 +1,49 @@
-# Bookmark Master Compatibility Analysis
+# Documentation References
 
-## Project Overview
-- Repository purpose: Managing and organizing bookmarks
-- Target enhancement: Scale to handle 11,000 URLs with AI-powered metadata generation
+## External Services & APIs
 
-## Technical Assessment
+### Zyte Web Scraping
+- Main Documentation: https://docs.zyte.com/web-scraping/get-started.html
+- Rate Limiting Guide: https://docs.zyte.com/web-scraping/rate-limits.html
+- Best Practices: https://docs.zyte.com/web-scraping/best-practices.html
 
-### 1. Project Structure
-✓ Modern TypeScript/Node.js project with clear separation of concerns:
-- `/server`: Backend implementation with Express
-- `/src`: Frontend implementation
-- `/db`: Database configuration and migrations
-- Well-organized with models, services, and utilities
+### Replit
+- Getting Started: https://docs.replit.com/category/getting-started
+- Version Control: https://docs.replit.com/programming-ide/using-git-on-replit
+- Deployment: https://docs.replit.com/hosting/deployments
 
-### 2. Feature Analysis
-#### Web Scraping Capabilities
-✓ Existing implementation:
-- Uses Puppeteer for web scraping
-- Has HTML parsing capabilities
-- Includes bookmark import functionality
+### Cursor
+- Command Bar (Cmd+K): https://docs.cursor.com/cmdk/overview
+- AI Features: https://docs.cursor.com/ai-features
+- Keyboard Shortcuts: https://docs.cursor.com/keyboard-shortcuts
 
-Scalability assessment:
-- Current implementation may need optimization for 11K URLs
-- Rate limiting and concurrent processing needed
+## Project Architecture
 
-#### Data Storage
-✓ Current solution:
-- Uses Drizzle ORM
-- Neon Database (Postgres) for storage
-- Well-structured schema with migrations
+### React Components
+- Structure Guidelines: https://blog.rstankov.com/structuring-react-components/
+- Best Practices: https://reactjs.org/docs/thinking-in-react.html
 
-Scalability for 11K records:
-- Database choice is suitable for scale
-- May need index optimization
-- Batch processing implementation required
+### TypeScript
+- Official Handbook: https://www.typescriptlang.org/docs/handbook/intro.html
+- Best Practices: https://google.github.io/styleguide/tsguide.html
 
-#### AI Integration
-✓ Existing AI features:
-- OpenAI and Anthropic integration already present
-- AI service layer implemented
+## Testing & Quality
+- Vitest Documentation: https://vitest.dev/guide/
+- React Testing Library: https://testing-library.com/docs/react-testing-library/intro/
 
-Integration points:
-- Ready for metadata generation
-- Existing service layer can be extended
+## Database
+- Drizzle ORM: https://orm.drizzle.team/docs/overview
+- Neon Database: https://neon.tech/docs/introduction
 
-### 3. Performance & Scalability
-Current state:
-- Basic error handling implemented
-- Async/await patterns used
-- Missing robust rate limiting
-- Needs concurrent processing implementation
+## AI Integration
+- Anthropic Claude API: https://docs.anthropic.com/claude/reference/getting-started-with-the-api
 
-## Recommendations
-1. Enhance scraping with:
-   - Implement rate limiting using existing dependencies
-   - Add concurrent processing using worker threads
-   - Add retry mechanisms for failed requests
+## Version Control
+- Git Best Practices: https://git-scm.com/book/en/v2
+- GitHub Actions: https://docs.github.com/en/actions
 
-2. Optimize data processing:
-   - Implement batch processing for bookmark imports
-   - Add database indexes for common queries
-   - Use bulk operations for insertions
+---
 
-3. Extend AI integration:
-   - Implement metadata generation pipeline
-   - Add caching for AI responses
-   - Implement background processing for AI tasks
+Last Updated: [Current Date]
 
-## Next Steps
-✓ Decision: Enhance existing implementation
-- Project has solid foundation
-- Modern tech stack with required integrations
-- Scalable architecture in place
-
-Priority tasks:
-1. Implement concurrent processing
-2. Add rate limiting
-3. Optimize database operations
-4. Extend AI service for metadata generation
-
-Resource requirements:
-1. Database scaling plan
-2. AI API usage estimates
-3. Processing capacity planning 
+Note: Keep this file updated as new documentation sources are referenced or new technologies are added to the project. 
