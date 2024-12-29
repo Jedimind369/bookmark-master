@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Sync changes with GitHub and deploy to Replit
+# Sync changes with GitHub and provide Replit deployment instructions
 
 # Get the current branch name
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -14,29 +14,31 @@ GITHUB_STATUS=$?
 
 if [ $GITHUB_STATUS -eq 0 ]; then
     echo "✅ Successfully pushed to GitHub!"
+    echo ""
+    echo "To deploy to Replit:"
+    echo "1. Open Replit Shell in your project"
+    echo "2. Run these commands:"
+    echo "   git fetch origin"
+    echo "   git reset --hard origin/main"
+    echo "   npm install"
+    echo "   npm run build"
+    echo ""
+    echo "💡 Tip: If Replit is slow, you can:"
+    echo "1. Create a new Replit from GitHub"
+    echo "2. Import https://github.com/Jedimind369/bookmark-master.git"
+    echo ""
     
-    # Deploy to Replit using CLI
-    echo "🔄 Deploying to Replit..."
-    
-    # Check if replit-cli is installed
-    if ! command -v replit &> /dev/null; then
-        echo "Installing Replit CLI..."
-        npm install -g replit-cli
-    fi
-    
-    # Deploy using Replit CLI
-    echo "Deploying to Replit..."
-    npx replit-cli deploy
-    REPLIT_STATUS=$?
-    
-    if [ $REPLIT_STATUS -eq 0 ]; then
-        echo "✅ Successfully deployed to Replit!"
-    else
-        echo "❌ Failed to deploy to Replit. Please check your Replit connection."
-        echo "Alternative deployment methods:"
-        echo "1. Use 'git pull' directly in Replit's shell"
-        echo "2. Fork the repository in Replit"
-        echo "3. Import from GitHub in Replit"
+    # Ask if user wants to open Replit
+    read -p "Would you like to open Replit in your browser? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            open "https://replit.com/@jedimind/BookmarkMaster"
+        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            xdg-open "https://replit.com/@jedimind/BookmarkMaster"
+        elif [[ "$OSTYPE" == "msys" ]]; then
+            start "https://replit.com/@jedimind/BookmarkMaster"
+        fi
     fi
 else
     echo "❌ Failed to push to GitHub"
