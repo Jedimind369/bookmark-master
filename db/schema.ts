@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, jsonb, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
@@ -7,6 +7,8 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
 });
 
 // Define the analysis status type
@@ -22,6 +24,7 @@ export const bookmarks = pgTable("bookmarks", {
   userId: integer("user_id").references(() => users.id).notNull(),
   dateAdded: timestamp("date_added").defaultNow(),
   dateModified: timestamp("date_modified"),
+  isArchived: boolean("is_archived").default(false),
   analysis: jsonb("analysis").$type<{
     status?: AnalysisStatus;
     lastUpdated?: string;
@@ -40,6 +43,15 @@ export const bookmarks = pgTable("bookmarks", {
       improvedTitle?: string;
       improvedDescription?: string;
       suggestedTags?: string[];
+    };
+    metadata?: {
+      author?: string;
+      publishDate?: string;
+      lastModified?: string;
+      mainImage?: string;
+      wordCount?: number;
+      readingTime?: number;
+      domainAuthority?: number;
     };
   }>(),
 });

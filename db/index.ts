@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
+import { Pool } from "@neondatabase/serverless";
 import * as schema from "@db/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -8,18 +8,12 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Optimize database connection settings
-const dbOptions = {
-  schema,
-  logger: false, // Disable logging in production
-  // Database connection pool settings
-  pool: {
-    min: 1,               // Minimum connections
-    max: 5,               // Maximum connections
-    idleTimeoutMillis: 30000, // Close idle connections after 30s
-    acquireTimeoutMillis: 5000, // Timeout after 5s if can't acquire connection
-    reapIntervalMillis: 1000, // Check for idle connections every 1s
-  }
-};
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-export const db = drizzle(process.env.DATABASE_URL, dbOptions);
+export const db = drizzle(pool, { schema });
+
+// Handle cleanup
+process.on('SIGINT', () => {
+  pool.end();
+  process.exit();
+});
