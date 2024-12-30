@@ -1,0 +1,30 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+debug/
+.env
+*.log
+coverage/
+.vscode/
+.idea/
+build/
+tmp/
+temp/
+attached_assets/
+generated-icon.png
+
+# Environment files
+.env*
+!.env.example
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
