@@ -8,26 +8,27 @@ import Bottleneck from 'bottleneck';
 import { YouTubeService, type VideoDetails } from './youtubeService';
 import { EventEmitter } from 'events';
 import { performanceMonitor } from "../utils/monitoring";
+import { performanceConfig } from "../config/performance";
 
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
-// Memory-efficient rate limiter configuration
+// Memory-efficient rate limiter configuration aligned with performance settings
 const limiter = new Bottleneck({
-  maxConcurrent: 2,
+  maxConcurrent: performanceConfig.maxConcurrentOperations,
   minTime: 1000,
-  reservoir: 10,
-  reservoirRefreshAmount: 10,
-  reservoirRefreshInterval: 60 * 1000,
+  reservoir: performanceConfig.api.maxRequests,
+  reservoirRefreshAmount: performanceConfig.api.maxRequests,
+  reservoirRefreshInterval: performanceConfig.api.windowMs,
   trackDoneStatus: false,
   Promise: Promise
 });
 
-// Cache and debug management
-const MAX_CACHE_SIZE = 100;
+// Optimized cache management
+const MAX_CACHE_SIZE = performanceConfig.cache.maxItems;
 const MAX_DEBUG_FILES = 50;
-const MAX_LISTENERS = 10;
+const MAX_LISTENERS = performanceConfig.maxConcurrentOperations * 2;
 const promptCache = new Map<string, string>();
 const analysisAttemptsMap = new Map<string, number>();
 const debugFiles = new Set<string>();
@@ -110,11 +111,11 @@ export class AIService {
   // Enhanced service with batch processing and rate limiting
   private static readonly MAX_RETRIES = 2;
   private static readonly INITIAL_RETRY_DELAY = 2000;
-  private static readonly TIMEOUT = 20000;
-  private static readonly DEFAULT_BATCH_SIZE = 20;
-  private static readonly DEFAULT_MAX_CONCURRENT = 2;
+  private static readonly TIMEOUT = performanceConfig.api.windowMs;
+  private static readonly DEFAULT_BATCH_SIZE = performanceConfig.batchSize;
+  private static readonly DEFAULT_MAX_CONCURRENT = performanceConfig.maxConcurrentOperations;
   private static readonly MAX_CONTENT_LENGTH = 3000;
-  
+
   private static limiter = limiter;
   private static progressEmitter = progressEmitter;
   private static resourceStats = {
@@ -133,7 +134,7 @@ export class AIService {
   private static async saveDebugInfo(url: string, data: any, type: string): Promise<void> {
     try {
       const debugDir = path.join(process.cwd(), 'debug');
-      
+
       // Limit number of debug files
       if (debugFiles.size >= MAX_DEBUG_FILES) {
         const oldestFile = Array.from(debugFiles)[0];
@@ -143,7 +144,7 @@ export class AIService {
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `${type}_${encodeURIComponent(url)}_${timestamp}.json`;
-      
+
       // Only save essential data
       const essentialData = {
         url,
@@ -251,7 +252,7 @@ The response must be a valid JSON object with this exact structure:
     }
 
     let responseText = content.text.trim();
-    
+
     // Memory optimization: Use substring instead of slice for large strings
     if (responseText.length > this.MAX_CONTENT_LENGTH) {
       responseText = responseText.substring(0, this.MAX_CONTENT_LENGTH);
@@ -263,7 +264,7 @@ The response must be a valid JSON object with this exact structure:
     }
 
     responseText = jsonMatch[0];
-    
+
     // Minimize debug info size
     const debugInfo = {
       timestamp: new Date().toISOString(),
@@ -331,7 +332,7 @@ The response must be a valid JSON object with this exact structure:
 
     for (let i = 0; i < this.MAX_RETRIES; i++) {
       try {
-        const prompt = content.type === 'video' 
+        const prompt = content.type === 'video'
           ? await this.getVideoAnalysisPrompt(content as unknown as VideoDetails)
           : await this.getWebAnalysisPrompt(content);
         const response = await this.callAnthropicWithRateLimit(prompt);
@@ -365,7 +366,7 @@ The response must be a valid JSON object with this exact structure:
             url,
             title: videoContent.title,
             description: videoContent.description,
-            content: JSON.stringify(videoContent), 
+            content: JSON.stringify(videoContent),
             type: 'video',
             metadata: {
               author: videoContent.author,
@@ -407,14 +408,14 @@ The response must be a valid JSON object with this exact structure:
         $('script, style, iframe, noscript').remove();
 
         // Extract content with memory efficiency
-        const title = $('meta[property="og:title"]').attr('content') || 
-                     $('title').text() || 
-                     url.split('/').pop() || 
+        const title = $('meta[property="og:title"]').attr('content') ||
+                     $('title').text() ||
+                     url.split('/').pop() ||
                      'Untitled';
 
-        const description = $('meta[property="og:description"]').attr('content') || 
-                          $('meta[name="description"]').attr('content') || 
-                          '';
+        const description = $('meta[property="og:description"]').attr('content') ||
+                           $('meta[name="description"]').attr('content') ||
+                           '';
 
         // Extract main content more efficiently
         const mainContent = $('article, main, .content')
@@ -429,8 +430,8 @@ The response must be a valid JSON object with this exact structure:
 
         return {
           url,
-          title: title.slice(0, 200),  
-          description: description.slice(0, 500),  
+          title: title.slice(0, 200),
+          description: description.slice(0, 500),
           content: mainContent,
           type,
           metadata: {
@@ -465,8 +466,8 @@ The response must be a valid JSON object with this exact structure:
     performanceMonitor.trackAIRequest(duration / 1000, success);
 
     // Suggest garbage collection if memory usage is high
-    if (memoryUsage.heapUsed > 0.8 * memoryUsage.heapTotal && 
-        Date.now() - this.resourceStats.lastGc > 60000) {
+    if (memoryUsage.heapUsed > performanceConfig.monitoring.memoryThreshold &&
+        Date.now() - this.resourceStats.lastGc > performanceConfig.gc.interval) {
       if (global.gc) {
         global.gc();
         this.resourceStats.lastGc = Date.now();
@@ -549,7 +550,7 @@ The response must be a valid JSON object with this exact structure:
     return {
       ...this.resourceStats,
       currentMemoryUsage: process.memoryUsage().heapUsed,
-      successRate: (this.resourceStats.requestCount - this.resourceStats.failureCount) / 
+      successRate: (this.resourceStats.requestCount - this.resourceStats.failureCount) /
                   Math.max(1, this.resourceStats.requestCount),
       averageProcessingTime: this.resourceStats.avgProcessingTime
     };
