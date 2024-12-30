@@ -110,8 +110,29 @@ export function setupMonitoring(app: express.Application) {
 }
 
 // Export metrics for use in other parts of the application
-export const metrics = {
+export const memoryUsage = new client.Gauge({
+  name: 'memory_usage_bytes',
+  help: 'Memory usage in bytes',
+  labelNames: ['type']
+});
+
+const connectionGauge = new client.Gauge({
+  name: 'active_connections',
+  help: 'Number of active database connections'
+});
+
+const metrics = {
   httpRequestDurationMicroseconds,
   bookmarksTotal,
-  aiProcessingDuration
+  aiProcessingDuration,
+  memoryUsage,
+  connectionGauge
 };
+
+// Monitor memory usage
+setInterval(() => {
+  const mem = process.memoryUsage();
+  memoryUsage.labels('heapUsed').set(mem.heapUsed);
+  memoryUsage.labels('heapTotal').set(mem.heapTotal);
+  memoryUsage.labels('rss').set(mem.rss);
+}, 30000);
