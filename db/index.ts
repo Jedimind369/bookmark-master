@@ -8,12 +8,12 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
 }
 
-// Optimized connection pool configuration using performance settings
+// Optimized connection pool configuration using new performance settings
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  maxSize: performanceConfig.db.maxConnections,
-  idleTimeout: performanceConfig.db.idleTimeoutMillis / 1000, // Convert to seconds
-  connectionTimeoutMillis: performanceConfig.db.connectionTimeoutMillis,
+  maxSize: performanceConfig.database.maxConnections,
+  idleTimeout: performanceConfig.database.idleTimeoutMillis / 1000, // Convert to seconds
+  connectionTimeoutMillis: performanceConfig.database.connectionTimeoutMillis,
   maxLifetimeSeconds: 60 * 15, // 15 minutes
   statementTimeout: 10000, // 10s query timeout
 });
@@ -35,7 +35,7 @@ async function checkConnection() {
   try {
     const currentTime = Date.now();
     // Only check if enough time has passed since last check
-    if (currentTime - lastHealthCheck < performanceConfig.db.idleTimeoutMillis) {
+    if (currentTime - lastHealthCheck < performanceConfig.database.idleTimeoutMillis) {
       return;
     }
 
@@ -51,7 +51,7 @@ async function checkConnection() {
     logger.error('Database connection check failed:', error);
 
     // Attempt to clean up if threshold exceeded
-    if (pool.totalCount > performanceConfig.db.maxConnections) {
+    if (pool.totalCount > performanceConfig.database.maxConnections) {
       try {
         await pool.end();
         logger.info('Connection pool reset due to threshold exceeded');
@@ -63,7 +63,7 @@ async function checkConnection() {
 }
 
 // Regular health checks with configurable interval
-setInterval(checkConnection, performanceConfig.db.idleTimeoutMillis);
+setInterval(checkConnection, performanceConfig.database.idleTimeoutMillis);
 
 // Graceful shutdown handling
 process.on('SIGTERM', async () => {
@@ -84,7 +84,7 @@ export function getConnectionStatus() {
     idleCount: pool.idleCount,
     waitingCount: pool.waitingCount,
     lastHealthCheck,
-    maxConnections: performanceConfig.db.maxConnections,
+    maxConnections: performanceConfig.database.maxConnections,
     currentMemoryUsage: process.memoryUsage().heapUsed
   };
 }

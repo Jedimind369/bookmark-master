@@ -1,7 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import * as cheerio from 'cheerio';
-import fetch from 'node-fetch';
-import type { Response } from 'node-fetch';
 import fs from 'fs/promises';
 import path from 'path';
 import Bottleneck from 'bottleneck';
@@ -14,12 +12,12 @@ if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
-// Memory-efficient rate limiter configuration aligned with performance settings
+// Memory-efficient rate limiter configuration using new performance settings
 const limiter = new Bottleneck({
-  maxConcurrent: performanceConfig.maxConcurrentOperations,
-  minTime: 1000,
-  reservoir: performanceConfig.api.maxRequests,
-  reservoirRefreshAmount: performanceConfig.api.maxRequests,
+  maxConcurrent: performanceConfig.api.maxConcurrent,
+  minTime: performanceConfig.api.minTime,
+  reservoir: performanceConfig.api.reservoir,
+  reservoirRefreshAmount: performanceConfig.api.reservoir,
   reservoirRefreshInterval: performanceConfig.api.windowMs,
   trackDoneStatus: false,
   Promise: Promise
@@ -313,7 +311,6 @@ The response must be a valid JSON object with this exact structure:
       };
     } catch (error) {
       // Clean up on error
-      //this.manageCache(); // Removed as superseded by garbage collection
       throw error;
     }
   }
