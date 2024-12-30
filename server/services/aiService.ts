@@ -7,6 +7,7 @@ import path from 'path';
 import Bottleneck from 'bottleneck';
 import { YouTubeService, type VideoDetails } from './youtubeService';
 import { EventEmitter } from 'events';
+import { performanceMonitor } from "../utils/monitoring";
 
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
@@ -116,6 +117,14 @@ export class AIService {
   
   private static limiter = limiter;
   private static progressEmitter = progressEmitter;
+  private static resourceStats = {
+    lastGc: Date.now(),
+    peakMemoryUsage: 0,
+    totalProcessingTime: 0,
+    requestCount: 0,
+    failureCount: 0,
+    avgProcessingTime: 0
+  };
 
   private static async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -303,7 +312,7 @@ The response must be a valid JSON object with this exact structure:
       };
     } catch (error) {
       // Clean up on error
-      this.manageCache();
+      //this.manageCache(); // Removed as superseded by garbage collection
       throw error;
     }
   }
@@ -356,7 +365,7 @@ The response must be a valid JSON object with this exact structure:
             url,
             title: videoContent.title,
             description: videoContent.description,
-            content: JSON.stringify(videoContent), // Changed to stringify VideoDetails
+            content: JSON.stringify(videoContent), 
             type: 'video',
             metadata: {
               author: videoContent.author,
@@ -420,8 +429,8 @@ The response must be a valid JSON object with this exact structure:
 
         return {
           url,
-          title: title.slice(0, 200),  // Limit title length
-          description: description.slice(0, 500),  // Limit description length
+          title: title.slice(0, 200),  
+          description: description.slice(0, 500),  
           content: mainContent,
           type,
           metadata: {
@@ -439,13 +448,53 @@ The response must be a valid JSON object with this exact structure:
     }
   }
 
+  private static async monitorResourceUsage(startTime: number, success: boolean) {
+    const duration = Date.now() - startTime;
+    this.resourceStats.totalProcessingTime += duration;
+    this.resourceStats.requestCount++;
+    if (!success) this.resourceStats.failureCount++;
+    this.resourceStats.avgProcessingTime = this.resourceStats.totalProcessingTime / this.resourceStats.requestCount;
+
+    const memoryUsage = process.memoryUsage();
+    this.resourceStats.peakMemoryUsage = Math.max(
+      this.resourceStats.peakMemoryUsage,
+      memoryUsage.heapUsed
+    );
+
+    // Track AI processing metrics
+    performanceMonitor.trackAIRequest(duration / 1000, success);
+
+    // Suggest garbage collection if memory usage is high
+    if (memoryUsage.heapUsed > 0.8 * memoryUsage.heapTotal && 
+        Date.now() - this.resourceStats.lastGc > 60000) {
+      if (global.gc) {
+        global.gc();
+        this.resourceStats.lastGc = Date.now();
+      }
+    }
+
+    return {
+      duration,
+      memoryUsage: memoryUsage.heapUsed,
+      success
+    };
+  }
+
+
   static async analyzeUrl(url: string): Promise<AIAnalysis> {
+    const startTime = Date.now();
+    let success = false;
+
     try {
       const content = await this.fetchPageContent(url);
-      return this.analyzeContentWithRetry(url, content);
+      const result = await this.analyzeContentWithRetry(url, content);
+      success = true;
+      return result;
     } catch (error) {
       console.error(`[Analysis] Failed to analyze URL ${url}:`, error);
       throw error;
+    } finally {
+      await this.monitorResourceUsage(startTime, success);
     }
   }
 
@@ -453,58 +502,57 @@ The response must be a valid JSON object with this exact structure:
     urls: string[],
     options: BatchOptions = {}
   ): Promise<Map<string, AIAnalysis>> {
-    const {
-      batchSize = this.DEFAULT_BATCH_SIZE,
-      maxConcurrent = this.DEFAULT_MAX_CONCURRENT,
-      onProgress
-    } = options;
-
+    const startTime = Date.now();
     const results = new Map<string, AIAnalysis>();
-    const progress: BatchProgress = {
-      total: urls.length,
-      completed: 0,
-      failed: 0,
-      inProgress: 0,
-      errors: [],
-      startTime: new Date()
-    };
+    let successCount = 0;
 
-    // Process URLs in batches
-    for (let i = 0; i < urls.length; i += batchSize) {
-      const batchUrls = urls.slice(i, i + batchSize);
-      const batchPromises = batchUrls.map(async (url) => {
-        progress.inProgress++;
-        this.updateProgress(progress, onProgress);
+    try {
+      const {
+        batchSize = this.DEFAULT_BATCH_SIZE,
+        maxConcurrent = this.DEFAULT_MAX_CONCURRENT,
+        onProgress
+      } = options;
 
-        try {
-          const result = await this.analyzeUrl(url);
-          results.set(url, result);
-          progress.completed++;
-        } catch (error) {
-          progress.failed++;
-          progress.errors.push({
-            url,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
-          console.error(`[Batch] Failed to analyze ${url}:`, error);
-        } finally {
-          progress.inProgress--;
-          this.updateEstimatedTimeRemaining(progress);
-          this.updateProgress(progress, onProgress);
-        }
-      });
+      // Process URLs in batches
+      for (let i = 0; i < urls.length; i += batchSize) {
+        const batchUrls = urls.slice(i, i + batchSize);
+        const batchPromises = batchUrls.map(async (url) => {
+          try {
+            const result = await this.analyzeUrl(url);
+            results.set(url, result);
+            successCount++;
+          } catch (error) {
+            console.error(`[Batch] Failed to analyze ${url}:`, error);
+          }
+        });
 
-      // Process batch with concurrency limit
-      await Promise.all(
-        batchPromises.map((promise) => this.limiter.schedule(() => promise))
-      );
+        // Process batch with concurrency limit
+        await Promise.all(
+          batchPromises.map((promise) => this.limiter.schedule(() => promise))
+        );
 
-      // Log batch completion
-      console.log(`[Batch] Completed batch ${i / batchSize + 1} of ${Math.ceil(urls.length / batchSize)}`);
-      console.log(`[Batch] Progress: ${progress.completed}/${progress.total} (${progress.failed} failed)`);
+        // Log batch completion and memory usage
+        const memoryUsage = process.memoryUsage();
+        console.log(
+          `[Batch] Completed batch ${i / batchSize + 1} of ${Math.ceil(urls.length / batchSize)}`,
+          `Memory: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`
+        );
+      }
+
+      return results;
+    } finally {
+      await this.monitorResourceUsage(startTime, successCount > 0);
     }
+  }
 
-    return results;
+  static getResourceStats() {
+    return {
+      ...this.resourceStats,
+      currentMemoryUsage: process.memoryUsage().heapUsed,
+      successRate: (this.resourceStats.requestCount - this.resourceStats.failureCount) / 
+                  Math.max(1, this.resourceStats.requestCount),
+      averageProcessingTime: this.resourceStats.avgProcessingTime
+    };
   }
 
   private static updateEstimatedTimeRemaining(progress: BatchProgress): void {
@@ -531,14 +579,6 @@ The response must be a valid JSON object with this exact structure:
     this.progressEmitter.on('progress', callback);
     // Return cleanup function
     return () => this.progressEmitter.removeListener('progress', callback);
-  }
-
-  // Cache management
-  private static manageCache(): void {
-    if (promptCache.size > MAX_CACHE_SIZE) {
-      const keysToDelete = Array.from(promptCache.keys()).slice(0, MAX_CACHE_SIZE / 2);
-      keysToDelete.forEach(key => promptCache.delete(key));
-    }
   }
 
   // Add cleanup method

@@ -320,6 +320,22 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add AI service monitoring endpoint
+  app.get("/api/monitoring/ai-service", (_req, res) => {
+    try {
+      const stats = AIService.getResourceStats();
+      res.json({
+        ...stats,
+        timestamp: Date.now(),
+        status: "healthy",
+        message: `Processing ${stats.requestCount} requests with ${Math.round(stats.successRate * 100)}% success rate`
+      });
+    } catch (error) {
+      console.error("Failed to get AI service stats:", error);
+      res.status(500).json({ message: "Failed to get AI service statistics" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
