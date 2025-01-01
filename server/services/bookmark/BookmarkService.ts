@@ -1,96 +1,62 @@
-import { IBookmarkService, IScrapingService, IMetricsService, ValidationResult, Bookmark, EnrichedBookmark } from '../../interfaces/services';
+import { injectable, inject } from 'tsyringe';
+import type { IBookmarkService, IScrapingService, IMetricsService, ValidationResult, Bookmark, EnrichedBookmark, ScrapedContent } from '../../interfaces/services';
 import { UrlValidator } from './validators/BookmarkValidator';
-import { performanceMonitor } from '../../utils/monitoring';
-import { logger } from '../../utils/logger';
+import { BaseService } from '../base/BaseService';
 
-export class BookmarkService implements IBookmarkService {
+@injectable()
+export class BookmarkService extends BaseService implements IBookmarkService {
     constructor(
-        private scraper: IScrapingService,
-        private metrics: IMetricsService
-    ) {}
+        @inject('IScrapingService') private scraper: IScrapingService,
+        @inject('IMetricsService') private metrics: IMetricsService
+    ) {
+        super();
+    }
 
     async validate(url: string): Promise<ValidationResult> {
-        const startTime = Date.now();
-        try {
+        return this.executeOperation('validate_bookmark', async () => {
             const validator = new UrlValidator();
-            const result = await validator.validate({ url });
-            
-            this.metrics.track({
-                operation: 'validate_bookmark',
-                duration: Date.now() - startTime
-            });
-            
-            return result;
-        } catch (error) {
-            this.metrics.track({
-                operation: 'validate_bookmark',
-                error: true
-            });
-            logger.error('Bookmark validation failed:', error);
-            throw error;
-        }
+            return validator.validate({ url });
+        });
     }
 
     async enrich(bookmark: Bookmark): Promise<EnrichedBookmark> {
-        const startTime = Date.now();
-        try {
-            // First validate the bookmark
+        return this.executeOperation('enrich_bookmark', async () => {
             const validationResult = await this.validate(bookmark.url);
             if (!validationResult.isValid) {
-                throw new Error(`Invalid bookmark: ${validationResult.errors.join(', ')}`);
+                throw new Error(validationResult.errors.join(', '));
             }
-
-            // Scrape content
             const scrapedContent = await this.scraper.scrape(bookmark.url);
-            
-            // Enrich the bookmark with scraped content
-            const enrichedBookmark: EnrichedBookmark = {
-                ...bookmark,
-                title: bookmark.title || scrapedContent.title,
-                metadata: scrapedContent.metadata,
-                analysis: {
-                    contentQuality: {
-                        relevance: 0.8,
-                        informativeness: 0.8,
-                        credibility: 0.8
-                    },
-                    mainTopics: []
-                }
-            };
-
-            this.metrics.track({
-                operation: 'enrich_bookmark',
-                duration: Date.now() - startTime
-            });
-
-            return enrichedBookmark;
-        } catch (error) {
-            this.metrics.track({
-                operation: 'enrich_bookmark',
-                error: true
-            });
-            logger.error('Bookmark enrichment failed:', error);
-            throw error;
-        }
+            return this.enrichBookmark(bookmark, scrapedContent);
+        });
     }
 
     async save(bookmark: Bookmark): Promise<void> {
-        const startTime = Date.now();
-        try {
+        return this.executeOperation('save_bookmark', async () => {
+            const validation = await this.validate(bookmark.url);
+            if (!validation.isValid) {
+                throw new Error(validation.errors.join(', '));
+            }
             // TODO: Implement database save logic
-            performanceMonitor.trackDatabaseOperation('save_bookmark', Date.now() - startTime);
-            
             this.metrics.track({
                 operation: 'save_bookmark',
-                duration: Date.now() - startTime
+                duration: Date.now()
             });
-        } catch (error) {
-            this.metrics.track({
-                operation: 'save_bookmark',
-                error: true
-            });
-            logger.error('Bookmark save failed:', error);
-            throw error;
-        }
+        });
+    }
+
+    private enrichBookmark(bookmark: Bookmark, scrapedContent: ScrapedContent): EnrichedBookmark {
+        return {
+            ...bookmark,
+            title: bookmark.title || scrapedContent.title,
+            metadata: scrapedContent.metadata,
+            analysis: {
+                contentQuality: {
+                    relevance: 0.8,
+                    informativeness: 0.8,
+                    credibility: 0.8
+                },
+                mainTopics: []
+            }
+        };
     }
 } 

@@ -1,29 +1,16 @@
-import winston from 'winston';
-
-const logger = winston.createLogger({
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-    ),
-    transports: [
-        new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.colorize(),
-                winston.format.simple()
-            )
-        })
-    ]
-});
-
-// Add file transport in production
-if (process.env.NODE_ENV === 'production') {
-    logger.add(new winston.transports.File({
-        filename: 'error.log',
-        level: 'error',
-        maxsize: 5242880, // 5MB
-        maxFiles: 5
-    }));
-}
-
-export { logger }; 
+export const logger = {
+    info: (message: string, meta?: object) => {
+        console.log(`[INFO] ${message}`, meta ? meta : '');
+    },
+    error: (message: string, meta?: object) => {
+        console.error(`[ERROR] ${message}`, meta ? meta : '');
+    },
+    debug: (message: string, meta?: object) => {
+        if (process.env.NODE_ENV !== 'production') {
+            console.debug(`[DEBUG] ${message}`, meta ? meta : '');
+        }
+    },
+    warn: (message: string, meta?: object) => {
+        console.warn(`[WARN] ${message}`, meta ? meta : '');
+    }
+}; 

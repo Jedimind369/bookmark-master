@@ -1,8 +1,14 @@
+import 'reflect-metadata';
+import express from 'express';
+import { container } from './container';
+import type { IBookmarkService } from './interfaces/services';
+import { registerRoutes } from './routes';
+import { performanceMonitor } from './utils/monitoring';
+import { setupMonitoring } from './services/monitoringService';
+import { logger } from './utils/logger';
 
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { performanceMonitor } from "./utils/monitoring";
-import { setupMonitoring } from "./services/monitoringService";
+// Initialize dependency injection
+const bookmarkService = container.resolve<IBookmarkService>('IBookmarkService');
 
 // Verify required environment variables
 const requiredEnvVars = ['ANTHROPIC_API_KEY', 'DATABASE_URL'];
@@ -34,22 +40,43 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 
 // Health check endpoint
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ 
-    status: 'healthy',
-    timestamp: new Date().toISOString()
-  });
+app.get('/health', async (_req, res) => {
+  try {
+    // Test bookmark service
+    const testBookmark = await bookmarkService.enrich({
+      url: 'https://example.com',
+      title: 'Health Check'
+    });
+    
+    res.json({ 
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      services: {
+        bookmark: testBookmark ? 'ok' : 'error'
+      }
+    });
+  } catch (error) {
+    logger.error('Health check failed:', { error: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json({ 
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 // Initialize routes
 (async () => {
   try {
-    console.log("Starting server initialization...");
+    logger.info("Starting server initialization...");
     const server = registerRoutes(app);
 
     // Global error handling middleware
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error("Server error:", err);
+    app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      logger.error("Server error:", { 
+        message: err.message || "Internal Server Error",
+        status: err.status || err.statusCode || 500
+      });
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
       res.status(status).json({ message });
@@ -58,12 +85,12 @@ app.get('/health', (_req: Request, res: Response) => {
     // Start the server
     const PORT = parseInt(process.env.PORT || "5000", 10);
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running at http://0.0.0.0:${PORT}`);
+      logger.info(`Server running at http://0.0.0.0:${PORT}`);
       performanceMonitor.resetMetrics();
     });
 
   } catch (error) {
-    console.error("Failed to start server:", error);
+    logger.error("Failed to start server:", { error: error instanceof Error ? error.message : 'Unknown error' });
     process.exit(1);
   }
 })();

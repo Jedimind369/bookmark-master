@@ -3,6 +3,7 @@
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
+  warnings?: string[];
 }
 
 export interface Bookmark {
@@ -10,6 +11,8 @@ export interface Bookmark {
   title?: string;
   description?: string;
   tags?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface EnrichedBookmark extends Bookmark {
@@ -45,6 +48,7 @@ export interface Metric {
   operation: string;
   duration?: number;
   error?: boolean;
+  context?: Record<string, any>;
 }
 
 export interface PerformanceStats {
@@ -56,8 +60,10 @@ export interface PerformanceStats {
 
 export interface IBookmarkService {
   validate(url: string): Promise<ValidationResult>;
+  validateBookmark?(url: string): Promise<ValidationResult>;
   enrich(bookmark: Bookmark): Promise<EnrichedBookmark>;
   save(bookmark: Bookmark): Promise<void>;
+  createBookmark?(url: string): Promise<Bookmark>;
 }
 
 export interface IScrapingService {
