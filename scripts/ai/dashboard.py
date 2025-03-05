@@ -217,6 +217,15 @@ with st.sidebar:
     
     if st.button("Export Data"):
         st.success(f"Data would be exported in {export_format} format")
+    
+    st.divider()
+    
+    # Future Enhancements Section
+    st.subheader("Future Enhancements")
+    st.info(
+        "Möchten Sie die Suchfunktion verbessern? Erwägen Sie die Integration des RAG-Ansatzes (Retrieval-Augmented Generation)."
+        "\nDetails finden Sie in der Datei 'docs/RAG_Idea.md'."
+    )
 
 # Footer
 # Custom CSS for styling

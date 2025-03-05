@@ -1,0 +1,23 @@
+<repo-prompt>
+  <prompt>
+    Analyze the function `analyze_complexity` in the file `scripts/ai/model_switcher.py`. 
+    
+    Please suggest optimizations to:
+    1. Make the complexity analysis more accurate by considering additional factors
+    2. Improve the performance of the function
+    3. Add adaptive learning based on historical data from cost_tracker.py
+    
+    The suggested changes should maintain compatibility with existing code that calls this function.
+  </prompt>
+  
+  <files>
+    <file>scripts/ai/model_switcher.py</file>
+    <file>scripts/ai/cost_tracker.py</file>
+  </files>
+  
+  <context>
+    This function is critical for the dynamic model selection system. It analyzes the complexity of prompts and code context to determine the most appropriate AI model to use. The goal is to balance cost and performance by using simpler models for simple tasks and more powerful models for complex reasoning tasks.
+    
+    The CostTracker class in cost_tracker.py stores historical data about API calls, including the complexity score used for each call. This data could potentially be used to improve the complexity analysis over time.
+  </context>
+</repo-prompt> 
