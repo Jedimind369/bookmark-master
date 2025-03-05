@@ -37,9 +37,38 @@ docker-compose up -d
 - `/docs` - Projektdokumentation
 - `/scripts` - Hilfsskripte
 
+## Repository-Struktur und Best Practices
+
+Dieses Repository folgt bewährten Praktiken für die Organisation und Wartung von Code:
+
+### Verzeichnisstruktur
+
+- `docker/`: Docker-Konfigurationsdateien (Dockerfile, docker-compose.yml)
+- `docs/`: Dokumentation zum Projekt
+- `scripts/`: Hilfsskripte für Entwicklung, Deployment und Wartung
+- `src/`: Quellcode der Anwendung
+  - `client/`: Frontend-Code
+  - `server/`: Backend-Code
+
+### Repository-Wartung
+
+Wir haben mehrere Skripte erstellt, um die Integrität und Struktur des Repositories zu gewährleisten:
+
+- `scripts/verify-repo-integrity.sh`: Überprüft die Integrität des Repositories
+- `scripts/cleanup-repository.sh`: Bereinigt die Repository-Struktur
+- `scripts/backup-to-github.sh`: Erstellt ein Backup des Repositories auf GitHub
+
+### Best Practices
+
+1. **Klare Verzeichnisstruktur**: Wir organisieren Code in logischen Verzeichnissen.
+2. **Dokumentation**: Wichtige Prozesse und Konfigurationen sind dokumentiert.
+3. **Automatisierung**: Wiederholende Aufgaben werden durch Skripte automatisiert.
+4. **Versionierung**: Wir verwenden Git-Tags für wichtige Releases.
+5. **Backup**: Regelmäßige Backups sichern den Code.
+
 ## Nächste Schritte
 
-Siehe [ROADMAP.md](docs/ROADMAP.md) für geplante Funktionen und Entwicklungsschritte.
+Siehe [docs/NEXT-STEPS.md](docs/NEXT-STEPS.md) für die geplanten nächsten Entwicklungsschritte.
 
 ## Lizenz
 
