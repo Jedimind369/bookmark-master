@@ -1,19 +1,27 @@
 #!/bin/bash
 
-# Backup script for bookmark-master project
+# Backup-Skript für das Bookmark-Master-Projekt
 
-echo "Starting backup process for bookmark-master..."
+echo "Starte Backup-Prozess für Bookmark-Master..."
 
-# Create a new branch for the backup
-git checkout -b backup-docker
+# Aktuelles Datum für den Branch-Namen
+DATUM=$(date +"%Y-%m-%d")
+BRANCH_NAME="backup-$DATUM"
 
-# Add all files to git
+# Sicherstellen, dass wir auf dem main Branch sind
+git checkout main
+
+# Neuen Branch für das Backup erstellen
+git checkout -b $BRANCH_NAME
+
+# Alle Dateien zu Git hinzufügen
 git add .
 
-# Commit changes
-git commit -m "Backup of bookmark-master with Docker implementation and fixed routing"
+# Änderungen committen
+git commit -m "Backup von Bookmark-Master vom $DATUM"
 
-# Push to remote repository
-git push -u origin backup-docker
+# Zum Remote-Repository pushen
+git push -u origin $BRANCH_NAME
 
-echo "Backup completed successfully!" 
+echo "Backup erfolgreich abgeschlossen!"
+echo "Branch: $BRANCH_NAME wurde erstellt und zu GitHub gepusht." 

@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 node:20-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -6,17 +6,14 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ git
 
 # Copy package.json and install dependencies
-COPY package.json package-lock.json* ./
-COPY src/server/package.json src/server/package-lock.json* ./src/server/
-RUN npm ci
-
-# Install server dependencies
-WORKDIR /app/src/server
-RUN npm ci
+COPY package*.json ./
+RUN npm install
 
 # Copy the rest of the application
-WORKDIR /app
 COPY . .
+
+# TypeScript zu JavaScript konvertieren
+RUN npm run build
 
 # Fix any line ending issues
 RUN sed -i '$ s/%$//' /app/src/server/index.ts
@@ -59,10 +56,10 @@ RUN npx prisma generate
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8000
 
 # Expose port
-EXPOSE 3000
+EXPOSE 8000
 
 # Start the application
 CMD ["node", "dist/index.js"] 
