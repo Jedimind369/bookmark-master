@@ -223,8 +223,8 @@ with st.sidebar:
     # Future Enhancements Section
     st.subheader("Future Enhancements")
     st.info(
-        "Möchten Sie die Suchfunktion verbessern? Erwägen Sie die Integration des RAG-Ansatzes (Retrieval-Augmented Generation)."
-        "\nDetails finden Sie in der Datei 'docs/RAG_Idea.md'."
+        "Consider integrating the RAG approach for semantic search and automated content enrichment. "
+        "See details in docs/RAG_Idea.md"
     )
 
 # Footer

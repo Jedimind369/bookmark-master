@@ -71,16 +71,30 @@ COMPLEXITY_THRESHOLDS = {
 REASONING_KEYWORDS = [
     "explain", "analyze", "compare", "contrast", "evaluate", 
     "debug", "architecture", "design pattern", "performance", 
-    "security", "best practice", "optimize", "refactor"
+    "security", "best practice", "optimize", "refactor",
+    # Erweiterte Schlüsselwörter
+    "dsgvo", "gdpr", "data protection", "privacy", "encryption",
+    "compliance", "security", "vulnerability", "penetration test",
+    "architecture", "scalability", "concurrency", "distributed",
+    "asynchronous", "multithreading", "database design", "race condition"
 ]
 
-def analyze_complexity(prompt, code_context=""):
+# DSGVO-spezifische Schlüsselwörter mit höherer Gewichtung
+GDPR_KEYWORDS = {
+    "dsgvo": 10, "gdpr": 10, "data protection": 10, "privacy": 8, 
+    "encryption": 7, "compliance": 7, "personal data": 8,
+    "data subject": 9, "anonymization": 7, "pseudonymization": 7,
+    "data security": 8, "sensitive data": 9, "data breach": 10
+}
+
+def analyze_complexity(prompt, code_context="", historical_data=None):
     """
     Analyze the complexity of a prompt and code context to determine the appropriate model.
     
     Args:
         prompt (str): The user prompt
         code_context (str, optional): Any associated code context
+        historical_data (dict, optional): Historical complexity data from CostTracker
     
     Returns:
         dict: Complexity metrics including score and category
@@ -90,8 +104,12 @@ def analyze_complexity(prompt, code_context=""):
         "length_score": 0,
         "code_complexity_score": 0,
         "keyword_score": 0,
+        "gdpr_score": 0,
+        "technical_difficulty_score": 0,
+        "historical_adjustment": 0,
         "total_score": 0,
-        "category": "simple"
+        "complexity_level": "simple",
+        "overall_score": 0
     }
     
     # 1. Length-based complexity (longer prompts are generally more complex)
@@ -109,6 +127,12 @@ def analyze_complexity(prompt, code_context=""):
         # Count function/class definitions as indicators of complexity
         function_count = len(re.findall(r'(def|function|class)\s+\w+', code_context))
         
+        # Check for advanced programming patterns
+        has_async = "async " in code_context or "await " in code_context
+        has_generators = "yield " in code_context
+        has_complex_regex = code_context.count(r'[.*+?(){}|[\]^$]') > 5
+        has_complex_imports = code_context.count("import ") > 5
+        
         if lines < 50:
             metrics["code_complexity_score"] = 10
         elif lines < 200:
@@ -118,25 +142,70 @@ def analyze_complexity(prompt, code_context=""):
             
         # Add bonus for many functions/classes
         metrics["code_complexity_score"] += min(function_count * 2, 20)
+        
+        # Add bonus for advanced programming patterns
+        if has_async:
+            metrics["code_complexity_score"] += 15
+        if has_generators:
+            metrics["code_complexity_score"] += 10
+        if has_complex_regex:
+            metrics["code_complexity_score"] += 8
+        if has_complex_imports:
+            metrics["code_complexity_score"] += 5
     
     # 3. Keyword-based complexity (specific keywords indicate more complex tasks)
-    keyword_count = sum(1 for keyword in REASONING_KEYWORDS if keyword.lower() in prompt.lower())
+    prompt_lower = prompt.lower()
+    keyword_count = sum(1 for keyword in REASONING_KEYWORDS if keyword.lower() in prompt_lower)
     metrics["keyword_score"] = min(keyword_count * 5, 30)
+    
+    # 4. DSGVO/GDPR complexity
+    gdpr_score = 0
+    for keyword, weight in GDPR_KEYWORDS.items():
+        if keyword in prompt_lower:
+            gdpr_score += weight
+    metrics["gdpr_score"] = min(gdpr_score, 50)  # Cap at 50
+    
+    # 5. Technical difficulty assessment based on patterns
+    technical_terms = [
+        "encryption", "authentication", "tokenization", "secure hash",
+        "concurrent", "thread safe", "race condition", "deadlock",
+        "optimization algorithm", "time complexity", "space complexity",
+        "distributed system", "microservice", "serverless"
+    ]
+    
+    technical_score = sum(10 for term in technical_terms if term in prompt_lower)
+    metrics["technical_difficulty_score"] = min(technical_score, 40)
+    
+    # 6. Historical complexity adjustment if data is available
+    if historical_data and 'average_complexity' in historical_data:
+        # Adjust current complexity by historical data (30% influence)
+        historical_complexity = historical_data['average_complexity']
+        adjustment = 0
+        
+        if 'similar_prompts' in historical_data and historical_data['similar_prompts'] > 0:
+            adjustment = historical_complexity * 0.3
+            metrics["historical_adjustment"] = adjustment
     
     # Calculate total complexity score
     metrics["total_score"] = (
         metrics["length_score"] + 
         metrics["code_complexity_score"] + 
-        metrics["keyword_score"]
+        metrics["keyword_score"] +
+        metrics["gdpr_score"] + 
+        metrics["technical_difficulty_score"] +
+        metrics["historical_adjustment"]
     )
     
+    # Calculate normalized overall score (0-100)
+    metrics["overall_score"] = min(metrics["total_score"], 100)
+    
     # Determine complexity category
-    if metrics["total_score"] <= COMPLEXITY_THRESHOLDS["simple"]:
-        metrics["category"] = "simple"
-    elif metrics["total_score"] <= COMPLEXITY_THRESHOLDS["medium"]:
-        metrics["category"] = "medium"
+    if metrics["overall_score"] <= COMPLEXITY_THRESHOLDS["simple"]:
+        metrics["complexity_level"] = "simple"
+    elif metrics["overall_score"] <= COMPLEXITY_THRESHOLDS["medium"]:
+        metrics["complexity_level"] = "medium"
     else:
-        metrics["category"] = "complex"
+        metrics["complexity_level"] = "complex"
     
     logger.info(f"Prompt complexity analysis: {metrics}")
     return metrics
@@ -152,7 +221,7 @@ def assign_model(complexity_metrics, gdpr_required=True):
     Returns:
         str: Model ID to use
     """
-    category = complexity_metrics["category"]
+    category = complexity_metrics["complexity_level"]
     
     # Simple decision tree for model selection
     if gdpr_required:
@@ -296,7 +365,7 @@ def call_model(prompt, code_context="", gdpr_required=True, max_cost=None):
         "gdpr_compliant": model_details["gdpr_compliant"],
         "estimated_cost": estimated_cost,
         "complexity_score": complexity["total_score"],
-        "complexity_category": complexity["category"],
+        "complexity_category": complexity["complexity_level"],
         "processing_time_ms": (datetime.now() - start_time).total_seconds() * 1000,
         "input_length": len(combined_input),
         "result": "This is a mock response. Implement actual API call here."

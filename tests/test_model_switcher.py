@@ -76,32 +76,78 @@ class TestModelSwitcher(unittest.TestCase):
                                "Complex reasoning prompts should score high")
         self.assertEqual(metrics["complexity_level"], "complex",
                         "This should be classified as complex")
+    
+    def test_analyze_complexity_gdpr_prompt(self):
+        """Test complexity analysis for GDPR-related prompts."""
+        prompt = """Implement a user data handling system that complies with GDPR requirements.
         
+        The system should handle personal data, implement data subject access rights,
+        and ensure proper encryption of sensitive information. We need to ensure 
+        compliance with data protection regulations in the EU.
+        """
+        metrics = analyze_complexity(prompt)
+        
+        self.assertGreater(metrics["gdpr_score"], 0,
+                          "GDPR-related prompts should have a positive GDPR score")
+        self.assertEqual(metrics["complexity_level"], "complex",
+                        "GDPR compliance tasks should be classified as complex")
+    
+    def test_analyze_complexity_with_historical_data(self):
+        """Test complexity analysis with historical data adjustment."""
+        prompt = "Generate a simple function."
+        
+        # Test without historical data
+        metrics_without_history = analyze_complexity(prompt)
+        
+        # Test with historical data suggesting higher complexity
+        historical_data = {
+            "average_complexity": 60,
+            "similar_prompts": 5
+        }
+        metrics_with_history = analyze_complexity(prompt, historical_data=historical_data)
+        
+        # The score should be higher with historical data
+        self.assertGreater(metrics_with_history["overall_score"], 
+                          metrics_without_history["overall_score"],
+                          "Historical data should influence complexity score")
+        self.assertGreater(metrics_with_history["historical_adjustment"], 0,
+                          "Historical adjustment should be positive")
+    
+    def test_analyze_complexity_technical_terms(self):
+        """Test complexity analysis for prompts with technical terms."""
+        prompt = """Create a thread-safe implementation of a cache with optimized time complexity.
+        The system should handle race conditions and prevent deadlocks during concurrent access.
+        """
+        metrics = analyze_complexity(prompt)
+        
+        self.assertGreater(metrics["technical_difficulty_score"], 0,
+                          "Technical terms should increase the difficulty score")
+    
     def test_assign_model(self):
         """Test model assignment based on complexity metrics."""
         # Simple complexity
         simple_metrics = {"overall_score": 30, "complexity_level": "simple"}
-        simple_model = assign_model(simple_metrics)
+        simple_model = assign_model(simple_metrics, gdpr_required=False)
         self.assertEqual(simple_model, "gpt4o_mini",
                         "Simple prompts should use the most cost-effective model")
         
         # Medium complexity
         medium_metrics = {"overall_score": 55, "complexity_level": "medium"}
-        medium_model = assign_model(medium_metrics)
+        medium_model = assign_model(medium_metrics, gdpr_required=False)
         self.assertEqual(medium_model, "claude_sonnet",
                         "Medium complexity prompts should use a balanced model")
         
         # Complex reasoning
         complex_metrics = {"overall_score": 85, "complexity_level": "complex"}
-        complex_model = assign_model(complex_metrics)
+        complex_model = assign_model(complex_metrics, gdpr_required=False)
         self.assertEqual(complex_model, "deepseek_r1",
                         "Complex reasoning prompts should use the most powerful model")
         
         # Test GDPR requirement
         non_gdpr_model = assign_model(simple_metrics, gdpr_required=False)
         gdpr_model = assign_model(simple_metrics, gdpr_required=True)
-        self.assertIsNotNone(non_gdpr_model, "Should return a model when GDPR is not required")
-        self.assertIsNotNone(gdpr_model, "Should return a GDPR-compliant model when required")
+        self.assertEqual(non_gdpr_model, "gpt4o_mini", "Should return gpt4o_mini when GDPR is not required")
+        self.assertEqual(gdpr_model, "claude_sonnet", "Should return claude_sonnet when GDPR is required")
     
     def test_estimate_tokens(self):
         """Test token estimation function."""
@@ -122,6 +168,7 @@ class TestModelSwitcher(unittest.TestCase):
         """Test cost estimation function."""
         # Test with different models and text lengths
         short_text = "This is a short text."
+        medium_text = "This is a medium length text with several sentences. " * 10
         long_text = "This is a very long text with many sentences. " * 50
         
         # Costs should be proportional to text length
@@ -130,15 +177,18 @@ class TestModelSwitcher(unittest.TestCase):
         self.assertLess(short_cost_mini, long_cost_mini,
                        "Longer texts should cost more with the same model")
         
-        # More powerful models should cost more for the same text
+        # Model cost comparison based on actual pricing
         cost_mini = estimate_cost("gpt4o_mini", medium_text)
         cost_sonnet = estimate_cost("claude_sonnet", medium_text)
         cost_deepseek = estimate_cost("deepseek_r1", medium_text)
         
-        self.assertLessEqual(cost_mini, cost_sonnet,
-                           "GPT-4o Mini should cost less than Claude Sonnet")
-        self.assertLessEqual(cost_sonnet, cost_deepseek,
-                           "Claude Sonnet should cost less than DeepSeek R1")
+        self.assertLessEqual(cost_mini, cost_deepseek,
+                           "GPT-4o Mini should cost less than DeepSeek R1")
+        # Claude Sonnet is actually more expensive per token than DeepSeek R1
+        self.assertGreater(cost_sonnet, cost_deepseek,
+                           "Claude Sonnet should cost more than DeepSeek R1")
+        self.assertGreater(cost_sonnet, cost_mini,
+                           "Claude Sonnet should cost more than GPT-4o Mini")
 
 
 if __name__ == "__main__":
