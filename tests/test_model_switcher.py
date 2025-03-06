@@ -29,6 +29,10 @@ class TestModelSwitcher(unittest.TestCase):
                         "Simple prompts should have a low complexity score")
         self.assertEqual(metrics["complexity_level"], "simple",
                         "Simple prompts should be classified as 'simple'")
+        self.assertEqual(len(metrics["security_matches"]), 0,
+                        "Simple prompts should not have security matches")
+        self.assertEqual(len(metrics["gdpr_matches"]), 0,
+                        "Simple prompts should not have GDPR matches")
         
     def test_analyze_complexity_medium_prompt(self):
         """Test complexity analysis for a medium complexity prompt."""
@@ -89,8 +93,38 @@ class TestModelSwitcher(unittest.TestCase):
         
         self.assertGreater(metrics["gdpr_score"], 0,
                           "GDPR-related prompts should have a positive GDPR score")
+        self.assertGreater(len(metrics["gdpr_matches"]), 0,
+                          "GDPR-related prompts should have GDPR keyword matches")
+        self.assertEqual(metrics["complexity_level"], "medium",
+                        "GDPR compliance tasks should be classified based on overall score")
+        
+        # Überprüfe, dass GDPR-Prompts trotz mittlerer Komplexität zu GDPR-konformen Modellen führen
+        model = assign_model(metrics, gdpr_required=False)
+        self.assertEqual(model, "claude_sonnet",
+                        "GDPR prompts should be assigned to GDPR-compliant models")
+    
+    def test_analyze_complexity_security_prompt(self):
+        """Test complexity analysis for security-related prompts."""
+        prompt = """Implement a secure authentication system with protection against common attacks.
+        
+        The system should use proper encryption, prevent SQL injection and XSS attacks,
+        implement two-factor authentication, and follow security best practices for
+        password storage using salted hashes.
+        """
+        metrics = analyze_complexity(prompt)
+        
+        self.assertGreater(metrics["security_score"], 0,
+                          "Security-related prompts should have a positive security score")
+        self.assertGreater(len(metrics["security_matches"]), 0,
+                          "Security-related prompts should have security keyword matches")
         self.assertEqual(metrics["complexity_level"], "complex",
-                        "GDPR compliance tasks should be classified as complex")
+                        "Security-focused tasks should be classified as complex")
+        
+        # Verify specific security keywords were detected
+        detected_keywords = set(metrics["security_matches"])
+        expected_keywords = {"encryption", "authentication", "sql injection", "xss", "two-factor"}
+        self.assertTrue(any(keyword in detected_keywords for keyword in expected_keywords),
+                       f"Expected to find some of {expected_keywords} in {detected_keywords}")
     
     def test_analyze_complexity_with_historical_data(self):
         """Test complexity analysis with historical data adjustment."""
@@ -123,22 +157,42 @@ class TestModelSwitcher(unittest.TestCase):
         self.assertGreater(metrics["technical_difficulty_score"], 0,
                           "Technical terms should increase the difficulty score")
     
+    def test_auto_gdpr_detection(self):
+        """Test automatic GDPR requirement detection based on keywords."""
+        # Prompt with GDPR keywords
+        gdpr_prompt = "Create a system that handles personal data in compliance with GDPR and ensures data protection."
+        gdpr_metrics = analyze_complexity(gdpr_prompt)
+        
+        # Prompt with security keywords
+        security_prompt = "Implement a secure system that prevents SQL injection, XSS attacks, and uses proper encryption."
+        security_metrics = analyze_complexity(security_prompt)
+        
+        # Test model assignment with auto-detection
+        gdpr_model = assign_model(gdpr_metrics, gdpr_required=False)
+        security_model = assign_model(security_metrics, gdpr_required=False)
+        
+        # Both should result in GDPR-compliant models due to auto-detection
+        self.assertEqual(gdpr_model, "claude_sonnet", 
+                        "GDPR keywords should trigger automatic GDPR compliance")
+        self.assertEqual(security_model, "claude_sonnet", 
+                        "Security keywords should trigger automatic GDPR compliance")
+    
     def test_assign_model(self):
         """Test model assignment based on complexity metrics."""
         # Simple complexity
-        simple_metrics = {"overall_score": 30, "complexity_level": "simple"}
+        simple_metrics = {"overall_score": 30, "complexity_level": "simple", "gdpr_score": 0, "security_score": 0}
         simple_model = assign_model(simple_metrics, gdpr_required=False)
         self.assertEqual(simple_model, "gpt4o_mini",
                         "Simple prompts should use the most cost-effective model")
         
         # Medium complexity
-        medium_metrics = {"overall_score": 55, "complexity_level": "medium"}
+        medium_metrics = {"overall_score": 55, "complexity_level": "medium", "gdpr_score": 0, "security_score": 0}
         medium_model = assign_model(medium_metrics, gdpr_required=False)
         self.assertEqual(medium_model, "claude_sonnet",
                         "Medium complexity prompts should use a balanced model")
         
         # Complex reasoning
-        complex_metrics = {"overall_score": 85, "complexity_level": "complex"}
+        complex_metrics = {"overall_score": 85, "complexity_level": "complex", "gdpr_score": 0, "security_score": 0}
         complex_model = assign_model(complex_metrics, gdpr_required=False)
         self.assertEqual(complex_model, "deepseek_r1",
                         "Complex reasoning prompts should use the most powerful model")

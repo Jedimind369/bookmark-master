@@ -67,24 +67,112 @@ COMPLEXITY_THRESHOLDS = {
     "complex": 100  # Complex tasks (everything else)
 }
 
-# Keywords that indicate complex reasoning tasks
-REASONING_KEYWORDS = [
-    "explain", "analyze", "compare", "contrast", "evaluate", 
-    "debug", "architecture", "design pattern", "performance", 
-    "security", "best practice", "optimize", "refactor",
-    # Erweiterte Schlüsselwörter
-    "dsgvo", "gdpr", "data protection", "privacy", "encryption",
-    "compliance", "security", "vulnerability", "penetration test",
-    "architecture", "scalability", "concurrency", "distributed",
-    "asynchronous", "multithreading", "database design", "race condition"
-]
+# Keywords that indicate complex reasoning tasks with weights
+REASONING_KEYWORDS = {
+    # Analytische Aufgaben
+    "explain": 1.5, "analyze": 1.8, "compare": 1.2, "contrast": 1.2, 
+    "evaluate": 1.5, "critique": 1.7, "review": 1.3, "assess": 1.5,
+    
+    # Debugging und Optimierung
+    "debug": 1.8, "optimize": 2.0, "refactor": 1.9, "performance": 1.7,
+    "bottleneck": 1.8, "memory leak": 2.0, "race condition": 2.2,
+    
+    # Architektur und Design
+    "architecture": 2.0, "design pattern": 1.9, "best practice": 1.5,
+    "scalability": 1.8, "maintainability": 1.6, "extensibility": 1.7,
+    
+    # Komplexe Konzepte
+    "concurrency": 2.2, "distributed": 2.1, "asynchronous": 1.9,
+    "multithreading": 2.0, "parallelism": 2.0, "event-driven": 1.8,
+    
+    # Datenbank und Speicher
+    "database design": 1.8, "query optimization": 1.9, "indexing": 1.7,
+    "normalization": 1.8, "transaction": 1.7, "acid": 1.9,
+    
+    # Algorithmen
+    "algorithm": 1.7, "complexity analysis": 2.0, "big o": 1.9,
+    "dynamic programming": 2.1, "recursion": 1.8, "graph theory": 2.0
+}
 
-# DSGVO-spezifische Schlüsselwörter mit höherer Gewichtung
+# DSGVO/GDPR-spezifische Schlüsselwörter mit höherer Gewichtung
 GDPR_KEYWORDS = {
-    "dsgvo": 10, "gdpr": 10, "data protection": 10, "privacy": 8, 
-    "encryption": 7, "compliance": 7, "personal data": 8,
-    "data subject": 9, "anonymization": 7, "pseudonymization": 7,
-    "data security": 8, "sensitive data": 9, "data breach": 10
+    # Grundlegende DSGVO-Begriffe
+    "dsgvo": 3.0, "gdpr": 3.0, "datenschutz": 2.8, "privacy": 2.5,
+    "data protection": 2.8, "datenschutzgrundverordnung": 3.0,
+    
+    # Personenbezogene Daten
+    "personal data": 2.7, "personenbezogene daten": 2.7, 
+    "sensitive data": 2.9, "special category data": 2.9,
+    "personally identifiable": 2.8, "pii": 2.8,
+    
+    # Betroffenenrechte
+    "data subject": 2.6, "betroffenenrechte": 2.6, 
+    "right to access": 2.5, "auskunftsrecht": 2.5,
+    "right to erasure": 2.7, "recht auf löschung": 2.7,
+    "right to be forgotten": 2.7, "recht auf vergessenwerden": 2.7,
+    "data portability": 2.5, "datenübertragbarkeit": 2.5,
+    
+    # Datensicherheit
+    "data security": 2.6, "datensicherheit": 2.6,
+    "encryption": 2.4, "verschlüsselung": 2.4,
+    "pseudonymization": 2.5, "pseudonymisierung": 2.5,
+    "anonymization": 2.5, "anonymisierung": 2.5,
+    
+    # Datenschutzverletzungen
+    "data breach": 3.0, "datenpanne": 3.0, 
+    "breach notification": 2.8, "meldepflicht": 2.8,
+    
+    # Verantwortlichkeiten
+    "data controller": 2.4, "verantwortlicher": 2.4,
+    "data processor": 2.4, "auftragsverarbeiter": 2.4,
+    "dpa": 2.5, "data processing agreement": 2.5,
+    "auftragsverarbeitungsvertrag": 2.5,
+    
+    # Compliance
+    "compliance": 2.3, "accountability": 2.4, "rechenschaftspflicht": 2.4,
+    "lawful basis": 2.5, "rechtsgrundlage": 2.5,
+    "legitimate interest": 2.4, "berechtigtes interesse": 2.4,
+    "consent": 2.6, "einwilligung": 2.6
+}
+
+# Sicherheits-spezifische Schlüsselwörter
+SECURITY_KEYWORDS = {
+    # Allgemeine Sicherheitsbegriffe
+    "security": 2.5, "sicherheit": 2.5, "vulnerability": 2.8, 
+    "schwachstelle": 2.8, "exploit": 2.9, "threat": 2.6, "bedrohung": 2.6,
+    
+    # Authentifizierung und Autorisierung
+    "authentication": 2.4, "authentifizierung": 2.4, 
+    "authorization": 2.4, "autorisierung": 2.4,
+    "oauth": 2.3, "openid": 2.3, "jwt": 2.2, "mfa": 2.5, 
+    "two-factor": 2.5, "zwei-faktor": 2.5,
+    
+    # Kryptographie
+    "cryptography": 2.7, "kryptographie": 2.7, 
+    "encryption": 2.6, "verschlüsselung": 2.6,
+    "hash": 2.3, "salt": 2.3, "cipher": 2.5, "tls": 2.4, "ssl": 2.4,
+    
+    # Angriffe und Schwachstellen
+    "injection": 2.8, "sql injection": 2.9, "xss": 2.8, 
+    "cross-site scripting": 2.8, "csrf": 2.7, "cross-site request forgery": 2.7,
+    "ddos": 2.7, "denial of service": 2.7, "mitm": 2.8, "man in the middle": 2.8,
+    
+    # Penetration Testing
+    "penetration testing": 2.7, "pentest": 2.7, "pentesting": 2.7,
+    "security audit": 2.6, "sicherheitsaudit": 2.6, "vulnerability scan": 2.6,
+    
+    # Sicherheitsmaßnahmen
+    "firewall": 2.3, "waf": 2.4, "ids": 2.5, "ips": 2.5,
+    "security policy": 2.4, "sicherheitsrichtlinie": 2.4,
+    "patch management": 2.5, "security update": 2.4,
+    
+    # Datensicherheit
+    "data leakage": 2.8, "data loss": 2.7, "dlp": 2.6,
+    "sensitive information": 2.7, "confidential data": 2.7,
+    
+    # Compliance und Standards
+    "iso 27001": 2.5, "nist": 2.5, "pci dss": 2.6, "hipaa": 2.6,
+    "security compliance": 2.5, "security standard": 2.4
 }
 
 def analyze_complexity(prompt, code_context="", historical_data=None):
@@ -105,11 +193,14 @@ def analyze_complexity(prompt, code_context="", historical_data=None):
         "code_complexity_score": 0,
         "keyword_score": 0,
         "gdpr_score": 0,
+        "security_score": 0,
         "technical_difficulty_score": 0,
         "historical_adjustment": 0,
         "total_score": 0,
         "complexity_level": "simple",
-        "overall_score": 0
+        "overall_score": 0,
+        "security_matches": [],
+        "gdpr_matches": []
     }
     
     # 1. Length-based complexity (longer prompts are generally more complex)
@@ -155,17 +246,35 @@ def analyze_complexity(prompt, code_context="", historical_data=None):
     
     # 3. Keyword-based complexity (specific keywords indicate more complex tasks)
     prompt_lower = prompt.lower()
-    keyword_count = sum(1 for keyword in REASONING_KEYWORDS if keyword.lower() in prompt_lower)
-    metrics["keyword_score"] = min(keyword_count * 5, 30)
+    
+    # Reasoning keywords (analytische und komplexe Aufgaben)
+    keyword_score = 0
+    for keyword, weight in REASONING_KEYWORDS.items():
+        if keyword.lower() in prompt_lower:
+            keyword_score += weight
+    metrics["keyword_score"] = min(keyword_score, 40)  # Cap at 40
     
     # 4. DSGVO/GDPR complexity
     gdpr_score = 0
+    gdpr_matches = []
     for keyword, weight in GDPR_KEYWORDS.items():
-        if keyword in prompt_lower:
+        if keyword.lower() in prompt_lower:
             gdpr_score += weight
+            gdpr_matches.append(keyword)
     metrics["gdpr_score"] = min(gdpr_score, 50)  # Cap at 50
+    metrics["gdpr_matches"] = gdpr_matches
     
-    # 5. Technical difficulty assessment based on patterns
+    # 5. Security complexity
+    security_score = 0
+    security_matches = []
+    for keyword, weight in SECURITY_KEYWORDS.items():
+        if keyword.lower() in prompt_lower:
+            security_score += weight
+            security_matches.append(keyword)
+    metrics["security_score"] = min(security_score, 50)  # Cap at 50
+    metrics["security_matches"] = security_matches
+    
+    # 6. Technical difficulty assessment based on patterns
     technical_terms = [
         "encryption", "authentication", "tokenization", "secure hash",
         "concurrent", "thread safe", "race condition", "deadlock",
@@ -176,7 +285,7 @@ def analyze_complexity(prompt, code_context="", historical_data=None):
     technical_score = sum(10 for term in technical_terms if term in prompt_lower)
     metrics["technical_difficulty_score"] = min(technical_score, 40)
     
-    # 6. Historical complexity adjustment if data is available
+    # 7. Historical complexity adjustment if data is available
     if historical_data and 'average_complexity' in historical_data:
         # Adjust current complexity by historical data (30% influence)
         historical_complexity = historical_data['average_complexity']
@@ -192,6 +301,7 @@ def analyze_complexity(prompt, code_context="", historical_data=None):
         metrics["code_complexity_score"] + 
         metrics["keyword_score"] +
         metrics["gdpr_score"] + 
+        metrics["security_score"] +
         metrics["technical_difficulty_score"] +
         metrics["historical_adjustment"]
     )
@@ -223,8 +333,16 @@ def assign_model(complexity_metrics, gdpr_required=True):
     """
     category = complexity_metrics["complexity_level"]
     
+    # Automatische GDPR-Erkennung basierend auf Keywords
+    auto_gdpr_required = gdpr_required
+    if complexity_metrics.get("gdpr_score", 0) > 5 or complexity_metrics.get("security_score", 0) > 10:
+        auto_gdpr_required = True
+        logger.info(f"Automatically enabling GDPR compliance due to detected keywords: " +
+                   f"GDPR score: {complexity_metrics.get('gdpr_score', 0)}, " +
+                   f"Security score: {complexity_metrics.get('security_score', 0)}")
+    
     # Simple decision tree for model selection
-    if gdpr_required:
+    if auto_gdpr_required:
         # In GDPR mode, we prioritize compliant models
         if category == "simple":
             # For simple tasks with GDPR, use Claude Sonnet as DeepSeek is not GDPR compliant by default
@@ -247,7 +365,7 @@ def assign_model(complexity_metrics, gdpr_required=True):
             # Complex reasoning tasks use DeepSeek R1
             model = "deepseek_r1"
     
-    logger.info(f"Selected model {model} for task with complexity {category}")
+    logger.info(f"Selected model {model} for task with complexity {category} (GDPR required: {auto_gdpr_required})")
     return model
 
 def estimate_tokens(text):
