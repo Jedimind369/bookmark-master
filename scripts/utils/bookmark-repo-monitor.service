@@ -1,0 +1,17 @@
+[Unit]
+Description=Bookmark Master Repository Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=jedimind
+WorkingDirectory=/Users/jedimind/Downloads/Coding/bookmark-master
+ExecStart=/usr/bin/node /Users/jedimind/Downloads/Coding/bookmark-master/scripts/utils/mcp_repo_monitor.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=bookmark-repo-monitor
+
+[Install]
+WantedBy=multi-user.target 

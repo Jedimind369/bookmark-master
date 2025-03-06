@@ -58,6 +58,23 @@ Wir haben mehrere Skripte erstellt, um die Integrität und Struktur des Reposito
 - `scripts/cleanup-repository.sh`: Bereinigt die Repository-Struktur
 - `scripts/backup-to-github.sh`: Erstellt ein Backup des Repositories auf GitHub
 
+### Automatische Repository-Synchronisation
+
+Das Repository verfügt über ein automatisches Synchronisationssystem, das sicherstellt, dass wichtige Änderungen immer aktuell sind:
+
+- **Kontinuierliche Überwachung**: Ein MCP-Monitor überwacht das Repository auf wichtige Änderungen
+- **Automatische Commits**: Bei wichtigen Änderungen werden automatisch Commits erstellt
+- **GitHub Actions**: Eine GitHub Action synchronisiert das Repository täglich
+- **Git-Hooks**: Ein Post-Commit-Hook führt nach jedem Commit eine Synchronisation durch
+
+Zur Einrichtung der automatischen Synchronisation führen Sie folgendes Skript aus:
+
+```bash
+./scripts/utils/setup_repo_monitor.sh
+```
+
+Weitere Informationen finden Sie in der [Repository-Synchronisations-Dokumentation](docs/repo_sync.md).
+
 ### Best Practices
 
 1. **Klare Verzeichnisstruktur**: Wir organisieren Code in logischen Verzeichnissen.
@@ -65,6 +82,7 @@ Wir haben mehrere Skripte erstellt, um die Integrität und Struktur des Reposito
 3. **Automatisierung**: Wiederholende Aufgaben werden durch Skripte automatisiert.
 4. **Versionierung**: Wir verwenden Git-Tags für wichtige Releases.
 5. **Backup**: Regelmäßige Backups sichern den Code.
+6. **Synchronisation**: Automatische Synchronisation hält das Repository aktuell.
 
 ## Nächste Schritte
 

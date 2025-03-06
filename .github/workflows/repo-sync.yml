@@ -1,0 +1,77 @@
+name: Repository Synchronization
+
+on:
+  # Zeitplan: Täglich um 2 Uhr morgens
+  schedule:
+    - cron: '0 2 * * *'
+  
+  # Bei Push-Events auf bestimmten Branches
+  push:
+    branches:
+      - main
+      - master
+      - features/hybrid-optimization
+      - develop
+  
+  # Bei Pull-Request-Events
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - master
+      - develop
+  
+  # Manuelle Auslösung
+  workflow_dispatch:
+
+jobs:
+  sync-repo:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Git
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+      
+      - name: Run Repository Sync Script
+        run: |
+          bash scripts/utils/repo_sync.sh
+      
+      - name: Check for Important Changes
+        id: check-changes
+        run: |
+          IMPORTANT_DIRS=("scripts/ai" "tests" "src/core" "config")
+          CHANGES_FOUND=false
+          
+          for dir in "${IMPORTANT_DIRS[@]}"; do
+            if [[ -n $(git status --porcelain "$dir" 2>/dev/null) ]]; then
+              echo "::set-output name=changes::true"
+              CHANGES_FOUND=true
+              break
+            fi
+          done
+          
+          if [[ "$CHANGES_FOUND" = false ]]; then
+            echo "::set-output name=changes::false"
+          fi
+      
+      - name: Create GitHub Release for Important Changes
+        if: steps.check-changes.outputs.changes == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Automatisches Update - ${{ github.run_number }}"
+          tag_name: "auto-update-${{ github.run_number }}"
+          body: |
+            Automatisches Update nach wichtigen Änderungen.
+            
+            Zeitpunkt: ${{ github.event.repository.updated_at }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
