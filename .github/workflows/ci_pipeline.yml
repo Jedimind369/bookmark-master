@@ -1,4 +1,4 @@
- name: API Monitoring CI
+name: API Monitoring CI
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 0  # Vollständige Git-History für korrekte Tests
+        fetch-depth: 0
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -49,7 +49,6 @@ jobs:
     
     - name: Check backup files integrity
       run: |
-        # Prüft, ob generierte Backup-Dateien vorhanden sind
         if [ -z "$(ls -A data/monitoring/backups)" ]; then
           echo "Keine Backup-Dateien gefunden!"
           exit 1
@@ -60,7 +59,6 @@ jobs:
     
     - name: Validate monitoring data structure
       run: |
-        # Prüft, ob die Nutzungsdatei korrekt erzeugt wurde
         if [ ! -f "data/monitoring/api_usage.json" ]; then
           echo "API-Nutzungsdatei nicht gefunden!"
           exit 1
