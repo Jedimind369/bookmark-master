@@ -51,14 +51,14 @@ jobs:
           
           for dir in "${IMPORTANT_DIRS[@]}"; do
             if [[ -n $(git status --porcelain "$dir" 2>/dev/null) ]]; then
-              echo "::set-output name=changes::true"
+              echo "changes=true" >> $GITHUB_OUTPUT
               CHANGES_FOUND=true
               break
             fi
           done
           
           if [[ "$CHANGES_FOUND" = false ]]; then
-            echo "::set-output name=changes::false"
+            echo "changes=false" >> $GITHUB_OUTPUT
           fi
       
       - name: Create GitHub Release for Important Changes
