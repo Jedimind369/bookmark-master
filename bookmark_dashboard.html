@@ -1,0 +1,141 @@
+
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Bookmark-Visualisierung</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+                    .dashboard-title { text-align: center; margin-bottom: 30px; color: #333; }
+                    .viz-container { background-color: white; padding: 20px; margin-bottom: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    .viz-title { margin-top: 0; color: #444; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+                    th { background-color: #f2f2f2; color: #333; }
+                    tr:hover { background-color: #f5f5f5; }
+                    .category-tag { display: inline-block; padding: 4px 8px; border-radius: 4px; background-color: #e0e0e0; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <h1 class="dashboard-title">Bookmark-Master Visualisierung</h1>
+                
+                <div class="viz-container">
+                    <h2 class="viz-title">Lesezeichen pro Kategorie</h2>
+                    <div id="category-chart"></div>
+                </div>
+                
+                <div class="viz-container">
+                    <h2 class="viz-title">Lesezeichen-Übersicht</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Titel</th>
+                                <th>Kategorie</th>
+                                <th>URL</th>
+                                <th>Beschreibung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            
+                            <tr>
+                                <td>1</td>
+                                <td>Python Documentation</td>
+                                <td><span class="category-tag">Technologie</span></td>
+                                <td><a href="https://docs.python.org/" target="_blank">https://docs.python.org/</a></td>
+                                <td>Official documentation for the Python programming language...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>2</td>
+                                <td>GitHub</td>
+                                <td><span class="category-tag">Technologie</span></td>
+                                <td><a href="https://github.com/" target="_blank">https://github.com/</a></td>
+                                <td>Platform for code hosting, collaboration, and version control...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>3</td>
+                                <td>Stack Overflow</td>
+                                <td><span class="category-tag">Technologie</span></td>
+                                <td><a href="https://stackoverflow.com/" target="_blank">https://stackoverflow.com/</a></td>
+                                <td>Community for developers to ask and answer programming questions...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>4</td>
+                                <td>MDN Web Docs</td>
+                                <td><span class="category-tag">Technologie</span></td>
+                                <td><a href="https://developer.mozilla.org/" target="_blank">https://developer.mozilla.org/</a></td>
+                                <td>Resources for developers, by developers...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>5</td>
+                                <td>Nature</td>
+                                <td><span class="category-tag">Wissenschaft</span></td>
+                                <td><a href="https://www.nature.com/" target="_blank">https://www.nature.com/</a></td>
+                                <td>International journal of science...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>6</td>
+                                <td>Science Magazine</td>
+                                <td><span class="category-tag">Wissenschaft</span></td>
+                                <td><a href="https://www.sciencemag.org/" target="_blank">https://www.sciencemag.org/</a></td>
+                                <td>Leading outlet for scientific news and research...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>7</td>
+                                <td>arXiv</td>
+                                <td><span class="category-tag">Wissenschaft</span></td>
+                                <td><a href="https://arxiv.org/" target="_blank">https://arxiv.org/</a></td>
+                                <td>Repository of electronic preprints for scientific papers...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>8</td>
+                                <td>Harvard Business Review</td>
+                                <td><span class="category-tag">Wirtschaft</span></td>
+                                <td><a href="https://hbr.org/" target="_blank">https://hbr.org/</a></td>
+                                <td>Management magazine published by Harvard Business School...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>9</td>
+                                <td>Bloomberg</td>
+                                <td><span class="category-tag">Wirtschaft</span></td>
+                                <td><a href="https://www.bloomberg.com/" target="_blank">https://www.bloomberg.com/</a></td>
+                                <td>Business and financial news...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>10</td>
+                                <td>Goodreads</td>
+                                <td><span class="category-tag">Kultur</span></td>
+                                <td><a href="https://www.goodreads.com/" target="_blank">https://www.goodreads.com/</a></td>
+                                <td>Book reviews and recommendations...</td>
+                            </tr>
+                
+                            <tr>
+                                <td>11</td>
+                                <td>IMDb</td>
+                                <td><span class="category-tag">Kultur</span></td>
+                                <td><a href="https://www.imdb.com/" target="_blank">https://www.imdb.com/</a></td>
+                                <td>Online database of information related to films and TV programs...</td>
+                            </tr>
+                
+                        </tbody>
+                    </table>
+                </div>
+                
+                <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+                <script>
+            var categoryChart = {"data":[{"marker":{"color":["#636EFA","#EF553B","#00CC96","#AB63FA"]},"text":["4","3","2","2"],"textposition":"auto","x":["Technologie","Wissenschaft","Wirtschaft","Kultur"],"y":[4,3,2,2],"type":"bar"}],"layout":{"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"title":{"text":"Anzahl der Lesezeichen pro Kategorie"},"xaxis":{"title":{"text":"Kategorie"}},"yaxis":{"title":{"text":"Anzahl der Lesezeichen"}},"width":800,"height":500}};
+
+                    Plotly.newPlot('category-chart', categoryChart.data, categoryChart.layout);
+                </script>
+            </body>
+            </html>
+            

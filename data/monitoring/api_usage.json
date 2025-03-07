@@ -1,0 +1,14 @@
+{
+  "start_date": "2025-03-07T10:29:36.922639",
+  "budget_limit": 20.0,
+  "total_cost": 0.0,
+  "api_calls": [],
+  "models": {},
+  "tasks": {},
+  "context_info": {
+    "git_branch": "features/hybrid-optimization",
+    "git_commit": "e1213726e9f1b3fddf0509a8902caccb8d0646ea",
+    "git_repo_path": "/Users/jedimind/Downloads/Coding/bookmark-master",
+    "git_sync_enabled": true
+  }
+}

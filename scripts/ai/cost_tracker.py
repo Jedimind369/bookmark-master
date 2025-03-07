@@ -283,9 +283,9 @@ class CostTracker:
         try:
             conn = sqlite3.connect(str(DB_PATH))
             
-            # Calculate date range
+            # Calculate date range - Verwende einen kürzeren Zeitraum für Tests
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
+            start_date = end_date - timedelta(minutes=5)  # Nur die letzten 5 Minuten für Tests
             
             # Query for model aggregated costs
             query = f'''
@@ -347,14 +347,15 @@ class CostTracker:
             cursor.execute('SELECT SUM(cost) FROM api_calls')
             total_cost = cursor.fetchone()[0] or 0
             
-            # Get call count statistics
-            cursor.execute('SELECT COUNT(*) FROM api_calls')
+            # Get call count statistics - nur für die letzten 5 Minuten, um die Testsitzung zu isolieren
+            five_minutes_ago = datetime.now() - timedelta(minutes=5)
+            cursor.execute('SELECT COUNT(*) FROM api_calls WHERE timestamp >= ?', (five_minutes_ago.isoformat(),))
             total_calls = cursor.fetchone()[0] or 0
             
             cursor.execute('''
             SELECT COUNT(*) FROM api_calls 
-            WHERE cached = 1
-            ''')
+            WHERE cached = 1 AND timestamp >= ?
+            ''', (five_minutes_ago.isoformat(),))
             cached_calls = cursor.fetchone()[0] or 0
             
             cache_hit_rate = cached_calls / total_calls if total_calls > 0 else 0

@@ -1,93 +1,135 @@
 # Bookmark Master
 
-Ein modernes Bookmark-Management-System mit Docker-Unterstützung.
+Ein intelligentes Bookmark-Verwaltungssystem mit dynamischer Modellauswahl, hybridem Caching und Kostenoptimierung.
 
-## Projektübersicht
+## Features
 
-Bookmark Master ist eine Anwendung zur Verwaltung von Lesezeichen mit folgenden Funktionen:
-- Speichern und Organisieren von Lesezeichen
-- Kategorisierung und Tagging
-- Volltextsuche
-- Benutzerauthentifizierung
-- API-Zugriff
+### Dynamische Modellauswahl (`model_switcher.py`)
+- Analysiert die Komplexität von Prompts und Code-Kontexten
+- Berücksichtigt Sicherheits- und DSGVO-Schlüsselwörter
+- Wählt das geeignete KI-Modell basierend auf Komplexität und Anforderungen
+- Nutzt historische Daten aus dem CostTracker zur Optimierung
 
-## Docker-Implementierung
+### Hybrides Caching-System (`prompt_cache.py`)
+- Unterstützt exakte und semantische Cache-Treffer
+- Time-To-Live (TTL) für Cache-Einträge
+- Berechnet Kosteneinsparungen durch Caching
+- Bietet Optimierungsempfehlungen für Cache-Einstellungen
+- **NEU**: Automatische Cache-Wartung und -Optimierung
+- **NEU**: Adaptive Anpassung des semantischen Schwellenwerts
 
-Das Projekt ist vollständig dockerisiert und umfasst:
-- Node.js 20 Alpine als Basis-Image
-- PostgreSQL 16 für die Datenbank
-- Redis 7 für Caching
-- Prometheus und Grafana für Monitoring
+### Kostentracking (`cost_tracker.py`)
+- Protokolliert API-Kosten und Nutzung
+- Liefert Kostenübersichten nach Modell und Zeitraum
+- Budget-Warnungen bei Überschreitung von Schwellenwerten
+- Empfiehlt Optimierungsmaßnahmen zur Kostenreduzierung
 
-## Schnellstart
+### Dashboard (`dashboard/app.py`)
+- **NEU**: Übersichts-Tab mit den wichtigsten Metriken auf einen Blick
+- **NEU**: Interaktive Zeitreihen-Grafiken für Systemmetriken
+- **NEU**: Erweiterte Visualisierungen mit Plotly
+- **NEU**: Anpassbare Zeiträume für Datenvisualisierung
+- Echtzeit-Visualisierung von Systemmetriken
+- Übersicht über Cache-Statistiken und Cache-Trefferquote
+- Kostentracking und Budget-Überwachung
+- Interaktive Diagramme für Modellnutzung und Kosten
+
+### Cursor-Monitor (`scripts/utils/cursor_monitor.py`)
+- Überwacht den Status von Cursor-Prozessen
+- Sendet visuelle und akustische Benachrichtigungen bei Blockaden
+- Desktop-Benachrichtigungen bei kritischen Zuständen
+- Konfigurierbare Prüfintervalle und Benachrichtigungsoptionen
+
+### CI/CD-Pipeline
+- **NEU**: Erweiterte CI/CD-Pipeline mit mehreren Phasen
+- **NEU**: Code-Qualitätsprüfungen (Linting, Formatting, Type Checking)
+- **NEU**: Integration Tests für Systemkomponenten
+- **NEU**: Performance Tests mit Locust
+- **NEU**: Automatisierte Dashboard-Tests
+- Automatisierte Tests mit GitHub Actions
+- Linting und Code-Qualitätsprüfungen
+- Coverage-Berichte für Testabdeckung
+- Automatische Deployment-Prozesse
+
+## Installation
+
+### Anforderungen
+- Python 3.8+
+- Pip
+
+### Setup
+
+1. Repository klonen:
+   ```bash
+   git clone https://github.com/yourusername/bookmark-master.git
+   cd bookmark-master
+   ```
+
+2. Virtuelle Umgebung erstellen und aktivieren:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # Unter Windows: venv\Scripts\activate
+   ```
+
+3. Abhängigkeiten installieren:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Verwendung
+
+### Dashboard starten
 
 ```bash
-# Repository klonen
-git clone https://github.com/Jedimind369/bookmark-master.git
-cd bookmark-master
-
-# Docker-Container starten
-docker-compose up -d
+streamlit run dashboard/app.py
 ```
 
-## Projektstruktur
+Das Dashboard ist dann unter http://localhost:8501 verfügbar.
 
-- `/app` - Frontend-Anwendung
-- `/server` - Backend-API
-- `/docs` - Projektdokumentation
-- `/scripts` - Hilfsskripte
+Eine detaillierte Anleitung zur Verwendung des Dashboards finden Sie in [docs/dashboard_guide.md](docs/dashboard_guide.md).
 
-## Repository-Struktur und Best Practices
-
-Dieses Repository folgt bewährten Praktiken für die Organisation und Wartung von Code:
-
-### Verzeichnisstruktur
-
-- `docker/`: Docker-Konfigurationsdateien (Dockerfile, docker-compose.yml)
-- `docs/`: Dokumentation zum Projekt
-- `scripts/`: Hilfsskripte für Entwicklung, Deployment und Wartung
-- `src/`: Quellcode der Anwendung
-  - `client/`: Frontend-Code
-  - `server/`: Backend-Code
-
-### Repository-Wartung
-
-Wir haben mehrere Skripte erstellt, um die Integrität und Struktur des Repositories zu gewährleisten:
-
-- `scripts/verify-repo-integrity.sh`: Überprüft die Integrität des Repositories
-- `scripts/cleanup-repository.sh`: Bereinigt die Repository-Struktur
-- `scripts/backup-to-github.sh`: Erstellt ein Backup des Repositories auf GitHub
-
-### Automatische Repository-Synchronisation
-
-Das Repository verfügt über ein automatisches Synchronisationssystem, das sicherstellt, dass wichtige Änderungen immer aktuell sind:
-
-- **Kontinuierliche Überwachung**: Ein MCP-Monitor überwacht das Repository auf wichtige Änderungen
-- **Automatische Commits**: Bei wichtigen Änderungen werden automatisch Commits erstellt
-- **GitHub Actions**: Eine GitHub Action synchronisiert das Repository täglich
-- **Git-Hooks**: Ein Post-Commit-Hook führt nach jedem Commit eine Synchronisation durch
-
-Zur Einrichtung der automatischen Synchronisation führen Sie folgendes Skript aus:
+### Cursor-Monitor starten
 
 ```bash
-./scripts/utils/setup_repo_monitor.sh
+python3 scripts/utils/cursor_monitor.py
 ```
 
-Weitere Informationen finden Sie in der [Repository-Synchronisations-Dokumentation](docs/repo_sync.md).
+Der Cursor-Monitor zeigt ein Fenster mit dem aktuellen Status und sendet Benachrichtigungen bei Problemen.
 
-### Best Practices
+### Tests ausführen
 
-1. **Klare Verzeichnisstruktur**: Wir organisieren Code in logischen Verzeichnissen.
-2. **Dokumentation**: Wichtige Prozesse und Konfigurationen sind dokumentiert.
-3. **Automatisierung**: Wiederholende Aufgaben werden durch Skripte automatisiert.
-4. **Versionierung**: Wir verwenden Git-Tags für wichtige Releases.
-5. **Backup**: Regelmäßige Backups sichern den Code.
-6. **Synchronisation**: Automatische Synchronisation hält das Repository aktuell.
+Unit Tests:
+```bash
+python -m unittest discover tests/
+```
 
-## Nächste Schritte
+Integration Tests:
+```bash
+python -m pytest tests/integration/
+```
 
-Siehe [docs/NEXT-STEPS.md](docs/NEXT-STEPS.md) für die geplanten nächsten Entwicklungsschritte.
+Performance Tests:
+```bash
+cd tests/performance
+python -m locust -f locustfile.py
+```
+
+## Dokumentation
+
+- [Dashboard Benutzerhandbuch](docs/dashboard_guide.md) - Anleitung zur Verwendung des Dashboards
+- [RAG Erweiterungskonzept](docs/RAG_Idee.md) - Konzept für zukünftige RAG-Funktionalität
 
 ## Lizenz
 
 MIT
+
+## Zukünftige Erweiterungen
+
+- Retrieval-Augmented Generation (RAG) für semantische Suche
+- Weitere Sprach- und Frameworks-Unterstützung
+- Mobile App für Unterwegs-Zugriff
+- Erweiterte Zusammenfassungs- und Kategorisierungsfunktionen
+- Integration mit externen Wissensquellen
+- Erweiterte Analysen und Visualisierungen im Dashboard
+
+Mehr Informationen zu den geplanten RAG-Funktionen finden Sie in [docs/RAG_Idee.md](docs/RAG_Idee.md).

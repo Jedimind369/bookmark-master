@@ -1,0 +1,10 @@
+{
+  "exact_hits": 0,
+  "semantic_hits": 1,
+  "misses": 2,
+  "total_time_saved": 0.05272793769836426,
+  "last_reset": "2025-03-06T12:10:18.881365",
+  "hit_rate": 0.3333333333333333,
+  "semantic_hit_rate": 1.0,
+  "last_updated": "2025-03-06T12:10:18.997567"
+}

@@ -1,0 +1,5 @@
+https://www.wikipedia.org
+https://www.python.org
+https://github.com
+https://www.openai.com
+https://www.anthropic.com

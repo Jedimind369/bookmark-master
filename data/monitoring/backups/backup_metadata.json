@@ -1,0 +1,14 @@
+{
+  "last_backup_date": "2025-03-07",
+  "backup_count": 1,
+  "backups": [
+    {
+      "date": "2025-03-07",
+      "file": "api_usage_backup_2025-03-07_full.json",
+      "type": "full",
+      "base_backup": null,
+      "size": 165,
+      "total_cost": 0.0
+    }
+  ]
+}
