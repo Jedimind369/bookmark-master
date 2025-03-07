@@ -23,12 +23,23 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install pytest pytest-asyncio
+        pip install numpy pandas psutil streamlit plotly
+        pip install sentence-transformers torch
+        pip install flake8 coverage
+        pip install pygame
     
     - name: Install monitoring dependencies
       run: |
         pip install streamlit pandas plotly altair matplotlib
+    
+    - name: Setup environment
+      run: |
+        echo "OPENAI_API_KEY=dummy_key" >> $GITHUB_ENV
+        echo "HELICONE_API_KEY=dummy_key" >> $GITHUB_ENV
+        echo "SLACK_WEBHOOK_URL=dummy_url" >> $GITHUB_ENV
+        mkdir -p data/monitoring
+        echo '{"budget_limit": 100, "warning_thresholds": [50, 80, 90]}' > data/monitoring/config.json
     
     - name: Configure Git
       run: |
@@ -38,14 +49,15 @@ jobs:
     - name: Create data directories
       run: |
         mkdir -p data/monitoring/backups
+        touch data/monitoring/api_usage.json
     
     - name: Run backup functionality tests
       run: |
-        python -m scripts.monitoring.test_monitoring --backup --days 3
+        python -m pytest scripts/monitoring/test_monitoring.py -v
     
     - name: Run GitHub sync tests
       run: |
-        python -m scripts.monitoring.test_github_sync --no-backup
+        python -m pytest scripts/monitoring/test_github_sync.py -v
     
     - name: Check backup files integrity
       run: |
