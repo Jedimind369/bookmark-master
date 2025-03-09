@@ -84,5 +84,4 @@ jobs:
       with:
         name: monitoring-backups
         path: data/monitoring/backups/
-        retention-days: 7 
         retention-days: 7
