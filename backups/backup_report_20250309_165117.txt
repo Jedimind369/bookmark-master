@@ -19,3 +19,49 @@ backups/backup_report_20250309_165117.txt
 backups/bookmarks_20250309_165117.db.gz.sha256
 
 [2025-03-09 16:51:17] Füge Dateien zu Git hinzu...
+[2025-03-09 16:51:17] Dateien erfolgreich hinzugefügt
+[2025-03-09 16:51:17] Erstelle Commit...
+[features/hybrid-optimization 158d43d] Hinzufügen aller unversionierten Dateien: 20250309_165117
+ 2 files changed, 22 insertions(+)
+ create mode 100644 backups/backup_report_20250309_165117.txt
+ create mode 100644 backups/bookmarks_20250309_165117.db.gz.sha256
+[2025-03-09 16:51:17] Commit erfolgreich erstellt: Hinzufügen aller unversionierten Dateien: 20250309_165117
+Commit erfolgreich erstellt: Hinzufügen aller unversionierten Dateien: 20250309_165117
+[2025-03-09 16:51:17] Push übersprungen
+Push übersprungen
+[2025-03-09 16:51:17] Hinzufügen unversionierter Dateien abgeschlossen
+Hinzufügen unversionierter Dateien abgeschlossen
+Siehe Log-Datei für Details: logs/add_unversioned_20250309_165117.log
+Status: Erfolgreich
+
+--------------------
+[2025-03-09 16:51:17] Starte Erstellung eines Repository-Spiegels
+[2025-03-09 16:51:17] Repository-URL: https://github.com/Jedimind369/bookmark-master.git
+[2025-03-09 16:51:17] Zielverzeichnis: mirror_backup_20250309_165117
+[2025-03-09 16:51:17] Klone Repository mit --mirror Option...
+[2025-03-09 16:51:20] Repository erfolgreich geklont
+[2025-03-09 16:51:20] Rufe Git LFS-Objekte ab...
+[2025-03-09 16:51:20] WARNUNG: Git LFS-Objekte konnten nicht abgerufen werden oder Git LFS wird nicht verwendet
+[2025-03-09 16:51:20] Archiviere Repository-Spiegel...
+[2025-03-09 16:51:20] Repository-Spiegel erfolgreich archiviert: mirror_backup_20250309_165117.tar.gz
+[2025-03-09 16:51:20] Prüfsumme erstellt: mirror_backup_20250309_165117.tar.gz.sha256
+[2025-03-09 16:51:20] Temporäres Verzeichnis entfernt
+[2025-03-09 16:51:20] Repository-Spiegel-Erstellung abgeschlossen
+Repository-Spiegel erstellt: mirror_backup_20250309_165117.tar.gz
+Siehe Log-Datei für Details: logs/mirror_backup_20250309_165117.log
+
+Anleitung zur Wiederherstellung des Repository-Spiegels:
+1. Entpacken Sie das Archiv: tar -xzf mirror_backup_20250309_165117.tar.gz
+2. Wechseln Sie in das Verzeichnis: cd mirror_backup_20250309_165117
+3. Klonen Sie das Repository: git clone mirror_backup_20250309_165117 neues_verzeichnis
+   Oder fügen Sie es als Remote hinzu: git remote add mirror mirror_backup_20250309_165117
+Status: Erfolgreich
+
+--------------------
+[2025-03-09 16:51:20] Starte umfassendes Backup
+[2025-03-09 16:51:20] Aktueller Branch: features/hybrid-optimization
+[2025-03-09 16:51:20] Führe SQLite-Datenbank-Backup durch...
+[2025-03-09 16:51:20] Integritätsprüfung erfolgreich.
+[2025-03-09 16:51:20] Datenbank-Backup erstellt: backups/bookmarks_20250309_165120.db.gz
+[2025-03-09 16:51:20] Führe Code-Backup auf GitHub durch...
+[2025-03-09 16:51:20] Ungespeicherte Änderungen gefunden
