@@ -1,0 +1,32 @@
+[
+  {
+    "url": "https://example.com",
+    "title": "Example Website",
+    "description": "Eine Beispiel-Website für Tests",
+    "tags": ["test", "example"]
+  },
+  {
+    "url": "https://github.com",
+    "title": "GitHub",
+    "description": "Code-Hosting-Plattform",
+    "tags": ["development", "git"]
+  },
+  {
+    "url": "https://developer.mozilla.org",
+    "title": "MDN Web Docs",
+    "description": "Ressourcen für Webentwickler",
+    "tags": ["documentation", "web", "development"]
+  },
+  {
+    "url": "https://stackoverflow.com",
+    "title": "Stack Overflow",
+    "description": "Frage-und-Antwort-Plattform für Programmierer",
+    "tags": ["programming", "community", "help"]
+  },
+  {
+    "url": "https://news.ycombinator.com",
+    "title": "Hacker News",
+    "description": "Nachrichten für Technikbegeisterte",
+    "tags": ["news", "tech", "community"]
+  }
+] 

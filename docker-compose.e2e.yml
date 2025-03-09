@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  webapp:
+    build: ./webapp
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=test
+      - PROCESSOR_URL=http://processor:5000
+    volumes:
+      - ./webapp:/app
+      - /app/node_modules
+    depends_on:
+      - processor
+      - redis
+      - database
+
+  processor:
+    build: ./processor
+    ports:
+      - "5000:5000"
+      - "9090:9090"
+    environment:
+      - MAX_WORKERS=2
+      - MIN_CHUNK_SIZE=50
+      - MAX_CHUNK_SIZE=1000
+      - MEMORY_TARGET=70
+    volumes:
+      - ./test-data:/app/data
+      - ./logs:/app/logs
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=testuser
+      - POSTGRES_PASSWORD=testpassword
+      - POSTGRES_DB=testdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_test_data:/data
+
+  e2e:
+    image: cypress/included:12.6.0
+    depends_on:
+      - webapp
+    environment:
+      - CYPRESS_baseUrl=http://webapp:3000
+    volumes:
+      - ./webapp/cypress:/cypress
+      - ./webapp/cypress.config.js:/cypress.config.js
+      - ./cypress-results:/cypress/results
+    command: cypress run --config screenshotsFolder=/cypress/results/screenshots,videosFolder=/cypress/results/videos
+
+volumes:
+  postgres_test_data:
+  redis_test_data: 

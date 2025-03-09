@@ -1,0 +1,2 @@
+# Abhängigkeiten für den Chunk-Prozessor
+psutil>=5.9.0 

@@ -1,0 +1,8 @@
+{
+  "this_is": "not a valid bookmark format",
+  "missing": ["required fields"],
+  "malformed": true,
+  "items": [
+    {"incomplete": "no url or title"}
+  ]
+} 

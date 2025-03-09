@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # Hauptanwendung (TypeScript/Node.js)
+  webapp:
+    build: 
+      context: ./webapp
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - database
+      - redis
+      - processor
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_USER=bookmark_user
+      - DB_PASSWORD=secure_password
+      - DB_NAME=bookmark_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PROCESSOR_URL=http://processor:5000
+    volumes:
+      - ./data:/app/data
+      - ./logs/webapp:/app/logs
+    restart: unless-stopped
+
+  # Datenbank
+  database:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=secure_password
+      - POSTGRES_USER=bookmark_user
+      - POSTGRES_DB=bookmark_db
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Cache
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Optimierte Verarbeitungskomponente (Python)
+  processor:
+    build:
+      context: ./processor
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+      - ./logs/processor:/app/logs
+    environment:
+      - MAX_WORKERS=4
+      - MIN_CHUNK_SIZE=50
+      - MAX_CHUNK_SIZE=10000
+      - MEMORY_TARGET=0.7
+    # Expose Prometheus-Metriken
+    ports:
+      - "5000:5000"  # API
+      - "9090:9090"  # Prometheus-Metriken
+    restart: unless-stopped
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    depends_on:
+      - processor
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data: 
