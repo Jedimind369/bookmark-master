@@ -1,0 +1,177 @@
+{
+  "bookmarks": [
+    {
+      "type": "folder",
+      "name": "Lesezeichenleiste",
+      "parent": "root",
+      "added": "2021-03-15T14:11:14",
+      "last_modified": "2021-03-15T14:11:14",
+      "depth": 0,
+      "items": [
+        {
+          "type": "folder",
+          "name": "Entwicklung",
+          "parent": "Lesezeichenleiste",
+          "added": "2021-03-15T14:11:14",
+          "last_modified": "2021-03-15T14:11:14",
+          "depth": 1,
+          "items": [
+            {
+              "type": "bookmark",
+              "title": "GitHub: Let's build from here · GitHub",
+              "url": "https://github.com/",
+              "folder": "Entwicklung",
+              "depth": 1,
+              "added": "2021-03-15T14:11:14",
+              "last_modified": null,
+              "description": null,
+              "tags": null,
+              "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACrElEQVQ4jW2SzWucVRTGf+fe9847SW2n+WioIdZkJkzGWLMsQvBjpRv1H1BcqSB166aUbgQXLkpEEGnF7ty5Edw0orULtS5DjNOZ5qvEaqJJ8n3cqy9tC7VeXZzF5XCe33nOeXSdGxl/4cTxn37zgyMIwAHgZEiJN0uQCqBzPbQAjuufPPdMt9vdsCJXP4LWpSFld9DEK3JQGIPiZEQjR7SMDQp3x9qzzcGNq+/M5t6hGQdRycCkCUJFdTGITppqBU8qLj5VB+bWvDESRayKNO97tPqodGfg1uP6q5fS4NRT9YdPfMbRgkYlmLUpEcVQJIhEg1ZdBCGLlWgEiUZ0Xn9gXv5zbvPqrZtPaa+wi0cKXxcTRdRCKPVj7q9/1NvZzGA7w1AAiPGOdMoJrMDmwFxav9xrDYdPfRF8eO9Hx6V9GPPK1+DeqSn0jDVeheXsKpwRYQcZAytzGCUCx5YaD7w4/9iJzm/b1XxcTxSh/d5TKd3B5o/HcR5PD6CuSEhJQVzAK2IEpMC2j9hZevDho9Pf1VdqK/UFgDPNKE5OVZ/PX5Q7119qzxghAQIoTILmZbSxgBxC0wCyYXcwWbuYLTbGahvVafPqtQQpwP4JZhZ6fZqtL5J8AkSEEwjrdz6nGY/gZTyFECOCl8QDG2zTDwaSgmRgdpAoRlZUJq7uaCzOTdUPayt0G0CXkkpjfbG8jNabRwVAOoVQ0Gv9S91ZxWQqXAIbCibGRlZUh/UFzXbj5MRj7vHiXWdeq5ZKc+6GhcVotTcFCrMgr4q25o6VlZA1YkUcRbDrBFB7z0iU7zZUJ3HiHXu9rZUTS8O45F0HCvJt0twnbxat8pbrjIIkUChKoZWkfE8C7H/9AcsPLS8+8tHRF/4B1La7XyHCCCcAAAAASUVORK5CYII="
+            },
+            {
+              "type": "bookmark",
+              "title": "Stack Overflow - Where Developers Learn, Share, & Build Careers",
+              "url": "https://stackoverflow.com/",
+              "folder": "Entwicklung",
+              "depth": 1,
+              "added": "2021-03-15T14:11:14",
+              "last_modified": null,
+              "description": null,
+              "tags": null,
+              "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABXklEQVQ4jbWQsUsCYRjGn/fuSu/Sk3ALmlzNtoagKRqSaHMKGkKhEOV0KWispSXPQaglAnNobOgfaCyIcgicmxO9zFPv/N5WwTs5gt7x+5739/2eDwgw/bK67HcnBQG4Ag3L0LJ/BoBFDuDzTiGUCAywDC3bNbRtANCrwxaBziRZanAGcjADwR8AX1uGesEZyFGzXwO43VsKn07GaJa5lY/GMefUAYooEvaELDnCEW9M2I1V7GdPg04hlLAM7dYqqut67ftLNwdpMB5dgRfXdVMgHIFpx9egfbwYk0eDA2LKAWJMkK6cUOhOGdkpZmoQiy29OmwFq1AKb5CgQyakAXqQJKpELn/eJzPK1JKhPhHjk4EmMzUVmU/coVLkeXff672pk155YXUsxikCJQFeYVCSgCiAV920N311b+r37FslH413S+qaV86rggfIBbG38RRAN+2ZHzsTMKvGv80vvziHGAusG84AAAAASUVORK5CYII="
+            },
+            {
+              "type": "bookmark",
+              "title": "Welcome to Python.org",
+              "url": "https://www.python.org/",
+              "folder": "Entwicklung",
+              "depth": 1,
+              "added": "2021-03-15T14:11:14",
+              "last_modified": null,
+              "description": null,
+              "tags": null,
+              "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABzklEQVQ4jY2TP2hTURTGf+e+l4SWoLQJIUVKoJYODhYHBxHcXFwKDg4OQkuKOFhKh4Jj/xSHDg4OQhcHB4dSaJEsJY1DgiBIwGJMjEle7nHIe2mTWPJ5w/3OPd/53j3nXlFVBEBEpmK+YYx5LiKPgMlSvQ18U9XXqnoKEBEZBbDWzgM/ReQl8OE8qCJyX0QWgdmxCWKMeQl8Bb4Dt4A3IvJtlD8BzgFE5EYpbgLPVPXruQpVtQ8kQAp8UtXHwDtgd4T/AHhbrjFggcsiMgv0VDU73YXRvS+l9QKtYfCBqj4FHgLtEm8Bn85UAGCMmQJWgXdAW1W3gSXgE7AO3CqxC8CvswQAqOo+sAHcKYkD4LmqJgAicgU4OFcBgDHmQkFdUtUHwFIZsQ3sANeAXWPMXJHvnKkAwBhzHXgPRMBt4EYZsQFsFb7GmHlgvVgPRwRFpCEiCyLSGMpbwCLwAzgEUNXvQHsYP1YgIhER2QE6IhKJSCQi74GfQKeA/4nIR2C7jB2ogLEKVDUWkXURWQNiVY2Bm8XbHqWgcPQBrBRXbyh3gKtAHzhW1d5/KjDGXAYeA3eL3/aBDWA1y7L+X+mhJHUW4zgXAAAAAElFTkSuQmCC"
+            },
+            {
+              "type": "folder",
+              "name": "Nachrichten",
+              "parent": "Entwicklung",
+              "added": "2021-03-15T14:11:14",
+              "last_modified": "2021-03-15T14:11:14",
+              "depth": 2,
+              "items": [
+                {
+                  "type": "bookmark",
+                  "title": "Hacker News",
+                  "url": "https://news.ycombinator.com/",
+                  "folder": "Nachrichten",
+                  "depth": 2,
+                  "added": "2021-03-15T14:11:14",
+                  "last_modified": null,
+                  "description": null,
+                  "tags": null,
+                  "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAyklEQVQ4jdWSsQ2DMBBF3xXpECOwBCNYsAMSdOzAAGzAALRUWcINFk5BkQrJJRQpokR5FKmCRwF8lPwq3f3v+fRlTXOLRvqW5gGM4pABRXAAVIDzYGbnYXOGrPMQwMxODjztLWYWG7DkTQEHwC2BsxQyoAQ+wCKBsxSygMOeCpfOOW9mMYXn/IuIS+dcmcLZAyXQufJFQJIkUqfTIH1pXvdLUgc5MKbw5GsKVdCagCRJtP0r7Qas9hSqoDWQpHHlq4Bi1ZW/ASUa+NI8MF8Bbo8E5yDGz/oAAAAASUVORK5CYII="
+                },
+                {
+                  "type": "bookmark",
+                  "title": "Web scraping - Wikipedia",
+                  "url": "https://en.wikipedia.org/wiki/Web_scraping",
+                  "folder": "Nachrichten",
+                  "depth": 2,
+                  "added": "2021-03-15T14:11:14",
+                  "last_modified": null,
+                  "description": null,
+                  "tags": null,
+                  "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABO0lEQVQ4jaWTMaoCMRCG/wnvDtELpBMsBAsbG8EjWHgDCzuvYmFhYW1hY2NvI55AsFOQB49IRJqQmcJHdvfp7+4WO5OZbz7+ZAIT1loPQOj7/tN13UgpFXS/oKoqJEmyxhgvAoCHEEJQXvU9+JGzruvEGfwMsm3bRhRFP0VRCACF53lBWZYfOsZY4Xnea5qmm6qqvgFAkGXZ3nGcPQCEYRgLIYQEQPCrY13XbTzPE67rTkQEInoFgCH/OXKWZXvp+/7LpQBj7A0Apvw/+QdF9pPnOSdJ8sL+AwAiQhAEO9/3t3cdBIEOw3AbRdHGsqyN7/vbMAwVEYGIwDl/AgCcc04+qqqKpZSCc/4CAMrzfKmUgpTyUwgRlGW5tG1bW5YlpJSfRVEsXdfVlmU5k8YYLyEEiQgA8A0YO/4/bvOyXwAAAABJRU5ErkJggg=="
+                },
+                {
+                  "type": "folder",
+                  "name": "KI und ML",
+                  "parent": "Nachrichten",
+                  "added": "2021-03-15T14:11:14",
+                  "last_modified": "2021-03-15T14:11:14",
+                  "depth": 3,
+                  "items": [
+                    {
+                      "type": "bookmark",
+                      "title": "OpenAI",
+                      "url": "https://openai.com/",
+                      "folder": "KI und ML",
+                      "depth": 3,
+                      "added": "2021-03-15T14:11:14",
+                      "last_modified": null,
+                      "description": null,
+                      "tags": null,
+                      "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAACEklEQVQ4jXWSPWgTcRTAf/87JDm/Lrm7JO1dLkmvubYSbEVLQToVBwd1UhDEwUlwcXAQv0DQSRQEQYSCDgouioMgiDg4OIiDOGgRbS1tY5O7S3PNXZObHBxqpT7e9n7v/d7XE1JKAHRdB1BKAQghfnIhhBBCKaWUQvyglEIIIaUUQgAopQzDMAxDSgmglJJSCiGEUkpKCaCUklJqmqbrul3XBdB1XdM0wzAMwwDQNE3TNNu2wzAEsCzLsqwwDKMoiqIIwLbtVCqVTqcBXNf1PC+KoiiKADKZTDabBXBd1/O8OI7jOAYQQpimCeC6rud5cRzHcQyQyWSy2SyA53me58VxnCQJgGVZALZtA0RRFEVREAQAjuM4jgPgeV4QBEEQAGSz2Vwu1+v1er1eEAQAjuM4jgPg+34QBL7vA+RyuXw+3+/3+/2+7/sAjuNkMhmAIAiCIAiCAKBQKBSLxUaj0fN8HyOfz+Xy+3+/7vt/tdgHK5XKlUqnX641GwzRNgGKxWCwWAVqtVqvV6na7AJVKpVqt1uv1er1umiaA4ziO4wC0Wq1Wq9XpdABc13Vdt9vtdjqdTqcDYFmWZVkA7Xa73W63220Ay7JM0wTodDqdTqfdbgPYtm3bNoAQot/vK6WklACGYRiGAaCUGg6HQggppQaQJEkURUmSACilkiRJkiRJEoAkSZRSSZIAJEkSRdFoNAL4Bvn+5PHMCM+/AAAAAElFTkSuQmCC"
+                    },
+                    {
+                      "type": "bookmark",
+                      "title": "PyTorch",
+                      "url": "https://pytorch.org/",
+                      "folder": "KI und ML",
+                      "depth": 3,
+                      "added": "2021-03-15T14:11:14",
+                      "last_modified": null,
+                      "description": null,
+                      "tags": null,
+                      "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACkUlEQVQ4jW2STYiVVxTHf+fe+3z3zkzjhJMxk4gfRWLEQIJQXLjQgIsunEWgNLhyJVKCIC5cuXBRQcxKXLgRXNgihbZUEFQwgkoWIgNiGIJ2dGac8XNm3o/7nNPFvPMxr+TAwb/n/M//nHPgf01V38pms91EtD+KoqN5ni8MBgP5YvHSpUu2vb39TJZlpwAXx/HxJEm+896/Pjo6+qTdbncPHDiw9PLlS7148WJ569at7Uaj8V2e5z/UarUfO53OUmNiYuJIkiRnjTF/AGuAGmNGwPPh4eGbwCmgBfwSRdFPzrn3ReQbYCMwlmXZD+Pj4+8MDQ39FhH7gSfGmAdABEwCk8aYB8aYJ8B+EdkbhuF1a+1eY8xK4JRz7lSr1fqyXq/fqdfrfwKrjTGPgFnv/QzwDJgB5rz3M977WeAZMOu9nwVeGGMeAavjOP4DWA9gjHkErAFqwFNgHlgCloB5oA/MichL4CUwJyJLwDywBDwF1gA1Y8wjYBxYISKzQAtoAl3AAX3AAX2gC/SAPtAFHNAHeoAD2kATWCEis8AKoOa9fwGsB9YCHSAFUmAeSIEUSIEFIAVSYB5IgRToAGuBdd77F0ANWOG9nwFagAVmgAyYAzJgDsiAOSADMmAOyIA5IANmAAssee9ngBpQ896/AFYB48BjYBFYBBaBRWARWAQWgUVgEVgEFoFF4DGwChjz3r8AakDNWvvUWnvdWnvXWnvPWnvPWnvPWnvPWnvPWnvPWnvPWnvPWnvXWnvdWvvUWlsDat77GWvtHWvtLWvtbWvtHWvtHWvtHWvtHWvtHWvtHWvtHWvtHWvtbWvtLWvtnUqlUgNqURRdj+P4eJIkZ733r3vvXwfOeu+PJ0lyPI7j41EUXQdq/wLxRbwfzmFKXwAAAABJRU5ErkJggg=="
+                    },
+                    {
+                      "type": "bookmark",
+                      "title": "pandas - Python Data Analysis Library",
+                      "url": "https://pandas.pydata.org/",
+                      "folder": "KI und ML",
+                      "depth": 3,
+                      "added": "2021-03-15T14:11:14",
+                      "last_modified": null,
+                      "description": null,
+                      "tags": null,
+                      "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACeUlEQVQ4jY2TPWhUQRDHfzP73t3LfZgzJCpnTGEhWKQJKFiIIKKFH2BpY2NjY2FrY2VlZWNhYWFhYWMlFoJoQAQRFMVCBU9Fz+Tuku/bvX37xmJzBM/EqdaZ+c3M/3/DCvIoBUAlAVSzpCxJQBJQRQQkl6jqH0lZkgQCiEKxZPYs6Scm5ZKuKjdUVVfVLEnZt5sCiEJ5dXwkPnNsf3Ts4ED05eZM+vjlXPp5Lk0Pj/bFxw/0R89eT6e3P8ykh0f7YoCH76bTXDLGGDEiYoxYY8RaI9ZaMcaIMUaMMWKMEWutWGvFGCPGGDHGiDFGrLVS5JKiKMjznDzPyfOcPM/J85w8z8nznDzPyfOcPM/J85w8z8nznKIoKIqCsixZXl6mLEuWl5cpioKyLCnLkrIsKcuSsiwpioKiKCiKgqIoKMuSsixZWlqiLEsWFxcpioLFxUWKomBxcZGiKFhaWmJpaYmiKFhaWmJpaYmiKFhaWmJhYYGiKJifn6coCubn5ymKgoWFBRYWFiiKgvn5eRYWFiiKgvn5eebm5iiKgrm5OYqiYG5ujqIomJ2dZXZ2lqIomJ2dZXZ2lqIomJ2d5efMDEVRMDMzQ1EUzMzMUBQFMzMzzMzMUBQF09PTTE9PUxQF09PTTE9PUxQF09PTfJ+aoigKpqamKIqCqakpiqJgamqKqakpiqJgcnKSyclJiqJgcnKSyclJiqJgcnKSiYkJiqJgYmKCoiiYmJigKArGx8cZHx+nKArGx8cZHx+nKArGxsYYGxujKArGxsYYGxujKApGR0cZHR2lKApGR0cZHR2lKAq+jYxQFAXfRkYoioIvw8MURcGX4WGKouDL8PBfC/4Ar46Jk4x/esoAAAAASUVORK5CYII="
+                    },
+                    {
+                      "type": "bookmark",
+                      "title": "asyncio — Asynchronous I/O — Python 3.11.8 documentation",
+                      "url": "https://docs.python.org/3/library/asyncio.html",
+                      "folder": "KI und ML",
+                      "depth": 3,
+                      "added": "2021-03-15T14:11:14",
+                      "last_modified": null,
+                      "description": null,
+                      "tags": null,
+                      "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABzklEQVQ4jY2TP2hTURTGf+e+l4SWoLQJIUVKoJYODhYHBxHcXFwKDg4OQkuKOFhKh4Jj/xSHDg4OQhcHB4dSaJEsJY1DgiBIwGJMjEle7nHIe2mTWPJ5w/3OPd/53j3nXlFVBEBEpmK+YYx5LiKPgMlSvQ18U9XXqnoKEBEZBbDWzgM/ReQl8OE8qCJyX0QWgdmxCWKMeQl8Bb4Dt4A3IvJtlD8BzgFE5EYpbgLPVPXruQpVtQ8kQAp8UtXHwDtgd4T/AHhbrjFggcsiMgv0VDU73YXRvS+l9QKtYfCBqj4FHgLtEm8Bn85UAGCMmQJWgXdAW1W3gSXgE7AO3CqxC8CvswQAqOo+sAHcKYkD4LmqJgAicgU4OFcBgDHmQkFdUtUHwFIZsQ3sANeAXWPMXJHvnKkAwBhzHXgPRMBt4EYZsQFsFb7GmHlgvVgPRwRFpCEiCyLSGMpbwCLwAzgEUNXvQHsYP1YgIhER2QE6IhKJSCQi74GfQKeA/4nIR2C7jB2ogLEKVDUWkXURWQNiVY2Bm8XbHqWgcPQBrBRXbyh3gKtAHzhW1d5/KjDGXAYeA3eL3/aBDWA1y7L+X+mhJHUW4zgXAAAAAElFTkSuQmCC"
+                    },
+                    {
+                      "type": "bookmark",
+                      "title": "Google",
+                      "url": "https://www.google.com/",
+                      "folder": "KI und ML",
+                      "depth": 3,
+                      "added": "2021-03-15T14:11:14",
+                      "last_modified": null,
+                      "description": null,
+                      "tags": null,
+                      "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACIklEQVQ4jYWSS0iUURTHf/fe8RvHooE2VlT2FNqUGWmNEYUR9lhEEVJhUIsoXOQuap1Rq6KHNQt3LaPAIOxhlNTChUwLMU3NR1CklUzg6xvPd1ro2KhTHjhcOOf/4/z/yyXLOZugWFxf3hGt2iXVW36dD+mPqooEpRNlZnjk48fXl43QWOD0GqWwruUzCbGYZUgxhCIIGGT2Srx+1qMsj66fCGPHVYWUh3WsKCuMXTGE/N8oGoAEVDUO92NHgreXnKMbs7s3x9Gw2fYgGUbtwUZWXUWkqKchSr7YlmuIW43H7Qn5U/lLzZ2wP6SnMZ6Y2JJUBdVX0fy3BdxYNv71VuaCZvk0FkvMDFwPWgQR5TnqrqXuQyGU6lHxuBLK/CgJbzqV+Tc3TOvEbdvj5iHNioIUFOfjFsdC/DqQIFpnNT5hkNwzpTz/LQx1NyHfOEBUTTmqkruRidWgJIZJdjP9c/4IVkHJ0JKMT+XGlJeG3XN3m3rePmkUpmUWwo0T5ZvVa7XLxJkS2TLjRf8zNHKjtQhKCBuZyQCUlZbjDp0KLP1k9iWUxO6RhFUW91QKpaBRg6gWgBX5brCQQE2JEvhVrTaOG1mHWlzpX38RxfFhUb9k0L3XLRCb8MjYksatqYnjRlYbJ5QEcmMGNdeMr7Y+lT5vx6D7r2SwJqoEh6/W4mwrB/hKaqBWLYOOQGm9Ngk/R4ScAAAAAElFTkSuQmCC"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "source_file": "data/bookmarks/test_bookmarks.html",
+    "browser_type": "chrome",
+    "parsed_at": "2025-03-08T13:42:31.411397",
+    "stats": {
+      "total_bookmarks": 10,
+      "total_folders": 4,
+      "invalid_urls": 0,
+      "duplicate_urls": 0,
+      "empty_titles": 0,
+      "max_depth": 3
+    }
+  }
+}

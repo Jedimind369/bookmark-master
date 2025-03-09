@@ -3,550 +3,566 @@
 """
 batch_processor.py
 
-Unterstützt das Batch-Processing von URLs für das Scraping und die KI-basierte Inhaltsanalyse.
-Optimiert für große URL-Listen (>10.000) mit Fortsetzungsmöglichkeit und umfangreicher Fortschrittsverfolgung.
+Dieses Skript verarbeitet Lesezeichen-URLs in Batches und verwendet die Zyte API
+oder andere Scraping-Methoden, um Inhalt und Metadaten zu extrahieren. Es unterstützt
+parallele Anfragen, Retry-Logik und detaillierte Fehlerbehandlung.
 """
 
 import os
-import sys
+import re
 import json
 import time
-import asyncio
+import random
 import logging
+import asyncio
 import argparse
-import aiohttp
 from pathlib import Path
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Set, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Any, Optional, Union, Set
+import aiohttp
+from urllib.parse import urlparse, urljoin
+from bs4 import BeautifulSoup
+import hashlib
 
-# Pfad zur Hauptanwendung hinzufügen, damit wir auf andere Module zugreifen können
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# Versuche, Zyte API Client zu importieren, falls verfügbar
+try:
+    from zyte_api import AsyncClient as ZyteClient
+    ZYTE_AVAILABLE = True
+except ImportError:
+    ZYTE_AVAILABLE = False
 
-# Import der benötigten Klassen und Einstellungen
-from .zyte_scraper import ZyteScraper
-from .content_analyzer import ContentAnalyzer
-from .settings import DATA_DIR, LOG_DIR, PROGRESS_DIR
+# Konfiguration
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_MAX_CONCURRENT = 5
+DEFAULT_TIMEOUT = 60  # Sekunden
+DEFAULT_RETRY_COUNT = 3
+DEFAULT_RETRY_DELAY = 5  # Sekunden
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+
+# Standardpfade für Dateien
+SCRIPT_DIR = Path(__file__).resolve().parent
+DATA_DIR = SCRIPT_DIR / "../../data/scraping"
+LOGS_DIR = SCRIPT_DIR / "../../logs/scraping"
+
+# Stelle sicher, dass die Verzeichnisse existieren
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Konfiguriere Logging
+log_file = LOGS_DIR / f"scraping_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(LOG_DIR / "batch_processor.log"),
+        logging.FileHandler(log_file),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger("batch_processor")
 
 class BatchProcessor:
-    """
-    Verarbeitet URLs in Batches, mit Wiederaufnahme und Fortschrittsverfolgung.
-    Optimiert für die Verarbeitung großer URL-Listen mit Neustartfähigkeit.
-    """
+    """Verarbeitet URLs in Batches zum Scraping von Inhalten."""
     
     def __init__(self, 
-                 batch_size: int = 100, 
-                 max_concurrent: int = 10, 
-                 max_retries: int = 3,
-                 retry_delay: int = 5,
-                 zyte_api_key: Optional[str] = None,
-                 output_dir: str = str(DATA_DIR)):
+                 api_key: Optional[str] = None,
+                 batch_size: int = DEFAULT_BATCH_SIZE, 
+                 max_concurrent: int = DEFAULT_MAX_CONCURRENT,
+                 timeout: int = DEFAULT_TIMEOUT,
+                 retry_count: int = DEFAULT_RETRY_COUNT,
+                 retry_delay: int = DEFAULT_RETRY_DELAY,
+                 use_zyte: bool = False):
         """
         Initialisiert den BatchProcessor.
         
         Args:
-            batch_size: Anzahl der URLs pro Batch
-            max_concurrent: Maximale Anzahl gleichzeitiger Anfragen
-            max_retries: Maximale Anzahl von Wiederholungsversuchen bei Fehlern
-            retry_delay: Verzögerung zwischen Wiederholungsversuchen in Sekunden
-            zyte_api_key: API-Schlüssel für Zyte (optional, sonst aus Umgebungsvariable)
-            output_dir: Verzeichnis für die Ausgabe der gescrapten Daten
+            api_key: Zyte API-Schlüssel, falls vorhanden.
+            batch_size: Größe der zu verarbeitenden Batches.
+            max_concurrent: Maximale Anzahl gleichzeitiger Anfragen.
+            timeout: Zeitlimit für Anfragen in Sekunden.
+            retry_count: Anzahl der Wiederholungen bei Fehlern.
+            retry_delay: Verzögerung zwischen Wiederholungen in Sekunden.
+            use_zyte: Ob die Zyte API verwendet werden soll.
         """
+        self.api_key = api_key
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
-        self.max_retries = max_retries
+        self.timeout = timeout
+        self.retry_count = retry_count
         self.retry_delay = retry_delay
-        
-        # Initialisiere den Zyte-Scraper
-        self.scraper = ZyteScraper(api_key=zyte_api_key, output_dir=output_dir)
-        
-        # Initialisiere den Content-Analyzer mit allen verfügbaren Modellen
-        self.analyzer = ContentAnalyzer()
+        self.use_zyte = use_zyte and ZYTE_AVAILABLE
         
         # Statistiken
         self.stats = {
             "total_urls": 0,
-            "processed_urls": 0,
-            "successful_urls": 0,
-            "failed_urls": 0,
-            "retry_count": 0,
+            "successful": 0,
+            "failed": 0,
+            "retries": 0,
             "start_time": None,
             "end_time": None,
-            "estimated_completion_time": None,
-            "model_usage": {}
+            "errors": {}
         }
         
-        # Fortschrittsverfolgung
-        self.processed_urls: Set[str] = set()
-        self.successful_urls: Set[str] = set()
-        self.failed_urls: Dict[str, str] = {}  # URL -> Fehlergrund
+        # Cache für bereits verarbeitete URLs
+        self.processed_urls = set()
         
-        # Verwende einen eindeutigen Namen für die Fortschrittsdatei
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.progress_file = PROGRESS_DIR / f"progress_{timestamp}.json"
+        # Semaphore für Begrenzung gleichzeitiger Anfragen
+        self.semaphore = asyncio.Semaphore(max_concurrent)
         
-        # Stelle sicher, dass Verzeichnisse existieren
-        PROGRESS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"BatchProcessor initialisiert: batch_size={batch_size}, max_concurrent={max_concurrent}")
+        if self.use_zyte:
+            logger.info("Verwende Zyte API für Scraping")
+        else:
+            logger.info("Verwende Standard HTTP-Client für Scraping")
     
-    def _save_progress(self):
-        """Speichert den aktuellen Fortschritt in einer Datei."""
-        progress_data = {
-            "stats": self.stats,
-            "processed_urls": list(self.processed_urls),
-            "successful_urls": list(self.successful_urls),
-            "failed_urls": self.failed_urls,
-            "last_updated": datetime.now().isoformat()
-        }
-        
-        with open(self.progress_file, 'w', encoding='utf-8') as f:
-            json.dump(progress_data, f, ensure_ascii=False, indent=2)
-        
-        logger.info(f"Fortschritt gespeichert: {self.progress_file}")
-    
-    def _load_progress(self, progress_file: Path) -> bool:
+    async def process_urls(self, urls: List[Dict[str, Any]], output_dir: Union[str, Path]) -> Dict[str, Any]:
         """
-        Lädt den Fortschritt aus einer bestehenden Datei.
+        Verarbeitet eine Liste von URLs in Batches.
         
         Args:
-            progress_file: Pfad zur Fortschrittsdatei
+            urls: Liste von URL-Dictionaries mit mindestens den Schlüsseln 'url' und 'id'.
+            output_dir: Verzeichnis für die Ausgabedateien.
             
         Returns:
-            bool: True, wenn der Fortschritt erfolgreich geladen wurde
+            Ein Dictionary mit Statistiken über den Scraping-Prozess.
         """
-        try:
-            if not progress_file.exists():
-                logger.warning(f"Fortschrittsdatei {progress_file} existiert nicht.")
-                return False
+        # Initialisiere Statistiken
+        self.stats["total_urls"] = len(urls)
+        self.stats["start_time"] = datetime.now().isoformat()
+        
+        # Stelle sicher, dass das Ausgabeverzeichnis existiert
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Erstelle Batches
+        batches = [urls[i:i + self.batch_size] for i in range(0, len(urls), self.batch_size)]
+        logger.info(f"Verarbeite {len(urls)} URLs in {len(batches)} Batches")
+        
+        # Verarbeite jeden Batch
+        for i, batch in enumerate(batches):
+            logger.info(f"Verarbeite Batch {i+1}/{len(batches)} mit {len(batch)} URLs")
             
-            with open(progress_file, 'r', encoding='utf-8') as f:
-                progress_data = json.load(f)
+            # Erstelle Tasks für gleichzeitige Verarbeitung
+            tasks = []
+            for url_item in batch:
+                # Prüfe, ob wir diese URL bereits verarbeitet haben
+                url = url_item.get('url')
+                if url in self.processed_urls:
+                    logger.info(f"Überspringe bereits verarbeitete URL: {url}")
+                    continue
+                
+                tasks.append(self.process_url(url_item, output_dir))
             
-            self.stats = progress_data.get("stats", self.stats)
-            self.processed_urls = set(progress_data.get("processed_urls", []))
-            self.successful_urls = set(progress_data.get("successful_urls", []))
-            self.failed_urls = progress_data.get("failed_urls", {})
+            # Führe die Tasks aus
+            await asyncio.gather(*tasks)
             
-            # Aktualisiere die Fortschrittsdatei für diese Sitzung
-            self.progress_file = progress_file
-            
-            logger.info(f"Fortschritt geladen: {len(self.processed_urls)} verarbeitete URLs, "
-                       f"{len(self.successful_urls)} erfolgreiche URLs, "
-                       f"{len(self.failed_urls)} fehlgeschlagene URLs.")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Fehler beim Laden des Fortschritts: {str(e)}")
-            return False
+            # Zeige Fortschritt
+            completed = self.stats["successful"] + self.stats["failed"]
+            progress = (completed / self.stats["total_urls"]) * 100
+            logger.info(f"Fortschritt: {completed}/{self.stats['total_urls']} URLs verarbeitet ({progress:.1f}%)")
+        
+        # Aktualisiere Endzeit
+        self.stats["end_time"] = datetime.now().isoformat()
+        
+        # Berechne zusätzliche Statistiken
+        self._calculate_additional_stats()
+        
+        return self.stats
     
-    def _log_progress(self, batch_index: int, total_batches: int):
+    async def process_url(self, url_item: Dict[str, Any], output_dir: Path) -> Dict[str, Any]:
         """
-        Loggt den aktuellen Fortschritt und schätzt die verbleibende Zeit.
+        Verarbeitet eine einzelne URL mit Retry-Logik.
         
         Args:
-            batch_index: Index des aktuellen Batches
-            total_batches: Gesamtanzahl der Batches
-        """
-        if self.stats["start_time"] is None or self.stats["processed_urls"] == 0:
-            return
-        
-        # Berechne die verstrichene Zeit
-        now = datetime.now()
-        elapsed_seconds = (now - self.stats["start_time"]).total_seconds()
-        
-        # Berechne die Rate (URLs pro Sekunde)
-        if elapsed_seconds > 0:
-            urls_per_second = self.stats["processed_urls"] / elapsed_seconds
-            
-            # Schätze die verbleibende Zeit
-            remaining_urls = self.stats["total_urls"] - self.stats["processed_urls"]
-            if urls_per_second > 0:
-                remaining_seconds = remaining_urls / urls_per_second
-                estimated_completion = now + timedelta(seconds=remaining_seconds)
-                self.stats["estimated_completion_time"] = estimated_completion.isoformat()
-                
-                # Formatiere für das Logging
-                if remaining_seconds < 60:
-                    time_str = f"{int(remaining_seconds)} Sekunden"
-                elif remaining_seconds < 3600:
-                    time_str = f"{int(remaining_seconds / 60)} Minuten"
-                else:
-                    time_str = f"{remaining_seconds / 3600:.1f} Stunden"
-                
-                # Bereite den Fortschrittsbalken vor
-                progress_pct = (self.stats["processed_urls"] / self.stats["total_urls"]) * 100
-                bar_length = 30
-                filled_length = int(bar_length * self.stats["processed_urls"] // self.stats["total_urls"])
-                bar = '█' * filled_length + '-' * (bar_length - filled_length)
-                
-                logger.info(f"Fortschritt: [{bar}] {progress_pct:.1f}% | "
-                           f"Batch {batch_index}/{total_batches} | "
-                           f"URLs: {self.stats['processed_urls']}/{self.stats['total_urls']} | "
-                           f"Rate: {urls_per_second:.2f} URLs/s | "
-                           f"Geschätzte verbleibende Zeit: {time_str}")
-                
-                # Modellnutzung loggen
-                model_stats = self.analyzer.get_model_usage_stats()
-                self.stats["model_usage"] = model_stats
-                
-                # Log nur, wenn Modelle verwendet wurden
-                if model_stats["total_uses"] > 0:
-                    logger.info(f"Modellnutzung: Gesamt: {model_stats['total_uses']} Aufrufe, "
-                               f"Kosten: ${model_stats['total_cost']:.4f}")
-                    for model_id, usage in model_stats["models"].items():
-                        if usage["uses"] > 0:
-                            logger.info(f"  - {model_id}: {usage['uses']} Aufrufe, ${usage['total_cost']:.4f}")
-    
-    def _split_urls_into_batches(self, urls: List[str]) -> List[List[str]]:
-        """
-        Teilt die URLs in Batches auf.
-        
-        Args:
-            urls: Liste der zu verarbeitenden URLs
+            url_item: Dictionary mit mindestens den Schlüsseln 'url' und 'id'.
+            output_dir: Verzeichnis für die Ausgabedateien.
             
         Returns:
-            Liste von URL-Batches
+            Die extrahierten Daten für die URL.
         """
-        batches = []
-        for i in range(0, len(urls), self.batch_size):
-            batches.append(urls[i:i + self.batch_size])
-        return batches
-    
-    async def _process_batch(self, batch: List[str]) -> Tuple[List[str], List[Tuple[str, str]]]:
-        """
-        Verarbeitet einen Batch von URLs.
-        
-        Args:
-            batch: Liste von URLs für den Batch
-            
-        Returns:
-            Tuple von (erfolgreiche URLs, fehlgeschlagene URLs mit Fehlergrund)
-        """
-        # Filtere URLs, die bereits verarbeitet wurden
-        new_urls = [url for url in batch if url not in self.processed_urls]
-        
-        if not new_urls:
-            logger.info("Alle URLs in diesem Batch wurden bereits verarbeitet.")
-            return [], []
-        
-        logger.info(f"Verarbeite Batch mit {len(new_urls)} URLs...")
-        
-        # Verwende den Zyte-Scraper für den Batch
-        results = await self.scraper.fetch_urls(new_urls, self.max_concurrent)
-        
-        successful = []
-        failed = []
-        
-        for url, result in results.items():
-            self.processed_urls.add(url)
-            self.stats["processed_urls"] += 1
-            
-            if result.get("success", False):
-                self.successful_urls.add(url)
-                self.stats["successful_urls"] += 1
-                successful.append(url)
-            else:
-                error = result.get("error", "Unbekannter Fehler")
-                self.failed_urls[url] = error
-                self.stats["failed_urls"] += 1
-                failed.append((url, error))
-        
-        return successful, failed
-    
-    async def _retry_failed_urls(self, max_retries: int = None) -> int:
-        """
-        Versucht, fehlgeschlagene URLs erneut zu verarbeiten.
-        
-        Args:
-            max_retries: Maximale Anzahl von Wiederholungsversuchen (optional)
-            
-        Returns:
-            Anzahl der erfolgreich wiederholten URLs
-        """
-        if max_retries is None:
-            max_retries = self.max_retries
-        
-        retried_urls = list(self.failed_urls.keys())
-        if not retried_urls:
-            logger.info("Keine fehlgeschlagenen URLs für Wiederholungsversuch.")
-            return 0
-        
-        logger.info(f"Wiederhole {len(retried_urls)} fehlgeschlagene URLs...")
-        
-        # Versuche ein weiteres Mal
-        retry_count = 0
-        recovered_count = 0
-        
-        for _ in range(max_retries):
-            if not retried_urls:
-                break
-                
-            retry_count += 1
-            self.stats["retry_count"] += 1
-            
-            # Warte vor dem Wiederholungsversuch
-            await asyncio.sleep(self.retry_delay)
-            
-            # Versuche erneut, Batches zu scrapen
-            batches = self._split_urls_into_batches(retried_urls)
-            still_failed = []
-            
-            for batch in batches:
-                results = await self.scraper.fetch_urls(batch, self.max_concurrent)
-                
-                for url, result in results.items():
-                    if result.get("success", False):
-                        # URL war diesmal erfolgreich
-                        self.successful_urls.add(url)
-                        self.stats["successful_urls"] += 1
-                        self.stats["failed_urls"] -= 1
-                        del self.failed_urls[url]
-                        recovered_count += 1
-                    else:
-                        # Immer noch fehlgeschlagen
-                        error = result.get("error", "Unbekannter Fehler")
-                        self.failed_urls[url] = error
-                        still_failed.append(url)
-            
-            retried_urls = still_failed
-            logger.info(f"Wiederholungsversuch {retry_count}: {recovered_count} URLs wiederhergestellt, "
-                       f"{len(still_failed)} noch fehlgeschlagen.")
-        
-        return recovered_count
-    
-    async def _analyze_content(self, urls: List[str]) -> Dict[str, Any]:
-        """
-        Analysiert den Inhalt der gescrapten URLs mit KI-Modellen.
-        
-        Args:
-            urls: Liste der URLs für die Analyse
-            
-        Returns:
-            Dict mit den Analyseergebnissen
-        """
-        if not urls:
-            logger.info("Keine URLs für die Inhaltsanalyse.")
+        url = url_item.get('url')
+        if not url:
+            logger.warning(f"Überspringe Eintrag ohne URL: {url_item}")
+            self.stats["failed"] += 1
             return {}
         
-        logger.info(f"Analysiere Inhalt für {len(urls)} URLs...")
+        url_id = url_item.get('id')
+        if not url_id:
+            # Erstelle eine ID basierend auf der URL
+            url_id = f"url_{hashlib.md5(url.encode()).hexdigest()}"
         
-        results = {}
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        # Markiere die URL als verarbeitet
+        self.processed_urls.add(url)
         
-        async def analyze_with_semaphore(url: str):
-            async with semaphore:
+        # Verwende Semaphore zur Begrenzung gleichzeitiger Anfragen
+        async with self.semaphore:
+            # Versuche es mehrmals mit Retry-Logik
+            for attempt in range(self.retry_count + 1):
                 try:
-                    # Lade die gescrapten Daten
-                    scraped_file = self.scraper.output_dir / f"{self.scraper._get_safe_filename(url)}.json"
+                    if attempt > 0:
+                        # Warte vor dem erneuten Versuch
+                        delay = self.retry_delay * (1 + random.random())
+                        logger.info(f"Warte {delay:.1f}s vor erneutem Versuch {attempt}/{self.retry_count} für URL: {url}")
+                        await asyncio.sleep(delay)
+                        self.stats["retries"] += 1
                     
-                    if not scraped_file.exists():
-                        logger.warning(f"Gescrapte Datei für {url} nicht gefunden: {scraped_file}")
-                        return url, {"success": False, "error": "Gescrapte Datei nicht gefunden"}
+                    # Extrahiere Daten
+                    if self.use_zyte:
+                        result = await self._extract_with_zyte(url)
+                    else:
+                        result = await self._extract_with_http(url)
                     
-                    with open(scraped_file, 'r', encoding='utf-8') as f:
-                        scraped_data = json.load(f)
+                    # Füge Metadaten hinzu
+                    result.update({
+                        "id": url_id,
+                        "original_url": url,
+                        "timestamp": datetime.now().isoformat(),
+                        "source": url_item
+                    })
                     
-                    # Analysiere den Inhalt
-                    analyzed_data = await self.analyzer.analyze_content(url, scraped_data)
+                    # Speichere das Ergebnis
+                    await self._save_result(result, output_dir)
                     
-                    return url, analyzed_data
+                    # Aktualisiere Statistiken
+                    self.stats["successful"] += 1
+                    
+                    return result
                     
                 except Exception as e:
-                    logger.error(f"Fehler bei der Analyse von {url}: {str(e)}")
-                    return url, {"success": False, "error": str(e)}
+                    error_type = type(e).__name__
+                    if error_type not in self.stats["errors"]:
+                        self.stats["errors"][error_type] = 0
+                    self.stats["errors"][error_type] += 1
+                    
+                    logger.error(f"Fehler beim Verarbeiten von URL {url} (Versuch {attempt+1}/{self.retry_count+1}): {str(e)}")
+                    
+                    # Wenn dies der letzte Versuch war, zähle es als fehlgeschlagen
+                    if attempt == self.retry_count:
+                        self.stats["failed"] += 1
+                        
+                        # Speichere Fehlerinformationen
+                        error_result = {
+                            "id": url_id,
+                            "original_url": url,
+                            "timestamp": datetime.now().isoformat(),
+                            "error": {
+                                "type": error_type,
+                                "message": str(e),
+                                "attempts": attempt + 1
+                            },
+                            "source": url_item
+                        }
+                        
+                        await self._save_result(error_result, output_dir, is_error=True)
+                        
+                        return error_result
         
-        # Analysiere alle URLs parallel
-        tasks = [analyze_with_semaphore(url) for url in urls]
-        results_list = await asyncio.gather(*tasks)
-        
-        # Sammle die Ergebnisse
-        for url, result in results_list:
-            results[url] = result
-        
-        # Aktualisiere Modellnutzungsdaten in den Statistiken
-        self.stats["model_usage"] = self.analyzer.get_model_usage_stats()
-        
-        return results
+        return {}
     
-    async def process_urls(self, urls: List[str], perform_analysis: bool = True) -> Dict[str, Any]:
+    async def _extract_with_zyte(self, url: str) -> Dict[str, Any]:
         """
-        Verarbeitet eine Liste von URLs mit Batching, Wiederholungen und Fortschrittsverfolgung.
+        Extrahiert Daten mit der Zyte API.
         
         Args:
-            urls: Liste der zu verarbeitenden URLs
-            perform_analysis: Ob eine Inhaltsanalyse durchgeführt werden soll
+            url: Die zu scrapende URL.
             
         Returns:
-            Statistiken über den Verarbeitungsprozess
+            Ein Dictionary mit den extrahierten Daten.
         """
-        try:
-            # Initialisiere Statistiken
-            self.stats["total_urls"] = len(urls)
-            self.stats["start_time"] = datetime.now()
-            
-            logger.info(f"Starte Verarbeitung von {len(urls)} URLs mit Batch-Größe {self.batch_size} "
-                       f"und maximal {self.max_concurrent} gleichzeitigen Anfragen.")
-            
-            # Teile URLs in Batches auf
-            batches = self._split_urls_into_batches(urls)
-            total_batches = len(batches)
-            logger.info(f"URLs in {total_batches} Batches aufgeteilt.")
-            
-            all_successful_urls = []
-            
-            # Verarbeite jeden Batch
-            for i, batch in enumerate(batches):
-                # Verarbeite den Batch
-                successful, failed = await self._process_batch(batch)
-                all_successful_urls.extend(successful)
-                
-                # Logge den Fortschritt
-                self._log_progress(i + 1, total_batches)
-                
-                # Speichere den Fortschritt regelmäßig
-                if i % 5 == 0 or i == total_batches - 1:
-                    self._save_progress()
-            
-            # Versuche, fehlgeschlagene URLs erneut zu verarbeiten
-            if self.failed_urls:
-                logger.info(f"Versuche, {len(self.failed_urls)} fehlgeschlagene URLs erneut zu verarbeiten...")
-                recovered = await self._retry_failed_urls()
-                logger.info(f"{recovered} URLs erfolgreich wiederhergestellt.")
-                
-                # Aktualisiere die Liste der erfolgreichen URLs
-                all_successful_urls = list(self.successful_urls)
-            
-            # Führe die Inhaltsanalyse durch, wenn gewünscht
-            if perform_analysis and all_successful_urls:
-                logger.info(f"Beginne Inhaltsanalyse für {len(all_successful_urls)} erfolgreich gescrapte URLs...")
-                analysis_results = await self._analyze_content(all_successful_urls)
-                
-                # Logge Modellnutzungsstatistiken
-                model_stats = self.analyzer.get_model_usage_stats()
-                logger.info(f"Inhaltsanalyse abgeschlossen. Gesamtkosten: ${model_stats['total_cost']:.4f}")
-            
-            # Aktualisiere abschließende Statistiken
-            self.stats["end_time"] = datetime.now()
-            elapsed = (self.stats["end_time"] - self.stats["start_time"]).total_seconds()
-            
-            logger.info(f"Verarbeitung abgeschlossen. Dauer: {elapsed:.1f} Sekunden.")
-            logger.info(f"Erfolgreich: {self.stats['successful_urls']}/{self.stats['total_urls']} URLs "
-                       f"({self.stats['successful_urls'] / max(1, self.stats['total_urls']) * 100:.1f}%).")
-            
-            # Speichere den finalen Fortschritt
-            self._save_progress()
-            
-            return self.stats
-            
-        except Exception as e:
-            logger.error(f"Fehler bei der URL-Verarbeitung: {str(e)}")
-            self.stats["error"] = str(e)
-            self._save_progress()
-            raise
+        if not self.api_key:
+            raise ValueError("Zyte API-Schlüssel ist erforderlich")
         
-        finally:
-            # Stelle sicher, dass der Fortschritt in jedem Fall gespeichert wird
-            self._save_progress()
+        async with ZyteClient(self.api_key) as client:
+            response = await client.extract(
+                url=url,
+                browserHtml=True,
+                article=True,
+                httpResponseHeaders=True,
+                screenshot=True
+            )
+            
+            result = {
+                "url": response.get("url", url),
+                "title": response.get("article", {}).get("headline"),
+                "text": response.get("article", {}).get("body"),
+                "html": response.get("browserHtml"),
+                "headers": response.get("httpResponseHeaders"),
+                "status_code": 200,  # Zyte API liefert keinen Statuscode, nehmen wir 200 an
+                "screenshot": response.get("screenshot")
+            }
+            
+            return result
+    
+    async def _extract_with_http(self, url: str) -> Dict[str, Any]:
+        """
+        Extrahiert Daten mit einem Standard HTTP-Client.
+        
+        Args:
+            url: Die zu scrapende URL.
+            
+        Returns:
+            Ein Dictionary mit den extrahierten Daten.
+        """
+        timeout = aiohttp.ClientTimeout(total=self.timeout)
+        headers = {
+            "User-Agent": DEFAULT_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1"
+        }
+        
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, headers=headers, ssl=False) as response:
+                html = await response.text()
+                
+                # Parse HTML
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                # Extrahiere Titel
+                title = soup.title.string if soup.title else None
+                
+                # Extrahiere Metadaten
+                meta_description = soup.find('meta', attrs={'name': 'description'})
+                description = meta_description.get('content') if meta_description else None
+                
+                # Extrahiere Hauptinhalt
+                main_content = self._extract_main_content(soup)
+                
+                # Extrahiere alle Links
+                links = [a.get('href') for a in soup.find_all('a', href=True)]
+                absolute_links = [urljoin(url, link) for link in links]
+                
+                result = {
+                    "url": str(response.url),
+                    "status_code": response.status,
+                    "title": title,
+                    "description": description,
+                    "text": main_content,
+                    "html": html,
+                    "headers": dict(response.headers),
+                    "links": absolute_links
+                }
+                
+                return result
+    
+    def _extract_main_content(self, soup: BeautifulSoup) -> str:
+        """
+        Extrahiert den Hauptinhalt einer Webseite.
+        
+        Args:
+            soup: BeautifulSoup-Objekt der Webseite.
+            
+        Returns:
+            Der extrahierte Hauptinhalt als Text.
+        """
+        # Versuche, Artikelinhalt zu finden
+        article = soup.find('article')
+        if article:
+            return article.get_text(separator="\n", strip=True)
+        
+        # Versuche, Hauptinhalt über häufige IDs zu finden
+        for content_id in ['content', 'main', 'main-content', 'article', 'post']:
+            content = soup.find(id=content_id) or soup.find(class_=content_id)
+            if content:
+                return content.get_text(separator="\n", strip=True)
+        
+        # Entferne Header, Footer, Navigation, etc.
+        for tag in soup(['header', 'footer', 'nav', 'aside', 'script', 'style']):
+            tag.decompose()
+        
+        # Verwende den Body als Fallback
+        body = soup.find('body')
+        if body:
+            return body.get_text(separator="\n", strip=True)
+        
+        # Fallback: Ganzer Text
+        return soup.get_text(separator="\n", strip=True)
+    
+    async def _save_result(self, result: Dict[str, Any], output_dir: Path, is_error: bool = False) -> None:
+        """
+        Speichert das Scraping-Ergebnis in einer JSON-Datei.
+        
+        Args:
+            result: Die zu speichernden Daten.
+            output_dir: Verzeichnis für die Ausgabedateien.
+            is_error: Ob es sich um einen Fehler handelt.
+        """
+        url_id = result.get("id")
+        if not url_id:
+            return
+        
+        # Erstelle Dateinamen
+        if is_error:
+            filename = f"error_{url_id}.json"
+            file_path = output_dir / "errors" / filename
+        else:
+            filename = f"result_{url_id}.json"
+            file_path = output_dir / "results" / filename
+        
+        # Stelle sicher, dass das Unterverzeichnis existiert
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            # Speichere die Daten
+            await asyncio.to_thread(self._write_json_file, result, file_path)
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern des Ergebnisses für URL-ID {url_id}: {str(e)}")
+    
+    def _write_json_file(self, data: Dict[str, Any], file_path: Path) -> None:
+        """
+        Schreibt Daten in eine JSON-Datei (synchron).
+        
+        Args:
+            data: Die zu speichernden Daten.
+            file_path: Pfad zur Ausgabedatei.
+        """
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    
+    def _calculate_additional_stats(self) -> None:
+        """Berechnet zusätzliche Statistiken über den Scraping-Prozess."""
+        if self.stats["start_time"] and self.stats["end_time"]:
+            start = datetime.fromisoformat(self.stats["start_time"])
+            end = datetime.fromisoformat(self.stats["end_time"])
+            duration = (end - start).total_seconds()
+            self.stats["duration_seconds"] = duration
+            
+            if self.stats["total_urls"] > 0:
+                self.stats["average_time_per_url"] = duration / self.stats["total_urls"]
+                self.stats["success_rate"] = (self.stats["successful"] / self.stats["total_urls"]) * 100
+            
+            logger.info(f"Scraping abgeschlossen in {duration:.1f} Sekunden")
+            logger.info(f"Erfolgsrate: {self.stats.get('success_rate', 0):.1f}% ({self.stats['successful']}/{self.stats['total_urls']})")
+            
+            if self.stats["errors"]:
+                logger.info("Fehlerstatistiken:")
+                for error_type, count in self.stats["errors"].items():
+                    logger.info(f"  - {error_type}: {count}")
 
-# Funktion zum Lesen von URLs aus einer Datei
-async def process_large_url_list(url_file: str, 
-                                batch_size: int = 100, 
-                                max_concurrent: int = 10, 
-                                perform_analysis: bool = True,
-                                zyte_api_key: Optional[str] = None,
-                                continue_from: Optional[str] = None) -> Dict[str, Any]:
+async def load_urls_from_file(file_path: Union[str, Path]) -> List[Dict[str, Any]]:
     """
-    Verarbeitet eine große Liste von URLs aus einer Datei.
+    Lädt URLs aus einer Datei.
     
     Args:
-        url_file: Pfad zur Datei mit den URLs (eine URL pro Zeile)
-        batch_size: Anzahl der URLs pro Batch
-        max_concurrent: Maximale Anzahl gleichzeitiger Anfragen
-        perform_analysis: Ob eine Inhaltsanalyse durchgeführt werden soll
-        zyte_api_key: API-Schlüssel für Zyte (optional)
-        continue_from: Pfad zur Fortschrittsdatei für die Fortsetzung (optional)
-    
+        file_path: Pfad zur Datei mit URLs.
+        
     Returns:
-        Statistiken über den Verarbeitungsprozess
+        Eine Liste von URL-Dictionaries.
     """
-    # Prüfe, ob die Datei existiert
-    if not os.path.exists(url_file):
-        logger.error(f"URL-Datei {url_file} nicht gefunden.")
-        return {"error": f"URL-Datei {url_file} nicht gefunden."}
+    file_path = Path(file_path)
     
-    try:
-        # Lade URLs aus der Datei
-        with open(url_file, 'r', encoding='utf-8') as f:
-            urls = [line.strip() for line in f if line.strip()]
-        
-        logger.info(f"{len(urls)} URLs aus {url_file} geladen.")
-        
-        # Initialisiere den BatchProcessor
-        processor = BatchProcessor(
-            batch_size=batch_size,
-            max_concurrent=max_concurrent,
-            zyte_api_key=zyte_api_key
-        )
-        
-        # Lade den vorherigen Fortschritt, wenn angegeben
-        if continue_from:
-            progress_file = Path(continue_from)
-            if processor._load_progress(progress_file):
-                logger.info(f"Fortschritt aus {continue_from} geladen. "
-                          f"Fortfahren mit {len(processor.processed_urls)} bereits verarbeiteten URLs.")
-        
-        # Verarbeite die URLs
-        result = await processor.process_urls(urls, perform_analysis)
-        return result
-        
-    except Exception as e:
-        logger.error(f"Fehler bei der Verarbeitung von {url_file}: {str(e)}")
-        return {"error": str(e)}
+    if file_path.suffix == '.json':
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+            # Überprüfe verschiedene Formate
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and 'urls' in data:
+                return data['urls']
+            elif isinstance(data, dict) and 'bookmarks' in data:
+                # Extrahiere URLs aus Lesezeichen-Hierarchie
+                try:
+                    from scripts.scraping.bookmark_parser import BookmarkParser
+                    parser = BookmarkParser()
+                    return parser.extract_urls(data)
+                except ImportError:
+                    logger.error("BookmarkParser konnte nicht importiert werden.")
+                    return []
+    else:
+        # Nimm an, dass es sich um eine einfache Textdatei mit einer URL pro Zeile handelt
+        urls = []
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for i, line in enumerate(f):
+                url = line.strip()
+                if url and not url.startswith('#'):
+                    urls.append({
+                        "id": f"url_{i+1}",
+                        "url": url,
+                        "source": "text_file"
+                    })
+        return urls
+    
+    return []
 
-# Hauptfunktion für die CLI-Verwendung
 async def main():
-    parser = argparse.ArgumentParser(description="Verarbeitet eine große Liste von URLs mit Batch-Processing.")
-    parser.add_argument("url_file", help="Pfad zur Datei mit den URLs (eine URL pro Zeile)")
-    parser.add_argument("--batch-size", type=int, default=100, help="Anzahl der URLs pro Batch")
-    parser.add_argument("--max-concurrent", type=int, default=10, help="Maximale Anzahl gleichzeitiger Anfragen")
-    parser.add_argument("--no-analysis", action="store_true", help="Keine Inhaltsanalyse durchführen")
-    parser.add_argument("--continue-from", help="Pfad zur Fortschrittsdatei für die Fortsetzung")
-    parser.add_argument("--zyte-api-key", help="API-Schlüssel für Zyte (optional, sonst aus Umgebungsvariable)")
+    """Hauptfunktion zum Verarbeiten von URLs in Batches."""
+    parser = argparse.ArgumentParser(description="Verarbeite URLs in Batches für Scraping")
+    parser.add_argument("input_file", help="Pfad zur Datei mit URLs (Text oder JSON)")
+    parser.add_argument("--output-dir", "-o", default=None,
+                      help="Ausgabeverzeichnis für Ergebnisse (Standard: data/scraping/YYYY-MM-DD)")
+    parser.add_argument("--batch-size", "-b", type=int, default=DEFAULT_BATCH_SIZE,
+                      help=f"Größe der Batches (Standard: {DEFAULT_BATCH_SIZE})")
+    parser.add_argument("--max-concurrent", "-m", type=int, default=DEFAULT_MAX_CONCURRENT,
+                      help=f"Maximale Anzahl gleichzeitiger Anfragen (Standard: {DEFAULT_MAX_CONCURRENT})")
+    parser.add_argument("--timeout", "-t", type=int, default=DEFAULT_TIMEOUT,
+                      help=f"Zeitlimit für Anfragen in Sekunden (Standard: {DEFAULT_TIMEOUT})")
+    parser.add_argument("--retry-count", "-r", type=int, default=DEFAULT_RETRY_COUNT,
+                      help=f"Anzahl der Wiederholungen bei Fehlern (Standard: {DEFAULT_RETRY_COUNT})")
+    parser.add_argument("--api-key", "-k", help="Zyte API-Schlüssel")
+    parser.add_argument("--use-zyte", "-z", action="store_true", help="Verwende Zyte API")
+    parser.add_argument("--test", action="store_true", help="Testmodus: Verarbeite nur die ersten 10 URLs")
     
     args = parser.parse_args()
     
-    result = await process_large_url_list(
-        url_file=args.url_file,
+    # Lade URLs
+    urls = await load_urls_from_file(args.input_file)
+    logger.info(f"Geladen: {len(urls)} URLs aus {args.input_file}")
+    
+    if args.test:
+        # Im Testmodus nur die ersten 10 URLs verwenden
+        test_count = min(10, len(urls))
+        urls = urls[:test_count]
+        logger.info(f"Testmodus: Verwende nur die ersten {test_count} URLs")
+    
+    # Setze Ausgabeverzeichnis
+    if not args.output_dir:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        args.output_dir = DATA_DIR / date_str
+    
+    # Erstelle den Processor
+    processor = BatchProcessor(
+        api_key=args.api_key,
         batch_size=args.batch_size,
         max_concurrent=args.max_concurrent,
-        perform_analysis=not args.no_analysis,
-        zyte_api_key=args.zyte_api_key,
-        continue_from=args.continue_from
+        timeout=args.timeout,
+        retry_count=args.retry_count,
+        use_zyte=args.use_zyte
     )
     
-    # Gib eine Zusammenfassung aus
-    if "error" in result:
-        print(f"Fehler: {result['error']}")
-        return 1
+    # Verarbeite URLs
+    stats = await processor.process_urls(urls, args.output_dir)
     
-    print("\nVerarbeitung abgeschlossen!")
-    print(f"Gesamt: {result['total_urls']} URLs")
-    print(f"Erfolgreich: {result['successful_urls']} URLs")
-    print(f"Fehlgeschlagen: {result['failed_urls']} URLs")
+    # Speichere Statistiken
+    stats_file = Path(args.output_dir) / "scraping_stats.json"
+    with open(stats_file, 'w', encoding='utf-8') as f:
+        json.dump(stats, f, indent=2, ensure_ascii=False)
     
-    if "model_usage" in result and "total_cost" in result["model_usage"]:
-        print(f"Gesamtkosten der KI-Modelle: ${result['model_usage']['total_cost']:.4f}")
+    logger.info(f"Scraping abgeschlossen. Statistiken in {stats_file} gespeichert.")
+    logger.info(f"Verarbeitet: {stats['total_urls']} URLs, Erfolgreich: {stats['successful']}, Fehlgeschlagen: {stats['failed']}")
     
-    return 0
+    # Zeige Zusammenfassung
+    success_rate = stats.get("success_rate", 0)
+    logger.info(f"Erfolgsrate: {success_rate:.1f}%")
+    logger.info(f"Dauer: {stats.get('duration_seconds', 0):.1f} Sekunden")
+    
+    # Empfehlung für Optimierungen
+    if success_rate < 80:
+        logger.warning("Die Erfolgsrate ist niedrig. Erwäge folgende Optimierungen:")
+        logger.warning("1. Erhöhe den Timeout-Wert mit --timeout")
+        logger.warning("2. Erhöhe die Anzahl der Wiederholungen mit --retry-count")
+        logger.warning("3. Verwende die Zyte API für bessere Ergebnisse mit --use-zyte")
+    
+    if stats.get("average_time_per_url", 0) > 10:
+        logger.warning("Die durchschnittliche Verarbeitungszeit pro URL ist hoch.")
+        logger.warning("1. Verringere max-concurrent für stabilere Ergebnisse")
+        logger.warning("2. Erhöhe batch-size für mehr Durchsatz (erfordert möglicherweise mehr Ressourcen)")
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Scraping-Prozess durch Benutzer unterbrochen")
+    except Exception as e:
+        logger.error(f"Unerwarteter Fehler: {str(e)}", exc_info=True) 

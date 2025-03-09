@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 """
-Semantic-Modul für das Bookmark-Master-Projekt.
+Semantische Analyse-Modul für Bookmarks.
 
-Dieses Modul implementiert semantische Verbindungen zwischen Lesezeichen
-mit Hilfe von Vektor-Embeddings und Ähnlichkeitssuche.
+Dieses Modul enthält Komponenten für die semantische Analyse von Bookmarks,
+einschließlich Embedding-Generierung, Ähnlichkeitssuche und Clustering.
 """
 
 from .vector_store import BookmarkVectorStore

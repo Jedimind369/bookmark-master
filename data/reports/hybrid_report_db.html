@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmark Explorer - 10 Lesezeichen</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .stats {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+        input[type="text"], select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .bookmark-card {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .bookmark-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .bookmark-title {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .bookmark-url {
+            font-size: 0.9em;
+            color: #3498db;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+        .bookmark-description {
+            margin-bottom: 15px;
+        }
+        .bookmark-meta {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            display: flex;
+            justify-content: space-between;
+        }
+        .folder-badge {
+            background-color: #e0f7fa;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            color: #00838f;
+            margin-right: 5px;
+        }
+        .cluster-badge {
+            background-color: #f3e5f5;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            color: #6a1b9a;
+            margin-right: 5px;
+        }
+        .cluster-section {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+        .bookmark-content {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            margin-top: 10px;
+            display: none;
+        }
+        .toggle-content {
+            background-color: #eee;
+            color: #333;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        .toggle-content:hover {
+            background-color: #ddd;
+        }
+        .no-results {
+            padding: 20px;
+            text-align: center;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .date-added {
+            color: #7f8c8d;
+            font-size: 0.8em;
+        }
+        .scraper-badge {
+            background-color: #e8f5e9;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            color: #2e7d32;
+        }
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-item {
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Bookmark Explorer</h1>
+    
+    <div class="stats">
+        <p><strong>10</strong> Lesezeichen, <strong>4</strong> thematische Cluster</p>
+        <p>Gescrapt mit: ScrapingBee (8), Fallback (2), Cache (0)</p>
+        <p>Generiert am: 09.03.2025 12:31:06</p>
+    </div>
+    
+    <div class="filters">
+        <div class="search-box filter-item">
+            <input type="text" id="search-input" placeholder="Suche nach Titel, URL oder Beschreibung...">
+        </div>
+        
+        <div class="filter-item">
+            <select id="folder-filter">
+                <option value="">Alle Ordner</option>
+                
+                <option value="Entwicklung">Entwicklung</option>
+                
+                <option value="Nachrichten">Nachrichten</option>
+                
+            </select>
+        </div>
+        
+        <div class="filter-item">
+            <select id="cluster-filter">
+                <option value="">Alle Cluster</option>
+                
+                <option value="1">Cluster 1 (4)</option>
+                
+                <option value="0">Cluster 0 (2)</option>
+                
+                <option value="2">Cluster 2 (2)</option>
+                
+                <option value="3">Cluster 3 (1)</option>
+                
+            </select>
+        </div>
+        
+        <div class="filter-item">
+            <button id="reset-filters">Filter zurücksetzen</button>
+        </div>
+    </div>
+    
+    <div id="bookmarks-container">
+        
+        <div class="cluster-section" data-cluster="1">
+            <h2>Cluster 1: Welcome to Python.org, Newest Questions - Stack Overflow, Hacker News</h2>
+            <p>4 Lesezeichen in diesem Cluster</p>
+            
+            <div class="bookmarks">
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+            </div>
+        </div>
+        
+        <div class="cluster-section" data-cluster="0">
+            <h2>Cluster 0: TensorFlow, NumPy</h2>
+            <p>2 Lesezeichen in diesem Cluster</p>
+            
+            <div class="bookmarks">
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+            </div>
+        </div>
+        
+        <div class="cluster-section" data-cluster="2">
+            <h2>Cluster 2: seaborn: statistical data visualization — seaborn 0.13.2 documentation, Matplotlib — Visualization with Python</h2>
+            <p>2 Lesezeichen in diesem Cluster</p>
+            
+            <div class="bookmarks">
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+            </div>
+        </div>
+        
+        <div class="cluster-section" data-cluster="3">
+            <h2>Cluster 3: Web scraping - Wikipedia</h2>
+            <p>1 Lesezeichen in diesem Cluster</p>
+            
+            <div class="bookmarks">
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+            </div>
+        </div>
+        
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            <p>Keine Lesezeichen gefunden. Bitte versuchen Sie es mit anderen Filterkriterien.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Suchfunktion
+        function performSearch() {
+            const searchText = document.getElementById('search-input').value.toLowerCase();
+            const folderFilter = document.getElementById('folder-filter').value;
+            const clusterFilter = document.getElementById('cluster-filter').value;
+            
+            const bookmarkCards = document.querySelectorAll('.bookmark-card');
+            const clusterSections = document.querySelectorAll('.cluster-section');
+            
+            let visibleBookmarks = 0;
+            const visibleClusters = new Set();
+            
+            bookmarkCards.forEach(card => {
+                const title = card.querySelector('.bookmark-title').textContent.toLowerCase();
+                const url = card.querySelector('.bookmark-url').textContent.toLowerCase();
+                const description = card.querySelector('.bookmark-description').textContent.toLowerCase();
+                const content = card.querySelector('.bookmark-content').textContent.toLowerCase();
+                const folder = card.getAttribute('data-folder');
+                const cluster = card.getAttribute('data-cluster');
+                
+                const matchesSearch = !searchText || 
+                    title.includes(searchText) || 
+                    url.includes(searchText) || 
+                    description.includes(searchText) ||
+                    content.includes(searchText);
+                
+                const matchesFolder = !folderFilter || folder === folderFilter;
+                const matchesCluster = !clusterFilter || cluster === clusterFilter;
+                
+                const isVisible = matchesSearch && matchesFolder && matchesCluster;
+                card.style.display = isVisible ? 'block' : 'none';
+                
+                if (isVisible) {
+                    visibleBookmarks++;
+                    visibleClusters.add(cluster);
+                }
+            });
+            
+            // Zeige/Verstecke Cluster-Abschnitte
+            clusterSections.forEach(section => {
+                const clusterId = section.getAttribute('data-cluster');
+                section.style.display = visibleClusters.has(clusterId) ? 'block' : 'none';
+            });
+            
+            // Zeige "Keine Ergebnisse" Nachricht
+            document.getElementById('no-results').style.display = visibleBookmarks === 0 ? 'block' : 'none';
+        }
+        
+        // Funktion zum Ein-/Ausblenden des Artikelinhalts
+        function toggleContent(button) {
+            const content = button.nextElementSibling;
+            const isHidden = content.style.display === 'none' || content.style.display === '';
+            
+            content.style.display = isHidden ? 'block' : 'none';
+            button.textContent = isHidden ? 'Inhalt ausblenden' : 'Inhalt anzeigen';
+        }
+        
+        // Event-Listener
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('search-input').addEventListener('input', performSearch);
+            document.getElementById('folder-filter').addEventListener('change', performSearch);
+            document.getElementById('cluster-filter').addEventListener('change', performSearch);
+            
+            document.getElementById('reset-filters').addEventListener('click', () => {
+                document.getElementById('search-input').value = '';
+                document.getElementById('folder-filter').value = '';
+                document.getElementById('cluster-filter').value = '';
+                performSearch();
+            });
+            
+            // Initial search to handle URL parameters
+            performSearch();
+        });
+    </script>
+</body>
+</html>

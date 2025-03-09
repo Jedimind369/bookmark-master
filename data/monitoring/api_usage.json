@@ -9,6 +9,10 @@
     "git_branch": "features/hybrid-optimization",
     "git_commit": "e1213726e9f1b3fddf0509a8902caccb8d0646ea",
     "git_repo_path": "/Users/jedimind/Downloads/Coding/bookmark-master",
-    "git_sync_enabled": true
+    "git_sync_enabled": true,
+    "client_initialized": true,
+    "github_integration": "MCP Server verbunden",
+    "code_repository": "GitHub",
+    "workspace_path": "/Users/jedimind/Downloads/Coding/bookmark-master"
   }
 }

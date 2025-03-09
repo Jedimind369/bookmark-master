@@ -1,0 +1,102 @@
+[
+  {
+    "title": "GitHub: Let's build from here \u00b7 GitHub",
+    "url": "https://github.com/",
+    "folder": "Entwicklung",
+    "depth": 1,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "Stack Overflow - Where Developers Learn, Share, & Build Careers",
+    "url": "https://stackoverflow.com/",
+    "folder": "Entwicklung",
+    "depth": 1,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "Welcome to Python.org",
+    "url": "https://www.python.org/",
+    "folder": "Entwicklung",
+    "depth": 1,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "Hacker News",
+    "url": "https://news.ycombinator.com/",
+    "folder": "Nachrichten",
+    "depth": 2,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "Web scraping - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "folder": "Nachrichten",
+    "depth": 2,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "OpenAI",
+    "url": "https://openai.com/",
+    "folder": "KI und ML",
+    "depth": 3,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "PyTorch",
+    "url": "https://pytorch.org/",
+    "folder": "KI und ML",
+    "depth": 3,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "pandas - Python Data Analysis Library",
+    "url": "https://pandas.pydata.org/",
+    "folder": "KI und ML",
+    "depth": 3,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "asyncio \u2014 Asynchronous I/O \u2014 Python 3.11.8 documentation",
+    "url": "https://docs.python.org/3/library/asyncio.html",
+    "folder": "KI und ML",
+    "depth": 3,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  },
+  {
+    "title": "Google",
+    "url": "https://www.google.com/",
+    "folder": "KI und ML",
+    "depth": 3,
+    "added": "2021-03-15T14:11:14",
+    "last_modified": null,
+    "description": null,
+    "tags": null
+  }
+]

@@ -1,0 +1,91 @@
+name: API Monitoring CI
+
+on:
+  push:
+    branches: [ main, develop, 'features/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-monitoring:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-asyncio
+        pip install numpy pandas psutil streamlit plotly
+        pip install sentence-transformers torch
+        pip install flake8 coverage
+        pip install pygame
+    
+    - name: Install monitoring dependencies
+      run: |
+        pip install streamlit pandas plotly altair matplotlib
+    
+    - name: Setup environment
+      run: |
+        echo "OPENAI_API_KEY=dummy_key" >> $GITHUB_ENV
+        echo "HELICONE_API_KEY=dummy_key" >> $GITHUB_ENV
+        echo "SLACK_WEBHOOK_URL=dummy_url" >> $GITHUB_ENV
+        mkdir -p data/monitoring
+        echo '{"budget_limit": 100, "warning_thresholds": [50, 80, 90]}' > data/monitoring/config.json
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+    
+    - name: Create data directories
+      run: |
+        mkdir -p data/monitoring/backups
+        touch data/monitoring/api_usage.json
+    
+    - name: Run backup functionality tests
+      run: |
+        python -m pytest scripts/monitoring/test_monitoring.py -v
+    
+    - name: Run GitHub sync tests
+      run: |
+        python -m pytest scripts/monitoring/test_github_sync.py -v
+    
+    - name: Check backup files integrity
+      run: |
+        if [ -z "$(ls -A data/monitoring/backups)" ]; then
+          echo "Keine Backup-Dateien gefunden!"
+          exit 1
+        else
+          echo "Backup-Dateien erfolgreich erstellt"
+          ls -la data/monitoring/backups
+        fi
+    
+    - name: Validate monitoring data structure
+      run: |
+        if [ ! -f "data/monitoring/api_usage.json" ]; then
+          echo "API-Nutzungsdatei nicht gefunden!"
+          exit 1
+        else
+          echo "API-Nutzungsdatei erfolgreich erstellt"
+          cat data/monitoring/api_usage.json
+        fi
+    
+    - name: Push test backup to artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: monitoring-backups
+        path: data/monitoring/backups/
+<<<<<<< HEAD
+        retention-days: 7 
+=======
+        retention-days: 7
+>>>>>>> c769d9d0e89656f6a3ba7af6d677611c6192b9b9

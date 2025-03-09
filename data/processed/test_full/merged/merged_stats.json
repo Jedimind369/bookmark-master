@@ -1,0 +1,20 @@
+{
+  "total_processed": 10,
+  "valid_bookmarks": 10,
+  "invalid_bookmarks": 0,
+  "input_dirs": [
+    "data/processed/test_full/run_1"
+  ],
+  "runs": [
+    {
+      "total_processed": 10,
+      "valid_bookmarks": 10,
+      "invalid_bookmarks": 0,
+      "start_index": 0,
+      "end_index": 200,
+      "batch_size": 50,
+      "total_batches": 1,
+      "browser_type": "unknown"
+    }
+  ]
+}

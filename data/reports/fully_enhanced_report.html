@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmark Explorer - 10 Lesezeichen</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 200px;
+            margin-right: 10px;
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #6c757d;
+        }
+        .stat-card p {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .folder {
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .folder-header {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .folder-header h3 {
+            margin: 0;
+        }
+        .folder-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .folder.active .folder-content {
+            max-height: 5000px;
+            padding: 15px;
+        }
+        .bookmark {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .bookmark-title {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+        }
+        .bookmark-url {
+            color: #6c757d;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .bookmark-date {
+            color: #6c757d;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        .bookmark-description {
+            margin-top: 5px;
+            color: #495057;
+            font-size: 0.9em;
+        }
+        .bookmark-tags {
+            margin-top: 5px;
+            color: #007bff;
+            font-size: 0.8em;
+        }
+        .search-container {
+            margin-bottom: 20px;
+        }
+        #searchInput {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .hidden {
+            display: none;
+        }
+        .folder-count {
+            background-color: #007bff;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+        .top-folders {
+            margin-bottom: 20px;
+        }
+        .folder-tag {
+            display: inline-block;
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            margin: 0 5px 5px 0;
+            border-radius: 15px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .folder-tag:hover {
+            background-color: #dee2e6;
+        }
+        .folder-tag.active {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bookmark Explorer</h1>
+    
+    <div class="stats">
+        <div class="stat-card">
+            <h3>Lesezeichen</h3>
+            <p>10</p>
+        </div>
+        <div class="stat-card">
+            <h3>Ordner</h3>
+            <p>3</p>
+        </div>
+    </div>
+    
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Suche nach Lesezeichen...">
+    </div>
+    
+    <div class="top-folders">
+        <h3>Top Ordner:</h3>
+        <div id="folderTags">
+            <span class="folder-tag active" data-folder="all">Alle</span>
+            <span class="folder-tag" data-folder="KI und ML">KI und ML (5)</span>
+            <span class="folder-tag" data-folder="Entwicklung">Entwicklung (3)</span>
+            <span class="folder-tag" data-folder="Nachrichten">Nachrichten (2)</span>
+
+        </div>
+    </div>
+    
+    <div id="bookmarkList">
+
+        <div class="folder" data-folder="Entwicklung">
+            <div class="folder-header">
+                <h3>Entwicklung</h3>
+                <span class="folder-count">3</span>
+            </div>
+            <div class="folder-content">
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://github.com/" target="_blank">GitHub · Build and ship software on a single, collaborative platform · GitHub</a></h4>
+                    <div class="bookmark-url">https://github.com/</div>
+                    <div class="bookmark-description">GitHub ist die weltweit führende Entwicklungsplattform für Open-Source- und private Softwareprojekte. Die Plattform bietet umfassende Funktionen für Versionskontrolle, Zusammenarbeit und Code-Hosting. Entwickler können auf GitHub Repositories erstellen, Code teilen, Issues verfolgen und Pull Requests einreichen. Mit über 100 Millionen Repositories und mehr als 70 Millionen Nutzern ist GitHub ein zentraler Knotenpunkt für die globale Entwicklergemeinschaft. Die Plattform unterstützt auch CI/CD-Workflows, Projektmanagement und Sicherheitsanalysen für moderne Softwareentwicklung.</div>
+                    <div class="bookmark-tags">Tags: platform, tools, your, build, programming, software, github</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://stackoverflow.com/" target="_blank">Newest Questions - Stack Overflow</a></h4>
+                    <div class="bookmark-url">https://stackoverflow.com/</div>
+                    <div class="bookmark-description">Stack Overflow ist die größte Online-Community für Programmierer und Entwickler zum Austausch von Wissen. Die Plattform funktioniert nach einem Frage-Antwort-Format, bei dem Nutzer technische Probleme posten und die Community Lösungen anbietet. Mit einem Reputationssystem werden hilfreiche Antworten und Beiträge belohnt, was zur hohen Qualität der Inhalte beiträgt. Stack Overflow umfasst praktisch alle Programmiersprachen, Frameworks und technischen Themen der Softwareentwicklung. Für viele Entwickler ist die Seite die erste Anlaufstelle bei der Problemlösung und ein unverzichtbares Werkzeug im Arbeitsalltag.</div>
+                    <div class="bookmark-tags">Tags: stack, overflow, questions, find, teams</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://www.python.org/" target="_blank">Welcome to Python.org</a></h4>
+                    <div class="bookmark-url">https://www.python.org/</div>
+                    <div class="bookmark-description">Python.org ist die offizielle Website der Python-Programmiersprache und wird von der Python Software Foundation betrieben. Hier finden Entwickler die offiziellen Downloads für alle Python-Versionen, umfassende Dokumentation und Tutorials. Die Website bietet Zugang zur Python Package Index (PyPI), dem Repository für Python-Bibliotheken und -Frameworks. Darüber hinaus enthält sie Informationen zu Community-Events, Konferenzen und den Python Enhancement Proposals (PEPs). Für Python-Entwickler aller Erfahrungsstufen ist Python.org eine zentrale Ressource für aktuelle Informationen und Best Practices.</div>
+                    <div class="bookmark-tags">Tags: lists, javascript, defining, web_development, python, programming</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="folder" data-folder="KI und ML">
+            <div class="folder-header">
+                <h3>KI und ML</h3>
+                <span class="folder-count">5</span>
+            </div>
+            <div class="folder-content">
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://openai.com/" target="_blank">OpenAI</a></h4>
+                    <div class="bookmark-url">https://openai.com/</div>
+                    <div class="bookmark-description">OpenAI ist ein führendes Forschungsunternehmen im Bereich der künstlichen Intelligenz mit dem Ziel, sichere und nützliche KI zu entwickeln. Das Unternehmen hat bahnbrechende Modelle wie GPT-4, DALL-E und ChatGPT entwickelt, die natürliche Sprache verstehen und generieren können. OpenAI verfolgt einen iterativen Deployment-Ansatz und arbeitet an der Ausrichtung fortschrittlicher KI-Systeme an menschlichen Werten. Die Forschungsergebnisse und Produkte von OpenAI haben weitreichende Anwendungen in Bereichen wie Bildung, Programmierung und Kreativität. Das Unternehmen setzt sich für eine breite Verteilung der Vorteile fortschrittlicher KI und für transparente Forschung ein.</div>
+                    
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://pytorch.org/" target="_blank">
+    
+      PyTorch
+    
+  </a></h4>
+                    <div class="bookmark-url">https://pytorch.org/</div>
+                    <div class="bookmark-description">PyTorch ist ein Open-Source-Framework für maschinelles Lernen, das von Facebook AI Research entwickelt wurde. Es bietet eine flexible und intuitive Plattform für die Entwicklung und das Training von Deep-Learning-Modellen. PyTorch ist bekannt für sein dynamisches Berechnungsgraph-System, das das Debugging erleichtert und eine natürlichere Programmierung ermöglicht. Das Framework wird von Forschern und Unternehmen gleichermaßen für Anwendungen in Computer Vision, natürlicher Sprachverarbeitung und Reinforcement Learning eingesetzt. Mit einer aktiven Community und umfangreicher Dokumentation ist PyTorch eine der führenden Plattformen für KI-Entwicklung.</div>
+                    <div class="bookmark-tags">Tags: get, started, run, data_science, pytorch, locally</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://pandas.pydata.org/" target="_blank">pandas - Python Data Analysis Library</a></h4>
+                    <div class="bookmark-url">https://pandas.pydata.org/</div>
+                    <div class="bookmark-description">Pandas ist eine leistungsstarke Python-Bibliothek für Datenanalyse und -manipulation, die schnelle, flexible und ausdrucksstarke Datenstrukturen bietet. Die Bibliothek implementiert die DataFrame-Struktur, die das Arbeiten mit strukturierten Daten ähnlich wie in R oder SQL ermöglicht. Pandas unterstützt das Einlesen und Schreiben verschiedener Dateiformate wie CSV, Excel, SQL-Datenbanken und JSON. Mit umfangreichen Funktionen für Datenbereinigung, -transformation, -aggregation und -visualisierung ist Pandas ein zentrales Werkzeug im Data-Science-Ökosystem. Die Bibliothek wird in Bereichen wie Finanzen, Wissenschaft, Technik und Statistik eingesetzt und integriert sich nahtlos mit anderen Python-Bibliotheken wie NumPy und Matplotlib.</div>
+                    <div class="bookmark-tags">Tags: python, pandas, programming, data, analysis, data_science, library</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://docs.python.org/3/library/asyncio.html" target="_blank">asyncio â Asynchronous I/O — Python 3.13.2 documentation</a></h4>
+                    <div class="bookmark-url">https://docs.python.org/3/library/asyncio.html</div>
+                    <div class="bookmark-description">Python.org ist die offizielle Website der Python-Programmiersprache und wird von der Python Software Foundation betrieben. Hier finden Entwickler die offiziellen Downloads für alle Python-Versionen, umfassende Dokumentation und Tutorials. Die Website bietet Zugang zur Python Package Index (PyPI), dem Repository für Python-Bibliotheken und -Frameworks. Darüber hinaus enthält sie Informationen zu Community-Events, Konferenzen und den Python Enhancement Proposals (PEPs). Für Python-Entwickler aller Erfahrungsstufen ist Python.org eine zentrale Ressource für aktuelle Informationen und Best Practices.</div>
+                    <div class="bookmark-tags">Tags: asynchronous, hello, python, programming, asyncio, world</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://www.google.com/" target="_blank">Google</a></h4>
+                    <div class="bookmark-url">https://www.google.com/</div>
+                    <div class="bookmark-description">Google ist die weltweit führende Suchmaschine und das Flaggschiffprodukt von Alphabet Inc. Mit einem Marktanteil von über 90% verarbeitet Google täglich Milliarden von Suchanfragen und indiziert einen Großteil des öffentlichen Internets. Neben der Suchfunktion bietet Google ein umfangreiches Ökosystem von Diensten wie Gmail, Google Maps, Google Drive und YouTube. Das Unternehmen ist führend in Bereichen wie künstliche Intelligenz, Cloud Computing und mobile Betriebssysteme (Android). Googles Geschäftsmodell basiert hauptsächlich auf Werbung, wobei das Unternehmen personalisierte Anzeigen basierend auf Nutzerdaten schaltet.</div>
+                    <div class="bookmark-tags">Tags: google</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="folder" data-folder="Nachrichten">
+            <div class="folder-header">
+                <h3>Nachrichten</h3>
+                <span class="folder-count">2</span>
+            </div>
+            <div class="folder-content">
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://news.ycombinator.com/" target="_blank">Hacker News</a></h4>
+                    <div class="bookmark-url">https://news.ycombinator.com/</div>
+                    <div class="bookmark-description">Hacker News ist eine soziale Nachrichten-Website, die sich auf Informatik, Technologie und Unternehmertum konzentriert. Die von Y Combinator betriebene Plattform präsentiert eine kuratierte Liste von Artikeln, die von der Community bewertet werden. Neben technischen Themen werden auch Diskussionen zu Wissenschaft, Politik und anderen gesellschaftlich relevanten Themen geführt. Die Kommentarsektion von Hacker News ist bekannt für tiefgründige und sachkundige Diskussionen auf hohem Niveau. Für viele Fachleute aus der Tech-Branche ist die Seite eine tägliche Informationsquelle, um über aktuelle Entwicklungen auf dem Laufenden zu bleiben.</div>
+                    <div class="bookmark-tags">Tags: news, hacker</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+                <div class="bookmark">
+                    <h4 class="bookmark-title"><a href="https://en.wikipedia.org/wiki/Web_scraping" target="_blank">Web scraping - Wikipedia</a></h4>
+                    <div class="bookmark-url">https://en.wikipedia.org/wiki/Web_scraping</div>
+                    <div class="bookmark-description">Dieser Wikipedia-Artikel bietet eine umfassende Übersicht zum Thema Web scraping. Wikipedia ist eine freie Online-Enzyklopädie, die von Freiwilligen in über 300 Sprachen bearbeitet wird. Der Artikel enthält verifizierte Informationen, Quellenangaben und Links zu verwandten Themen. Als kollaboratives Projekt wird der Inhalt kontinuierlich aktualisiert und erweitert, um aktuelle Entwicklungen zu berücksichtigen. Wikipedia-Artikel zu technischen Themen wie diesem bieten oft einen guten Einstiegspunkt für weitere Recherchen.</div>
+                    <div class="bookmark-tags">Tags: web, software, web_development, tools, programming, scraping, data, data_science, using</div>
+                    <div class="bookmark-date">Hinzugefügt: 2021-03-15T14:11:14</div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Funktion zum Umschalten der Ordner
+        document.querySelectorAll('.folder-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const folder = header.parentElement;
+                folder.classList.toggle('active');
+            });
+        });
+        
+        // Suchfunktion
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            document.querySelectorAll('.bookmark').forEach(bookmark => {
+                const title = bookmark.querySelector('.bookmark-title').textContent.toLowerCase();
+                const url = bookmark.querySelector('.bookmark-url').textContent.toLowerCase();
+                const description = bookmark.querySelector('.bookmark-description') ? 
+                    bookmark.querySelector('.bookmark-description').textContent.toLowerCase() : '';
+                const tags = bookmark.querySelector('.bookmark-tags') ? 
+                    bookmark.querySelector('.bookmark-tags').textContent.toLowerCase() : '';
+                
+                if (title.includes(searchTerm) || url.includes(searchTerm) || 
+                    description.includes(searchTerm) || tags.includes(searchTerm)) {
+                    bookmark.classList.remove('hidden');
+                    // Zeige den übergeordneten Ordner an
+                    const folder = bookmark.closest('.folder');
+                    folder.classList.remove('hidden');
+                    // Öffne den Ordner, wenn etwas gefunden wurde
+                    if (searchTerm.length > 0) {
+                        folder.classList.add('active');
+                    }
+                } else {
+                    bookmark.classList.add('hidden');
+                }
+            });
+            
+            // Verstecke leere Ordner
+            document.querySelectorAll('.folder').forEach(folder => {
+                const visibleBookmarks = folder.querySelectorAll('.bookmark:not(.hidden)').length;
+                if (visibleBookmarks === 0 && searchTerm.length > 0) {
+                    folder.classList.add('hidden');
+                } else {
+                    folder.classList.remove('hidden');
+                }
+            });
+        });
+        
+        // Ordner-Filter
+        document.querySelectorAll('.folder-tag').forEach(tag => {
+            tag.addEventListener('click', () => {
+                // Entferne die aktive Klasse von allen Tags
+                document.querySelectorAll('.folder-tag').forEach(t => {
+                    t.classList.remove('active');
+                });
+                
+                // Füge die aktive Klasse zum geklickten Tag hinzu
+                tag.classList.add('active');
+                
+                const selectedFolder = tag.getAttribute('data-folder');
+                
+                // Zeige/verstecke Ordner basierend auf der Auswahl
+                document.querySelectorAll('.folder').forEach(folder => {
+                    if (selectedFolder === 'all' || folder.getAttribute('data-folder') === selectedFolder) {
+                        folder.style.display = 'block';
+                    } else {
+                        folder.style.display = 'none';
+                    }
+                });
+            });
+        });
+        
+        // Öffne den ersten Ordner standardmäßig
+        document.querySelector('.folder').classList.add('active');
+    </script>
+</body>
+</html>

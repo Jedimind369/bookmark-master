@@ -1,135 +1,134 @@
-# Bookmark Master
+# Bookmark Manager
 
-Ein intelligentes Bookmark-Verwaltungssystem mit dynamischer Modellauswahl, hybridem Caching und Kostenoptimierung.
+A comprehensive system for parsing, enriching, and analyzing bookmarks using semantic analysis.
 
 ## Features
 
-### Dynamische Modellauswahl (`model_switcher.py`)
-- Analysiert die Komplexität von Prompts und Code-Kontexten
-- Berücksichtigt Sicherheits- und DSGVO-Schlüsselwörter
-- Wählt das geeignete KI-Modell basierend auf Komplexität und Anforderungen
-- Nutzt historische Daten aus dem CostTracker zur Optimierung
-
-### Hybrides Caching-System (`prompt_cache.py`)
-- Unterstützt exakte und semantische Cache-Treffer
-- Time-To-Live (TTL) für Cache-Einträge
-- Berechnet Kosteneinsparungen durch Caching
-- Bietet Optimierungsempfehlungen für Cache-Einstellungen
-- **NEU**: Automatische Cache-Wartung und -Optimierung
-- **NEU**: Adaptive Anpassung des semantischen Schwellenwerts
-
-### Kostentracking (`cost_tracker.py`)
-- Protokolliert API-Kosten und Nutzung
-- Liefert Kostenübersichten nach Modell und Zeitraum
-- Budget-Warnungen bei Überschreitung von Schwellenwerten
-- Empfiehlt Optimierungsmaßnahmen zur Kostenreduzierung
-
-### Dashboard (`dashboard/app.py`)
-- **NEU**: Übersichts-Tab mit den wichtigsten Metriken auf einen Blick
-- **NEU**: Interaktive Zeitreihen-Grafiken für Systemmetriken
-- **NEU**: Erweiterte Visualisierungen mit Plotly
-- **NEU**: Anpassbare Zeiträume für Datenvisualisierung
-- Echtzeit-Visualisierung von Systemmetriken
-- Übersicht über Cache-Statistiken und Cache-Trefferquote
-- Kostentracking und Budget-Überwachung
-- Interaktive Diagramme für Modellnutzung und Kosten
-
-### Cursor-Monitor (`scripts/utils/cursor_monitor.py`)
-- Überwacht den Status von Cursor-Prozessen
-- Sendet visuelle und akustische Benachrichtigungen bei Blockaden
-- Desktop-Benachrichtigungen bei kritischen Zuständen
-- Konfigurierbare Prüfintervalle und Benachrichtigungsoptionen
-
-### CI/CD-Pipeline
-- **NEU**: Erweiterte CI/CD-Pipeline mit mehreren Phasen
-- **NEU**: Code-Qualitätsprüfungen (Linting, Formatting, Type Checking)
-- **NEU**: Integration Tests für Systemkomponenten
-- **NEU**: Performance Tests mit Locust
-- **NEU**: Automatisierte Dashboard-Tests
-- Automatisierte Tests mit GitHub Actions
-- Linting und Code-Qualitätsprüfungen
-- Coverage-Berichte für Testabdeckung
-- Automatische Deployment-Prozesse
+- **Bookmark Parsing**: Extract bookmarks from HTML export files from browsers
+- **Content Enrichment**: Scrape and enrich bookmarks with content from the web
+- **Semantic Analysis**: Generate embeddings and analyze bookmark relationships
+- **Dashboard**: Visualize and explore your bookmarks with a Streamlit dashboard
 
 ## Installation
 
-### Anforderungen
-- Python 3.8+
-- Pip
-
-### Setup
-
-1. Repository klonen:
+1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/bookmark-master.git
-   cd bookmark-master
+   git clone https://github.com/yourusername/bookmark-manager.git
+   cd bookmark-manager
    ```
 
-2. Virtuelle Umgebung erstellen und aktivieren:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # Unter Windows: venv\Scripts\activate
-   ```
-
-3. Abhängigkeiten installieren:
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-## Verwendung
+## Usage
 
-### Dashboard starten
+### Complete Pipeline
 
-```bash
-streamlit run dashboard/app.py
-```
-
-Das Dashboard ist dann unter http://localhost:8501 verfügbar.
-
-Eine detaillierte Anleitung zur Verwendung des Dashboards finden Sie in [docs/dashboard_guide.md](docs/dashboard_guide.md).
-
-### Cursor-Monitor starten
+Run the complete pipeline with a single command:
 
 ```bash
-python3 scripts/utils/cursor_monitor.py
+python scripts/run_pipeline.py path/to/your/bookmarks.html
 ```
 
-Der Cursor-Monitor zeigt ein Fenster mit dem aktuellen Status und sendet Benachrichtigungen bei Problemen.
+This will:
+1. Parse the HTML bookmarks file
+2. Enrich the bookmarks with content from the web
+3. Generate embeddings for semantic analysis
+4. Start the dashboard
 
-### Tests ausführen
+### Step-by-Step Usage
 
-Unit Tests:
+If you prefer to run each step separately:
+
+#### 1. Parse HTML Bookmarks
+
 ```bash
-python -m unittest discover tests/
+python -m scripts.processing.process_bookmarks path/to/your/bookmarks.html
 ```
 
-Integration Tests:
+This will create several JSON files in the `data/processed` directory:
+- `bookmarks_structured.json`: Complete bookmark structure
+- `bookmarks_urls.json`: All extracted URLs
+- `bookmarks_valid_urls.json`: Valid URLs only
+- `bookmarks_invalid_urls.json`: Invalid URLs with error information
+- `processing_stats.json`: Statistics about the parsing process
+
+#### 2. Enrich Bookmarks with Content
+
 ```bash
-python -m pytest tests/integration/
+python -m scripts.scraping.batch_scraper data/processed/bookmarks_valid_urls.json --batch-size 50 --max-workers 5
 ```
 
-Performance Tests:
+This will create enriched bookmark files in the `data/enriched` directory:
+- `enriched_batch_X.json`: Enriched bookmarks for each batch
+- `enriched_all.json`: All enriched bookmarks combined
+- `enriched_batch_X_stats.json`: Statistics for each batch
+
+#### 3. Generate Embeddings
+
 ```bash
-cd tests/performance
-python -m locust -f locustfile.py
+python -m scripts.semantic.generate_embeddings data/enriched/enriched_all.json --num-clusters 20
 ```
 
-## Dokumentation
+This will create embedding files in the `data/embeddings` directory:
+- `bookmark_embeddings.pkl`: Serialized embeddings
+- `bookmark_clusters.json`: Cluster assignments
+- `embedding_stats.json`: Statistics about the embeddings
 
-- [Dashboard Benutzerhandbuch](docs/dashboard_guide.md) - Anleitung zur Verwendung des Dashboards
-- [RAG Erweiterungskonzept](docs/RAG_Idee.md) - Konzept für zukünftige RAG-Funktionalität
+#### 4. Run the Dashboard
 
-## Lizenz
+```bash
+streamlit run scripts/monitoring/dashboard.py
+```
+
+This will start the Streamlit dashboard on http://localhost:8501.
+
+## Dashboard Features
+
+The dashboard includes several tabs:
+
+1. **System Overview**: General system statistics
+2. **API Usage**: Monitor API usage and costs
+3. **Backup Monitor**: Track backup status
+4. **Bookmark Explorer**: Browse and search bookmarks
+5. **Semantic Analysis**: Explore semantic relationships between bookmarks
+   - Search bookmarks by text
+   - Find similar bookmarks
+   - Explore bookmark clusters
+
+## Directory Structure
+
+```
+bookmark-manager/
+├── data/
+│   ├── bookmarks/        # Raw bookmark files
+│   ├── processed/        # Processed bookmark data
+│   ├── enriched/         # Enriched bookmark content
+│   └── embeddings/       # Semantic embeddings
+├── scripts/
+│   ├── processing/       # Bookmark processing scripts
+│   ├── scraping/         # Web scraping scripts
+│   ├── semantic/         # Semantic analysis scripts
+│   ├── monitoring/       # Dashboard and monitoring scripts
+│   └── run_pipeline.py   # Main pipeline script
+└── logs/                 # Log files
+```
+
+## Requirements
+
+- Python 3.8+
+- sentence-transformers
+- faiss-cpu
+- streamlit
+- beautifulsoup4
+- requests
+- pandas
+- plotly
+- scikit-learn
+- tqdm
+
+## License
 
 MIT
-
-## Zukünftige Erweiterungen
-
-- Retrieval-Augmented Generation (RAG) für semantische Suche
-- Weitere Sprach- und Frameworks-Unterstützung
-- Mobile App für Unterwegs-Zugriff
-- Erweiterte Zusammenfassungs- und Kategorisierungsfunktionen
-- Integration mit externen Wissensquellen
-- Erweiterte Analysen und Visualisierungen im Dashboard
-
-Mehr Informationen zu den geplanten RAG-Funktionen finden Sie in [docs/RAG_Idee.md](docs/RAG_Idee.md).

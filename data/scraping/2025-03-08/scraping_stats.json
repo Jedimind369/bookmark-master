@@ -1,0 +1,12 @@
+{
+  "total_urls": 10,
+  "successful": 10,
+  "failed": 0,
+  "retries": 0,
+  "start_time": "2025-03-08T11:02:52.297183",
+  "end_time": "2025-03-08T11:02:53.077681",
+  "errors": {},
+  "duration_seconds": 0.780498,
+  "average_time_per_url": 0.0780498,
+  "success_rate": 100.0
+}

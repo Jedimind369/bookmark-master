@@ -1,6 +1,6 @@
 {
-  "last_backup_date": "2025-03-07",
-  "backup_count": 1,
+  "last_backup_date": "2025-03-08",
+  "backup_count": 2,
   "backups": [
     {
       "date": "2025-03-07",
@@ -8,6 +8,14 @@
       "type": "full",
       "base_backup": null,
       "size": 165,
+      "total_cost": 0.0
+    },
+    {
+      "date": "2025-03-08",
+      "file": "api_usage_backup_2025-03-08_incremental.json",
+      "type": "incremental",
+      "base_backup": "api_usage_backup_2025-03-07_full.json",
+      "size": 154,
       "total_cost": 0.0
     }
   ]

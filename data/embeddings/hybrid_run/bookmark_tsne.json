@@ -1,0 +1,56 @@
+[
+  {
+    "url": "https://seaborn.pydata.org/",
+    "x": 64.7814712524414,
+    "y": -0.5229936242103577,
+    "cluster": 2
+  },
+  {
+    "url": "https://www.tensorflow.org/",
+    "x": 41.62521743774414,
+    "y": 47.4377326965332,
+    "cluster": 0
+  },
+  {
+    "url": "https://matplotlib.org/",
+    "x": -52.84662628173828,
+    "y": -6.862652778625488,
+    "cluster": 2
+  },
+  {
+    "url": "https://numpy.org/",
+    "x": -3.5437285900115967,
+    "y": 80.601806640625,
+    "cluster": 0
+  },
+  {
+    "url": "https://www.python.org/",
+    "x": 11.723514556884766,
+    "y": -8.635623931884766,
+    "cluster": 1
+  },
+  {
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "x": -58.786598205566406,
+    "y": 49.3054313659668,
+    "cluster": 3
+  },
+  {
+    "url": "https://stackoverflow.com/",
+    "x": -22.225719451904297,
+    "y": -50.34205627441406,
+    "cluster": 1
+  },
+  {
+    "url": "https://news.ycombinator.com/",
+    "x": -11.344895362854004,
+    "y": 29.770309448242188,
+    "cluster": 1
+  },
+  {
+    "url": "https://github.com/",
+    "x": 36.84172821044922,
+    "y": -52.9388427734375,
+    "cluster": 1
+  }
+]

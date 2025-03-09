@@ -1,0 +1,13 @@
+# Testdatei mit URLs zum Testen des Scraping-Systems
+# Jede Zeile enthält eine URL
+
+https://www.python.org
+https://github.com
+https://stackoverflow.com
+https://en.wikipedia.org/wiki/Web_scraping
+https://docs.python.org/3/library/asyncio.html
+https://www.google.com
+https://news.ycombinator.com
+https://openai.com
+https://pandas.pydata.org
+https://pytorch.org 

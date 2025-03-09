@@ -1,0 +1,10 @@
+{
+  "url": "https://github.com/",
+  "success": true,
+  "raw_response": "Fehler bei der API-Anfrage: QwQ API-Schlüssel nicht gefunden. Setze die Umgebungsvariable QWQ_API_KEY.",
+  "error_processing": "Expecting value: line 1 column 1 (char 0)",
+  "timestamp": "",
+  "model_used": "qwq",
+  "complexity": "sehr_niedrig",
+  "model_cost": 0
+}

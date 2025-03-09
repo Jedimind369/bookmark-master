@@ -1,0 +1,6 @@
+{
+  "backup_type": "incremental",
+  "base_backup": "api_usage_backup_2025-03-07_full.json",
+  "timestamp": "2025-03-08T13:41:15.690174",
+  "changes": {}
+}

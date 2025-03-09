@@ -10,7 +10,9 @@ import os
 import json
 import logging
 import subprocess
-from datetime import datetime
+import datetime
+import requests
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple
 
@@ -69,6 +71,19 @@ class GitHubSync:
         
         # Speichere Git-Informationen im Kontext
         self._store_git_info()
+        
+        self.config_path = Path(MONITORING_DATA_DIR) / "github_config.json"
+        self.config = self._load_config()
+        
+        # Setze Standard-Repository-Pfad (aktuelles Arbeitsverzeichnis)
+        self.repo_path = Path.cwd()
+        self.last_sync_path = Path(MONITORING_DATA_DIR) / "last_sync.json"
+        
+        # GitHub API-Basis-URL
+        self.api_base_url = "https://api.github.com"
+        
+        # Lade den Access-Token aus der Umgebungsvariable
+        self.github_token = os.environ.get("GITHUB_TOKEN", "")
     
     def _is_git_repo(self) -> bool:
         """Prüft, ob das Verzeichnis ein Git-Repository ist."""
@@ -172,7 +187,7 @@ class GitHubSync:
             # Standardnachricht, wenn keine angegeben wurde
             if message is None:
                 backup_type = "full" if "full" in backup_file.name else "incremental"
-                message = f"Automatisches {backup_type} Backup vom {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                message = f"Automatisches {backup_type} Backup vom {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             
             # Füge die Datei zum Git-Index hinzu
             add_result = subprocess.run(
@@ -241,7 +256,7 @@ class GitHubSync:
                     # Füge Git-Informationen hinzu
                     backup['git_commit'] = commit_hash
                     backup['git_branch'] = self._get_current_branch()
-                    backup['git_commit_time'] = datetime.now().isoformat()
+                    backup['git_commit_time'] = datetime.datetime.now().isoformat()
                     break
             
             # Speichere die aktualisierten Metadaten
@@ -343,6 +358,343 @@ class GitHubSync:
         """
         self.api_monitor.store_context_information("github_sync_instance", self)
         logger.info("GitHub-Sync-Hook für Backups registriert")
+    
+    def _load_config(self) -> Dict[str, Any]:
+        """Lade die GitHub-Konfiguration aus der Datei."""
+        if self.config_path.exists():
+            try:
+                with open(self.config_path, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"Fehler beim Laden der GitHub-Konfiguration: {str(e)}")
+        
+        # Standard-Konfiguration
+        return {
+            "repository": os.environ.get("GITHUB_REPOSITORY", ""),
+            "branch": os.environ.get("GITHUB_BRANCH", "main"),
+            "auto_sync": os.environ.get("GITHUB_AUTO_SYNC", "false").lower() == "true"
+        }
+    
+    def _save_last_sync(self, data: Dict[str, Any]) -> None:
+        """Speichere Informationen über die letzte Synchronisation."""
+        try:
+            with open(self.last_sync_path, 'w') as f:
+                json.dump(data, f, indent=2)
+        except IOError as e:
+            logger.error(f"Fehler beim Speichern der Sync-Informationen: {str(e)}")
+    
+    def _load_last_sync(self) -> Dict[str, Any]:
+        """Lade Informationen über die letzte Synchronisation."""
+        if self.last_sync_path.exists():
+            try:
+                with open(self.last_sync_path, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"Fehler beim Laden der Sync-Informationen: {str(e)}")
+        
+        # Standard-Werte, wenn keine Datei existiert
+        return {
+            "last_sync": None,
+            "last_commit": None,
+            "status": "Nie synchronisiert"
+        }
+    
+    def _run_git_command(self, command: List[str]) -> Tuple[bool, str]:
+        """Führe einen Git-Befehl aus und gib Erfolg und Ausgabe zurück."""
+        try:
+            result = subprocess.run(
+                command,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return True, result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git-Befehl fehlgeschlagen: {' '.join(command)}")
+            logger.error(f"Fehler: {e.stderr.strip()}")
+            return False, e.stderr.strip()
+    
+    def get_repository_info(self) -> Dict[str, Any]:
+        """Hole Informationen über das Repository."""
+        info = {
+            "current_branch": "Unbekannt",
+            "last_sync": "Nie",
+            "open_issues": 0,
+            "remote_url": "Nicht konfiguriert"
+        }
+        
+        # Hole den aktuellen Branch
+        success, branch_output = self._run_git_command(["git", "branch", "--show-current"])
+        if success:
+            info["current_branch"] = branch_output
+        
+        # Hole die Remote-URL
+        success, remote_output = self._run_git_command(["git", "remote", "get-url", "origin"])
+        if success:
+            info["remote_url"] = remote_output
+        
+        # Hole Informationen zur letzten Synchronisation
+        last_sync = self._load_last_sync()
+        if last_sync.get("last_sync"):
+            info["last_sync"] = last_sync["last_sync"]
+        
+        # Hole die Anzahl offener Issues von der GitHub API
+        if self.config["repository"]:
+            repo_parts = self.config["repository"].split("/")
+            if len(repo_parts) == 2:
+                owner, repo = repo_parts
+                issues = self.get_open_issues_count(owner, repo)
+                info["open_issues"] = issues
+        
+        return info
+    
+    def get_open_issues_count(self, owner: str, repo: str) -> int:
+        """Hole die Anzahl offener Issues vom GitHub-Repository."""
+        url = f"{self.api_base_url}/repos/{owner}/{repo}/issues?state=open&per_page=1"
+        
+        headers = {}
+        if self.github_token:
+            headers["Authorization"] = f"token {self.github_token}"
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                # Extrahiere die Gesamtzahl aus dem Link-Header, wenn vorhanden
+                link_header = response.headers.get("Link", "")
+                if 'rel="last"' in link_header:
+                    last_page_url = link_header.split('rel="last"')[0].split(",")[-1].strip()[1:-1]
+                    from urllib.parse import parse_qs, urlparse
+                    query_params = parse_qs(urlparse(last_page_url).query)
+                    if "page" in query_params:
+                        return int(query_params["page"][0])
+                
+                # Wenn keine Paginierung oder nur eine Seite vorhanden ist
+                return len(response.json())
+            else:
+                logger.error(f"Fehler beim Abrufen der Issues: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Fehler beim Abrufen der Issues: {str(e)}")
+        
+        return 0
+    
+    def get_recent_commits(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Hole die letzten Commits aus dem Repository."""
+        commits = []
+        
+        success, output = self._run_git_command(["git", "log", f"-{limit}", "--pretty=format:%H|%an|%ad|%s", "--date=iso"])
+        if success:
+            for line in output.split("\n"):
+                if line.strip():
+                    parts = line.split("|", 3)
+                    if len(parts) == 4:
+                        commit_hash, author, date, message = parts
+                        commits.append({
+                            "hash": commit_hash[:7],  # Kurzer Hash
+                            "author": author,
+                            "date": date,
+                            "message": message
+                        })
+        
+        return commits
+    
+    def sync_repository(self) -> Tuple[bool, str]:
+        """Synchronisiere das Repository mit dem Remote-Server."""
+        logger.info("Starte Repository-Synchronisation")
+        
+        # Hole den aktuellen Branch
+        success, branch_output = self._run_git_command(["git", "branch", "--show-current"])
+        if not success:
+            return False, f"Fehler beim Ermitteln des aktuellen Branches: {branch_output}"
+        
+        current_branch = branch_output
+        logger.info(f"Aktueller Branch: {current_branch}")
+        
+        # Prüfe, ob es ungespeicherte Änderungen gibt
+        success, status_output = self._run_git_command(["git", "status", "--porcelain"])
+        if not success:
+            return False, f"Fehler beim Prüfen des Repository-Status: {status_output}"
+        
+        has_changes = bool(status_output.strip())
+        logger.info(f"Ungespeicherte Änderungen gefunden: {has_changes}")
+        
+        if has_changes:
+            # Prüfe, ob es wichtige Änderungen gibt, die committet werden sollen
+            important_dirs = ["scripts/monitoring", "config", "data/monitoring"]
+            important_changes = False
+            
+            for dir_path in important_dirs:
+                success, dir_status = self._run_git_command(["git", "status", "--porcelain", dir_path])
+                if success and dir_status.strip():
+                    important_changes = True
+                    break
+            
+            if important_changes:
+                logger.info("Wichtige Änderungen gefunden, erstelle Commit")
+                
+                # Füge Änderungen hinzu und committe sie
+                self._run_git_command(["git", "add"] + important_dirs)
+                commit_success, commit_output = self._run_git_command([
+                    "git", "commit", "-m", 
+                    f"Automatische Synchronisation - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                ])
+                
+                if not commit_success:
+                    return False, f"Fehler beim Erstellen des Commits: {commit_output}"
+                
+                logger.info(f"Commit erfolgreich erstellt: {commit_output}")
+            else:
+                logger.info("Keine wichtigen Änderungen gefunden, kein Commit notwendig")
+        
+        # Hole Änderungen vom Remote-Repository
+        success, pull_output = self._run_git_command(["git", "pull", "origin", current_branch])
+        if not success:
+            if "diverged" in pull_output.lower():
+                logger.warning("WARNUNG: Lokale und Remote-Änderungen divergieren")
+                return False, "Lokale und Remote-Änderungen divergieren. Manuelles Eingreifen erforderlich."
+            return False, f"Fehler beim Abrufen von Remote-Änderungen: {pull_output}"
+        
+        logger.info(f"Pull erfolgreich: {pull_output}")
+        
+        # Pushe Änderungen zum Remote-Repository
+        if has_changes and "wichtige Änderungen gefunden" in locals():
+            success, push_output = self._run_git_command(["git", "push", "origin", current_branch])
+            if not success:
+                return False, f"Fehler beim Pushen der Änderungen: {push_output}"
+            
+            logger.info(f"Push erfolgreich: {push_output}")
+        
+        # Speichere Informationen zur Synchronisation
+        self._save_last_sync({
+            "last_sync": datetime.datetime.now().isoformat(),
+            "last_commit": self.get_recent_commits(1)[0] if self.get_recent_commits(1) else None,
+            "status": "Erfolgreich"
+        })
+        
+        logger.info("Repository-Synchronisation abgeschlossen")
+        return True, "Repository erfolgreich synchronisiert"
+    
+    def push_monitoring_data(self) -> Tuple[bool, str]:
+        """Pushe nur die Monitoring-Daten zum Repository."""
+        logger.info("Pushe Monitoring-Daten zum Repository")
+        
+        monitoring_paths = [
+            "data/monitoring/api_usage.json",
+            "data/monitoring/backups"
+        ]
+        
+        # Prüfe, ob die Dateien existieren
+        for path in monitoring_paths:
+            if not (self.repo_path / path).exists():
+                continue
+            
+            # Füge die Monitoring-Dateien hinzu
+            success, output = self._run_git_command(["git", "add", path])
+            if not success:
+                return False, f"Fehler beim Hinzufügen von {path}: {output}"
+        
+        # Prüfe, ob es Änderungen gibt
+        success, status_output = self._run_git_command(["git", "status", "--porcelain"])
+        if not success:
+            return False, f"Fehler beim Prüfen des Repository-Status: {status_output}"
+        
+        if not status_output.strip():
+            return True, "Keine Änderungen in den Monitoring-Daten gefunden"
+        
+        # Erstelle einen Commit
+        commit_success, commit_output = self._run_git_command([
+            "git", "commit", "-m", 
+            f"Update Monitoring-Daten - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        ])
+        
+        if not commit_success:
+            return False, f"Fehler beim Erstellen des Commits: {commit_output}"
+        
+        # Hole den aktuellen Branch
+        success, branch_output = self._run_git_command(["git", "branch", "--show-current"])
+        if not success:
+            return False, f"Fehler beim Ermitteln des aktuellen Branches: {branch_output}"
+        
+        current_branch = branch_output
+        
+        # Pushe die Änderungen
+        push_success, push_output = self._run_git_command(["git", "push", "origin", current_branch])
+        if not push_success:
+            return False, f"Fehler beim Pushen der Änderungen: {push_output}"
+        
+        logger.info(f"Monitoring-Daten erfolgreich gepusht: {push_output}")
+        return True, "Monitoring-Daten erfolgreich zum Repository gepusht"
+    
+    def get_open_issues(self) -> List[Dict[str, Any]]:
+        """Hole die offenen Issues vom GitHub-Repository."""
+        issues = []
+        
+        if not self.config["repository"]:
+            return issues
+        
+        repo_parts = self.config["repository"].split("/")
+        if len(repo_parts) != 2:
+            return issues
+        
+        owner, repo = repo_parts
+        url = f"{self.api_base_url}/repos/{owner}/{repo}/issues?state=open"
+        
+        headers = {}
+        if self.github_token:
+            headers["Authorization"] = f"token {self.github_token}"
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                for issue in response.json():
+                    issues.append({
+                        "number": issue.get("number"),
+                        "title": issue.get("title"),
+                        "created_at": issue.get("created_at"),
+                        "author": issue.get("user", {}).get("login")
+                    })
+            else:
+                logger.error(f"Fehler beim Abrufen der Issues: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Fehler beim Abrufen der Issues: {str(e)}")
+        
+        return issues
+    
+    def get_open_pull_requests(self) -> List[Dict[str, Any]]:
+        """Hole die offenen Pull Requests vom GitHub-Repository."""
+        pull_requests = []
+        
+        if not self.config["repository"]:
+            return pull_requests
+        
+        repo_parts = self.config["repository"].split("/")
+        if len(repo_parts) != 2:
+            return pull_requests
+        
+        owner, repo = repo_parts
+        url = f"{self.api_base_url}/repos/{owner}/{repo}/pulls?state=open"
+        
+        headers = {}
+        if self.github_token:
+            headers["Authorization"] = f"token {self.github_token}"
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                for pr in response.json():
+                    pull_requests.append({
+                        "number": pr.get("number"),
+                        "title": pr.get("title"),
+                        "created_at": pr.get("created_at"),
+                        "author": pr.get("user", {}).get("login"),
+                        "branch": pr.get("head", {}).get("ref")
+                    })
+            else:
+                logger.error(f"Fehler beim Abrufen der Pull Requests: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Fehler beim Abrufen der Pull Requests: {str(e)}")
+        
+        return pull_requests
 
 # Hilfsfunktion zum Erstellen einer GitHubSync-Instanz
 def create_github_sync(api_monitor: Optional[APIMonitor] = None, repo_path: Optional[str] = None) -> GitHubSync:

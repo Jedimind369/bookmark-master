@@ -1,0 +1,7 @@
+[
+  {
+    "url": "https://github.com/",
+    "error": "RetryError[<Future at 0x103feaad0 state=finished raised HTTPError>]",
+    "scrape_time": "2025-03-09T10:27:50.230949"
+  }
+]

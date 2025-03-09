@@ -1,0 +1,10 @@
+{
+  "total_processed": 0,
+  "valid_bookmarks": 0,
+  "invalid_bookmarks": 0,
+  "start_index": 3000,
+  "end_index": 6000,
+  "batch_size": 50,
+  "total_batches": 0,
+  "browser_type": "unknown"
+}

@@ -1,0 +1,113 @@
+[
+  {
+    "id": "1",
+    "title": "Python Dokumentation",
+    "url": "https://docs.python.org/",
+    "description": "Offizielle Python-Dokumentation mit Tutorials und Referenz",
+    "tags": [
+      "python",
+      "programmierung",
+      "dokumentation"
+    ]
+  },
+  {
+    "id": "2",
+    "title": "TensorFlow - Machine Learning Framework",
+    "url": "https://www.tensorflow.org/",
+    "description": "Open-Source-ML-Framework f\u00fcr maschinelles Lernen und KI",
+    "tags": [
+      "ai",
+      "machine-learning",
+      "framework"
+    ]
+  },
+  {
+    "id": "3",
+    "title": "PyTorch - Machine Learning Framework",
+    "url": "https://pytorch.org/",
+    "description": "Open-Source-ML-Framework f\u00fcr Python mit dynamischen Berechnungsgraphen",
+    "tags": [
+      "ai",
+      "machine-learning",
+      "framework"
+    ]
+  },
+  {
+    "id": "4",
+    "title": "Streamlit - Build Data Apps",
+    "url": "https://streamlit.io/",
+    "description": "Framework zum Erstellen von Daten-Apps mit Python",
+    "tags": [
+      "python",
+      "data",
+      "webapp",
+      "dashboard"
+    ]
+  },
+  {
+    "id": "5",
+    "title": "Pandas - Python Data Analysis",
+    "url": "https://pandas.pydata.org/",
+    "description": "Python-Bibliothek f\u00fcr Datenanalyse und -manipulation",
+    "tags": [
+      "python",
+      "data",
+      "analysis"
+    ]
+  },
+  {
+    "id": "6",
+    "title": "NumPy - Scientific Computing",
+    "url": "https://numpy.org/",
+    "description": "Grundlegende Python-Bibliothek f\u00fcr wissenschaftliches Rechnen",
+    "tags": [
+      "python",
+      "data",
+      "wissenschaft"
+    ]
+  },
+  {
+    "id": "7",
+    "title": "FAISS - Similarity Search Library",
+    "url": "https://github.com/facebookresearch/faiss",
+    "description": "Bibliothek f\u00fcr effiziente \u00c4hnlichkeitssuche und Clustering von dichten Vektoren",
+    "tags": [
+      "ai",
+      "search",
+      "similarity"
+    ]
+  },
+  {
+    "id": "8",
+    "title": "SentenceTransformers Documentation",
+    "url": "https://www.sbert.net/",
+    "description": "Python-Framework f\u00fcr Satz- und Text-Embeddings",
+    "tags": [
+      "ai",
+      "nlp",
+      "embeddings"
+    ]
+  },
+  {
+    "id": "9",
+    "title": "GitHub - Code Hosting Platform",
+    "url": "https://github.com/",
+    "description": "Plattform f\u00fcr Versionskontrolle und Zusammenarbeit bei der Softwareentwicklung",
+    "tags": [
+      "git",
+      "development",
+      "collaboration"
+    ]
+  },
+  {
+    "id": "10",
+    "title": "VS Code - Code Editor",
+    "url": "https://code.visualstudio.com/",
+    "description": "Quelltext-Editor mit Unterst\u00fctzung f\u00fcr Debugging, Git und Erweiterungen",
+    "tags": [
+      "editor",
+      "development",
+      "tool"
+    ]
+  }
+]

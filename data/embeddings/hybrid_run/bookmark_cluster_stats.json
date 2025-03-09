@@ -1,0 +1,35 @@
+[
+  {
+    "cluster_id": 1,
+    "count": 4,
+    "sample_titles": [
+      "Welcome to Python.org",
+      "Newest Questions - Stack Overflow",
+      "Hacker News",
+      "GitHub · Build and ship software on a single, collaborative platform · GitHub"
+    ]
+  },
+  {
+    "cluster_id": 0,
+    "count": 2,
+    "sample_titles": [
+      "TensorFlow",
+      "NumPy"
+    ]
+  },
+  {
+    "cluster_id": 2,
+    "count": 2,
+    "sample_titles": [
+      "seaborn: statistical data visualization — seaborn 0.13.2 documentation",
+      "Matplotlib — Visualization with Python"
+    ]
+  },
+  {
+    "cluster_id": 3,
+    "count": 1,
+    "sample_titles": [
+      "Web scraping - Wikipedia"
+    ]
+  }
+]

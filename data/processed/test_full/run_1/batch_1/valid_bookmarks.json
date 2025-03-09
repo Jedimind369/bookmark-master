@@ -1,0 +1,92 @@
+[
+  {
+    "id": "bm_1",
+    "url": "https://github.com/",
+    "title": "GitHub: Let's build from here · GitHub",
+    "folder": "Entwicklung",
+    "folder_path": "Lesezeichenleiste/Entwicklung",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_2",
+    "url": "https://stackoverflow.com/",
+    "title": "Stack Overflow - Where Developers Learn, Share, & Build Careers",
+    "folder": "Entwicklung",
+    "folder_path": "Lesezeichenleiste/Entwicklung",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_3",
+    "url": "https://www.python.org/",
+    "title": "Welcome to Python.org",
+    "folder": "Entwicklung",
+    "folder_path": "Lesezeichenleiste/Entwicklung",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_4",
+    "url": "https://news.ycombinator.com/",
+    "title": "Hacker News",
+    "folder": "Nachrichten",
+    "folder_path": "Lesezeichenleiste/Entwicklung/Nachrichten",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_5",
+    "url": "https://en.wikipedia.org/wiki/Web_scraping",
+    "title": "Web scraping - Wikipedia",
+    "folder": "Nachrichten",
+    "folder_path": "Lesezeichenleiste/Entwicklung/Nachrichten",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_6",
+    "url": "https://openai.com/",
+    "title": "OpenAI",
+    "folder": "KI und ML",
+    "folder_path": "Lesezeichenleiste/Entwicklung/Nachrichten/KI und ML",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_7",
+    "url": "https://pytorch.org/",
+    "title": "PyTorch",
+    "folder": "KI und ML",
+    "folder_path": "Lesezeichenleiste/Entwicklung/Nachrichten/KI und ML",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_8",
+    "url": "https://pandas.pydata.org/",
+    "title": "pandas - Python Data Analysis Library",
+    "folder": "KI und ML",
+    "folder_path": "Lesezeichenleiste/Entwicklung/Nachrichten/KI und ML",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_9",
+    "url": "https://docs.python.org/3/library/asyncio.html",
+    "title": "asyncio — Asynchronous I/O — Python 3.11.8 documentation",
+    "folder": "KI und ML",
+    "folder_path": "Lesezeichenleiste/Entwicklung/Nachrichten/KI und ML",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  },
+  {
+    "id": "bm_10",
+    "url": "https://www.google.com/",
+    "title": "Google",
+    "folder": "KI und ML",
+    "folder_path": "Lesezeichenleiste/Entwicklung/Nachrichten/KI und ML",
+    "added": "2021-03-15T14:11:14",
+    "tags": null
+  }
+]

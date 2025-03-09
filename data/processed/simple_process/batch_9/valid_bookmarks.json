@@ -1,0 +1,452 @@
+[
+  {
+    "id": "bm_401",
+    "url": "https://community.openai.com/",
+    "title": "OpenAI API Community Forum",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-09T11:13:34",
+    "tags": null
+  },
+  {
+    "id": "bm_402",
+    "url": "https://docs.google.com/document/d/11WlzjBT0xRpQhP9tFMtxzd0q6ANIdHPUBkMV-YB043U/edit#",
+    "title": "DALL·E 2 Prompt Engineering Guide - Google Docs",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-09T13:07:00",
+    "tags": null
+  },
+  {
+    "id": "bm_403",
+    "url": "https://pitch.com/v/DALL-E-prompt-book-v1-tmd33y",
+    "title": "The DALL·E 2 prompt book",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-09T13:09:10",
+    "tags": null
+  },
+  {
+    "id": "bm_404",
+    "url": "https://github.com/thunlp/PromptPapers",
+    "title": "GitHub - thunlp/PromptPapers: Must-read papers on prompt-based tuning for pre-trained language models.",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-09T13:22:15",
+    "tags": null
+  },
+  {
+    "id": "bm_405",
+    "url": "https://www.youtube.com/watch?v=5ef83Wljm-M",
+    "title": "(7) CMU Advanced NLP 2022 (9): Prompting - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-09T13:22:36",
+    "tags": null
+  },
+  {
+    "id": "bm_406",
+    "url": "https://github.com/promptslab/Awesome-Prompt-Engineering",
+    "title": "GitHub - promptslab/Awesome-Prompt-Engineering: This repository contains a hand-curated resources for Prompt Engineering with a focus on Generative Pre-trained Transformer (GPT), ChatGPT, PaLM etc",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-09T13:28:15",
+    "tags": null
+  },
+  {
+    "id": "bm_407",
+    "url": "https://learnprompting.org/docs/category/%EF%B8%8F-image-prompting",
+    "title": "🖼️ Image Prompting | Learn Prompting",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-09T13:37:09",
+    "tags": null
+  },
+  {
+    "id": "bm_408",
+    "url": "https://bookauthority.org/books/best-chatgpt-ebooks",
+    "title": "20 Best ChatGPT eBooks of All Time - BookAuthority",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-10T12:12:18",
+    "tags": null
+  },
+  {
+    "id": "bm_409",
+    "url": "https://hasantoxr.gumroad.com/l/cc?layout=profile",
+    "title": "The Ultimate ChatGPT Course",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-10T12:30:25",
+    "tags": null
+  },
+  {
+    "id": "bm_410",
+    "url": "https://openai.com/product/gpt-4",
+    "title": "GPT-4",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-17T16:44:34",
+    "tags": null
+  },
+  {
+    "id": "bm_411",
+    "url": "https://prompthero.com/chatgpt-prompts",
+    "title": "Best ChatGPT Prompts - PromptHero",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-17T17:24:42",
+    "tags": null
+  },
+  {
+    "id": "bm_412",
+    "url": "https://oneusefulthing.substack.com/p/power-and-weirdness-how-to-use-bing",
+    "title": "Power and Weirdness: How to Use Bing AI - by Ethan Mollick",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-17T18:28:12",
+    "tags": null
+  },
+  {
+    "id": "bm_413",
+    "url": "https://www.jailbreakchat.com/prompt/588ab0ed-2829-4be8-a3f3-f28e29c06621",
+    "title": "Evil Confidant",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-17T18:44:00",
+    "tags": null
+  },
+  {
+    "id": "bm_414",
+    "url": "https://www.skool.com/chatgpt",
+    "title": "Chat GPT Users",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-17T19:36:11",
+    "tags": null
+  },
+  {
+    "id": "bm_415",
+    "url": "https://docs.midjourney.com/docs/quick-start",
+    "title": "Midjourney Quick Start Guide",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-18T15:01:43",
+    "tags": null
+  },
+  {
+    "id": "bm_416",
+    "url": "https://www.youtube.com/watch?v=vBRExD5A5-E",
+    "title": "(4) How to SUPERCHARGE your ChatGPT 4 prompts (DO THIS) - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-20T15:21:26",
+    "tags": null
+  },
+  {
+    "id": "bm_417",
+    "url": "https://www.tiktok.com/@ironickmedia/video/7186797481311915310",
+    "title": "Pasting transcripts too long for ChatGPT? I’ve got you! I was having ... | TikTok",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-24T15:41:07",
+    "tags": null
+  },
+  {
+    "id": "bm_418",
+    "url": "https://www.youtube.com/watch?v=o28kYHu14DM",
+    "title": "(24) I taught Chat GPT 4 how to use Midjourney. Now it's a master promptcrafter. - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-29T01:02:18",
+    "tags": null
+  },
+  {
+    "id": "bm_419",
+    "url": "https://www.youtube.com/watch?v=SwALa9WHsLE",
+    "title": "(31) Prompt Engineering: Die besten Ergebnisse aus ChatGPT, Midjourney und Co bekommen | Tutorial #01 - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-29T15:45:23",
+    "tags": null
+  },
+  {
+    "id": "bm_420",
+    "url": "https://www.youtube.com/watch?v=GxXpYLIH6To",
+    "title": "(54) GPT-4 & Midjourney 5 Master Prompt Revealed! - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-29T18:46:19",
+    "tags": null
+  },
+  {
+    "id": "bm_421",
+    "url": "https://www.youtube.com/watch?v=Z1C2KT1jMbc",
+    "title": "(57) 🔥This ChatGPT Prompt Makes Any Content Helpful! - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-29T18:52:38",
+    "tags": null
+  },
+  {
+    "id": "bm_422",
+    "url": "https://doc.clickup.com/37456139/d/h/13q28b-324/e2a22b0c164b1f9",
+    "title": "The Ultimate GPT-4 Guide",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-31T09:45:41",
+    "tags": null
+  },
+  {
+    "id": "bm_423",
+    "url": "https://cdn.openai.com/papers/gpt-4.pdf",
+    "title": "gpt-4.pdf",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-31T09:49:33",
+    "tags": null
+  },
+  {
+    "id": "bm_424",
+    "url": "https://www.google.com/search?q=outline&oq=outline&aqs=chrome..69i57j0i131i433i512j0i512l7j46i512.1801j0j7&sourceid=chrome&ie=UTF-8",
+    "title": "outline - Google Suche",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-31T10:00:09",
+    "tags": null
+  },
+  {
+    "id": "bm_425",
+    "url": "https://gist.github.com/rain-1/eebd5e5eb2784feecf450324e3341c8d?utm_source=www.thepromptreport.com&utm_medium=newsletter&utm_campaign=report-6-everything-you-see-online-is-fake",
+    "title": "LLM Introduction: Learn Language Models · GitHub",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-31T10:14:57",
+    "tags": null
+  },
+  {
+    "id": "bm_426",
+    "url": "https://ora.sh/pizza/promptgpt?utm_source=www.thepromptreport.com&utm_medium=newsletter&utm_campaign=report-6-everything-you-see-online-is-fake",
+    "title": "PromptGPT | ora.sh",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-03-31T10:17:08",
+    "tags": null
+  },
+  {
+    "id": "bm_427",
+    "url": "https://promptperfect.jina.ai/",
+    "title": "PromptPerfect - Elevate your prompts to perfection",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-04T18:54:31",
+    "tags": null
+  },
+  {
+    "id": "bm_428",
+    "url": "https://www.youtube.com/watch?v=ka1Pqk2o3tM",
+    "title": "(202) The ChatGPT Playbook of EPIC Prompts - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-05T20:03:49",
+    "tags": null
+  },
+  {
+    "id": "bm_429",
+    "url": "https://www.youtube.com/watch?v=aZV53_mTsGA",
+    "title": "(26) 7 TIPPS FÜR BESSERE CHATGPT PROMPTS - So bekommst du die besten Antworten vom Chatbot - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-06T09:09:00",
+    "tags": null
+  },
+  {
+    "id": "bm_430",
+    "url": "https://docs.google.com/document/d/1bVQLci_C8WQYW0qbf6fNmoqKE4YuIRZlwURgYD5e3go/edit",
+    "title": "GPT-4 Midjourney Prompt - Google Docs",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-06T10:56:02",
+    "tags": null
+  },
+  {
+    "id": "bm_431",
+    "url": "https://www.youtube.com/watch?v=Lt8sPeU8Kpw",
+    "title": "(2) 💪 Crush the #1 Google Result: Reverse Engineer with ChatGPT - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-09T10:23:32",
+    "tags": null
+  },
+  {
+    "id": "bm_432",
+    "url": "https://www.youtube.com/results?search_query=Reverse+Engineer+with+ChatGPT",
+    "title": "(2) Reverse Engineer with ChatGPT - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-09T10:23:54",
+    "tags": null
+  },
+  {
+    "id": "bm_433",
+    "url": "https://www.youtube.com/watch?v=UUHQfl5t9eI",
+    "title": "5 Secrets To Writing Books With GPT-4 - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-09T10:40:39",
+    "tags": null
+  },
+  {
+    "id": "bm_434",
+    "url": "https://www.youtube.com/watch?v=2ORzO01NhJY",
+    "title": "(27) 100 AI Art Tricks That 99% Don't Know - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-09T17:47:05",
+    "tags": null
+  },
+  {
+    "id": "bm_435",
+    "url": "https://chrome.google.com/webstore/detail/keywords-everywhere-keywo/hbapdpeemoojbophdfndmlgdhppljgmp?hl=en",
+    "title": "Keywords Everywhere - Keyword Tool - Chrome Web Store",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-18T15:48:43",
+    "tags": null
+  },
+  {
+    "id": "bm_436",
+    "url": "https://www.youtube.com/watch?v=S1GlVv4tZA8&list=PLI1hJP_Ps2kPXEyL-8U3TuZuaTaP28d4B&index=1",
+    "title": "(7) Speedrun of GPT for Sheets - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-24T14:09:41",
+    "tags": null
+  },
+  {
+    "id": "bm_437",
+    "url": "https://www.youtube.com/watch?v=fe4P3VLwcF8",
+    "title": "🔥Jasper vs. Originality: 💯New Hacks Found! - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-25T19:59:49",
+    "tags": null
+  },
+  {
+    "id": "bm_438",
+    "url": "https://aiadvantagecourse.com/",
+    "title": "AI Advantage Course - ChatGPT Course",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-26T08:15:00",
+    "tags": null
+  },
+  {
+    "id": "bm_439",
+    "url": "https://www.youtube.com/watch?v=EjbcDF66vy4&ab_channel=MattWolfe",
+    "title": "The ONE ChatGPT prompt to rule them all! - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-04-29T17:09:31",
+    "tags": null
+  },
+  {
+    "id": "bm_440",
+    "url": "https://promptbase.com/prompt/prompt-generator-pro",
+    "title": "Prompt Generator Pro GPT Prompt | PromptBase",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-03T12:57:19",
+    "tags": null
+  },
+  {
+    "id": "bm_441",
+    "url": "https://www.promptbox.ai/",
+    "title": "PromptBox | Organize and save your AI prompts",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-09T14:00:35",
+    "tags": null
+  },
+  {
+    "id": "bm_442",
+    "url": "https://www.youtube.com/watch?v=buy61CQgo9o",
+    "title": "(2) ChatGPT: Unveiling the Secrets of OpenAI Playground - See What You've Been Missing! - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-11T00:19:40",
+    "tags": null
+  },
+  {
+    "id": "bm_443",
+    "url": "https://chatgpt-prompt-splitter.jjdiaz.dev/",
+    "title": "Long PROMPTs Splitter",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-12T10:44:34",
+    "tags": null
+  },
+  {
+    "id": "bm_444",
+    "url": "https://www.youtube.com/watch?v=tKSw6XNzo5A",
+    "title": "(1) 3 Advanced Prompt Engineering Techniques to Make You A Pro - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-16T08:30:12",
+    "tags": null
+  },
+  {
+    "id": "bm_445",
+    "url": "https://www.youtube.com/watch?v=MTpA13HgVsY&list=WL&index=6",
+    "title": "(4) I found A Master Prompt Engineering Discord - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-17T14:07:57",
+    "tags": null
+  },
+  {
+    "id": "bm_446",
+    "url": "https://docs.google.com/document/d/1vzUsQf4TfXze9zgdXXcHYE7kko4wbyTTTLxxZHmNk4I/edit",
+    "title": "The One Prompt To Rule Them All - Google Docs",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-18T14:31:40",
+    "tags": null
+  },
+  {
+    "id": "bm_447",
+    "url": "https://discord.com/channels/1100933695986208849/1105889692022476842",
+    "title": "(42) Discord | \"Ponder v2.2 - Idea Improver/Generator\" | Stunspot Prompting",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-18T14:51:59",
+    "tags": null
+  },
+  {
+    "id": "bm_448",
+    "url": "https://www.allabtai.com/all-about-ai-ultimate-solver-prompt/",
+    "title": "All About AI Ultimate Solver Prompt",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-18T15:42:30",
+    "tags": null
+  },
+  {
+    "id": "bm_449",
+    "url": "https://flowgpt.com/",
+    "title": "FlowGPT | the best ChatGPT prompts&AI prompts community",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-18T17:56:59",
+    "tags": null
+  },
+  {
+    "id": "bm_450",
+    "url": "https://www.youtube.com/watch?v=DW5PX-BWRlg&ab_channel=What%27sAIbyLouisBouchard",
+    "title": "What is Prompt Injection? Can you Hack a Prompt? - YouTube",
+    "folder": "Prompt Engeneering",
+    "folder_path": "Favoritenleiste/BG Remover/chatGPT/Data Analysis/Web Scraping/fav/chatPDF/Prompt Engeneering",
+    "added": "2023-05-23T11:01:41",
+    "tags": null
+  }
+]
