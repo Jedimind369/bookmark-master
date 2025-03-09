@@ -1,134 +1,119 @@
-# Bookmark Manager
+# Bookmark Manager - Optimierte Microservice-Architektur
 
-A comprehensive system for parsing, enriching, and analyzing bookmarks using semantic analysis.
+Dieses Projekt implementiert einen leistungsstarken Bookmark-Manager mit einer modernen Microservice-Architektur und optimierten Verarbeitungskomponenten.
 
-## Features
+## Architektur
 
-- **Bookmark Parsing**: Extract bookmarks from HTML export files from browsers
-- **Content Enrichment**: Scrape and enrich bookmarks with content from the web
-- **Semantic Analysis**: Generate embeddings and analyze bookmark relationships
-- **Dashboard**: Visualize and explore your bookmarks with a Streamlit dashboard
+Das System besteht aus folgenden Komponenten:
 
-## Installation
+- **Webapp**: Eine TypeScript/Node.js-Anwendung, die die Benutzeroberfläche und API-Endpunkte bereitstellt
+- **Database**: Eine PostgreSQL-Datenbank für die persistente Speicherung von Lesezeichen und Metadaten
+- **Redis**: Ein Cache-Service für verbesserte Leistung
+- **Processor**: Ein Python-Microservice für die optimierte Verarbeitung von Lesezeichen mit Chunk-basierter Parallelverarbeitung
+- **Prometheus**: Ein Monitoring-Service für die Erfassung von Metriken
+- **Grafana**: Ein Dashboard-Service für die Visualisierung von Metriken
 
-1. Clone the repository:
+## Hauptmerkmale
+
+- **Hochleistungs-Verarbeitung**: Chunk-basierte Verarbeitung mit dynamischer Größenanpassung für optimale Speichernutzung
+- **Parallele Verarbeitung**: Effiziente Nutzung mehrerer CPU-Kerne für schnellere Verarbeitung
+- **Robuste Fehlerbehandlung**: Umfassende Fehlerbehandlung und Wiederherstellungsmechanismen
+- **Thread-sichere UI-Updates**: Vermeidung von Race-Conditions bei UI-Updates
+- **Umfassendes Monitoring**: Detaillierte Metriken für Leistung, Speichernutzung und Fehler
+- **Automatisierte Backups**: Robuste Backup-Strategie für SQLite-Datenbanken mit Integritätsprüfungen
+- **Skalierbare Architektur**: Microservice-Architektur für einfache Skalierung und Wartung
+
+## Erste Schritte
+
+### Voraussetzungen
+
+- Docker und Docker Compose
+- Git
+
+### Installation
+
+1. Repository klonen:
    ```bash
    git clone https://github.com/yourusername/bookmark-manager.git
    cd bookmark-manager
    ```
 
-2. Install dependencies:
+2. Umgebungsvariablen konfigurieren:
    ```bash
-   pip install -r requirements.txt
+   cp .env.example .env
+   # Bearbeiten Sie die .env-Datei mit Ihren Einstellungen
    ```
 
-## Usage
+3. System starten:
+   ```bash
+   docker-compose up -d
+   ```
 
-### Complete Pipeline
+4. Zugriff auf die Anwendung:
+   - Webapp: http://localhost:3000
+   - Grafana-Dashboard: http://localhost:3001 (Benutzername: admin, Passwort: admin)
 
-Run the complete pipeline with a single command:
+## Konfiguration
+
+### Processor-Konfiguration
+
+Der Processor-Service kann über Umgebungsvariablen konfiguriert werden:
+
+- `MAX_WORKERS`: Maximale Anzahl paralleler Worker (Standard: Anzahl der CPU-Kerne)
+- `MIN_CHUNK_SIZE`: Minimale Chunk-Größe in Bytes (Standard: 1000)
+- `MAX_CHUNK_SIZE`: Maximale Chunk-Größe in Bytes (Standard: 10000000)
+- `MEMORY_TARGET`: Ziel-Speichernutzung in Prozent (Standard: 70)
+
+### Backup-Konfiguration
+
+Das Backup-Skript kann über folgende Variablen konfiguriert werden:
+
+- `DB_PATH`: Pfad zur SQLite-Datenbank
+- `BACKUP_DIR`: Verzeichnis für Backups
+- `CLOUD_BACKUP_DIR`: Verzeichnis für Cloud-Backups (optional)
+- `RETENTION_DAYS`: Anzahl der Tage, für die Backups aufbewahrt werden sollen
+
+## Entwicklung
+
+### Lokale Entwicklung
+
+1. Repository klonen und Abhängigkeiten installieren:
+   ```bash
+   git clone https://github.com/yourusername/bookmark-manager.git
+   cd bookmark-manager
+   
+   # Für den Processor
+   cd processor
+   pip install -r requirements.txt
+   
+   # Für die Webapp
+   cd ../webapp
+   npm install
+   ```
+
+2. Lokale Entwicklungsserver starten:
+   ```bash
+   # Processor
+   cd processor
+   python app.py
+   
+   # Webapp
+   cd webapp
+   npm run dev
+   ```
+
+### Tests
 
 ```bash
-python scripts/run_pipeline.py path/to/your/bookmarks.html
+# Processor-Tests
+cd processor
+pytest
+
+# Webapp-Tests
+cd webapp
+npm test
 ```
 
-This will:
-1. Parse the HTML bookmarks file
-2. Enrich the bookmarks with content from the web
-3. Generate embeddings for semantic analysis
-4. Start the dashboard
+## Lizenz
 
-### Step-by-Step Usage
-
-If you prefer to run each step separately:
-
-#### 1. Parse HTML Bookmarks
-
-```bash
-python -m scripts.processing.process_bookmarks path/to/your/bookmarks.html
-```
-
-This will create several JSON files in the `data/processed` directory:
-- `bookmarks_structured.json`: Complete bookmark structure
-- `bookmarks_urls.json`: All extracted URLs
-- `bookmarks_valid_urls.json`: Valid URLs only
-- `bookmarks_invalid_urls.json`: Invalid URLs with error information
-- `processing_stats.json`: Statistics about the parsing process
-
-#### 2. Enrich Bookmarks with Content
-
-```bash
-python -m scripts.scraping.batch_scraper data/processed/bookmarks_valid_urls.json --batch-size 50 --max-workers 5
-```
-
-This will create enriched bookmark files in the `data/enriched` directory:
-- `enriched_batch_X.json`: Enriched bookmarks for each batch
-- `enriched_all.json`: All enriched bookmarks combined
-- `enriched_batch_X_stats.json`: Statistics for each batch
-
-#### 3. Generate Embeddings
-
-```bash
-python -m scripts.semantic.generate_embeddings data/enriched/enriched_all.json --num-clusters 20
-```
-
-This will create embedding files in the `data/embeddings` directory:
-- `bookmark_embeddings.pkl`: Serialized embeddings
-- `bookmark_clusters.json`: Cluster assignments
-- `embedding_stats.json`: Statistics about the embeddings
-
-#### 4. Run the Dashboard
-
-```bash
-streamlit run scripts/monitoring/dashboard.py
-```
-
-This will start the Streamlit dashboard on http://localhost:8501.
-
-## Dashboard Features
-
-The dashboard includes several tabs:
-
-1. **System Overview**: General system statistics
-2. **API Usage**: Monitor API usage and costs
-3. **Backup Monitor**: Track backup status
-4. **Bookmark Explorer**: Browse and search bookmarks
-5. **Semantic Analysis**: Explore semantic relationships between bookmarks
-   - Search bookmarks by text
-   - Find similar bookmarks
-   - Explore bookmark clusters
-
-## Directory Structure
-
-```
-bookmark-manager/
-├── data/
-│   ├── bookmarks/        # Raw bookmark files
-│   ├── processed/        # Processed bookmark data
-│   ├── enriched/         # Enriched bookmark content
-│   └── embeddings/       # Semantic embeddings
-├── scripts/
-│   ├── processing/       # Bookmark processing scripts
-│   ├── scraping/         # Web scraping scripts
-│   ├── semantic/         # Semantic analysis scripts
-│   ├── monitoring/       # Dashboard and monitoring scripts
-│   └── run_pipeline.py   # Main pipeline script
-└── logs/                 # Log files
-```
-
-## Requirements
-
-- Python 3.8+
-- sentence-transformers
-- faiss-cpu
-- streamlit
-- beautifulsoup4
-- requests
-- pandas
-- plotly
-- scikit-learn
-- tqdm
-
-## License
-
-MIT
+Dieses Projekt steht unter der MIT-Lizenz - siehe die [LICENSE](LICENSE)-Datei für Details.
